@@ -74,6 +74,35 @@
       </main>
     </div>
 
+    <div id="authOverlay" class="dialog-overlay hidden">
+      <div class="dialog-card auth-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow">Welcome</p>
+            <h3 id="authTitle">Create your Librito profile</h3>
+          </div>
+          <button id="closeAuthBtn" class="icon-btn" aria-label="Close">✕</button>
+        </div>
+        <div class="auth-panel">
+          <p class="auth-copy">Sign in with Google to keep your shelves and books synced across devices.</p>
+          <button id="googleAuthBtn" class="action-btn auth-provider-btn" type="button">Continue with Google</button>
+          <form id="profileForm" class="book-form auth-form">
+            <label>
+              Display name
+              <input id="displayNameInput" name="displayName" placeholder="Mina" />
+            </label>
+            <label>
+              Favorite shelf
+              <input name="favoriteShelf" placeholder="Currently Reading" />
+            </label>
+            <div class="form-actions">
+              <button type="submit" class="secondary-btn">Save profile</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <div id="dialogOverlay" class="dialog-overlay hidden">
       <div class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="dialogTitle">
         <div class="dialog-head">

@@ -51,6 +51,11 @@ const isbnInput = document.getElementById("isbnInput");
 const scannerVideo = document.getElementById("scannerVideo");
 const scanStatus = document.getElementById("scanStatus");
 const authButton = document.getElementById("authButton");
+const authOverlay = document.getElementById("authOverlay");
+const closeAuthBtn = document.getElementById("closeAuthBtn");
+const googleAuthBtn = document.getElementById("googleAuthBtn");
+const profileForm = document.getElementById("profileForm");
+const displayNameInput = document.getElementById("displayNameInput");
 const newShelfInput = document.getElementById("newShelfInput");
 const createShelfBtn = document.getElementById("createShelfBtn");
 let cameraStream = null;
@@ -169,6 +174,16 @@ function openDialog() {
 function closeDialog() {
   dialogOverlay.classList.add("hidden");
   bookForm.reset();
+}
+
+function openAuthModal() {
+  authOverlay.classList.remove("hidden");
+  displayNameInput.focus();
+}
+
+function closeAuthModal() {
+  authOverlay.classList.add("hidden");
+  profileForm.reset();
 }
 
 function showToast(message) {
@@ -315,7 +330,7 @@ async function initializeSupabase() {
   }
 }
 
-async function ensureProfile() {
+async function ensureProfile(displayName = "", favoriteShelf = "") {
   if (!state.supabase || !state.session) return;
   const user = state.session.user;
   const { data, error } = await state.supabase
@@ -324,7 +339,8 @@ async function ensureProfile() {
       {
         id: user.id,
         email: user.email,
-        full_name: user.user_metadata?.full_name || user.email,
+        full_name: displayName || user.user_metadata?.full_name || user.email,
+        favorite_shelf: favoriteShelf || null,
       },
       { onConflict: "id" }
     )
@@ -462,20 +478,64 @@ authButton.addEventListener("click", async () => {
     showToast("Signed out");
     return;
   }
-  const email = window.prompt("Enter your email to sign in") || "";
-  if (!email) {
-    showToast("A valid email is required");
-    return;
+  openAuthModal();
+});
+
+googleAuthBtn.addEventListener("click", async () => {
+  if (!state.supabase) {
+    await initializeSupabase();
   }
-  const { error } = await state.supabase.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: window.location.origin },
+
+  const { data, error } = await state.supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: window.location.origin,
+      queryParams: {
+        access_type: "offline",
+        prompt: "consent",
+      },
+    },
   });
+
   if (error) {
-    showToast("Unable to sign in");
+    showToast("Unable to start Google sign-in");
     return;
   }
-  showToast("Check your email for the sign-in link");
+
+  if (data?.url) {
+    window.location.assign(data.url);
+  }
+});
+
+profileForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!state.session) {
+    showToast("Sign in first");
+    return;
+  }
+
+  const formData = new FormData(profileForm);
+  const displayName = formData.get("displayName").toString().trim();
+  const favoriteShelf = formData.get("favoriteShelf").toString().trim();
+
+  if (!displayName) {
+    showToast("Add a display name");
+    return;
+  }
+
+  await ensureProfile(displayName, favoriteShelf);
+  closeAuthModal();
+  showToast("Profile ready");
+});
+
+closeAuthBtn.addEventListener("click", () => {
+  closeAuthModal();
+});
+
+authOverlay.addEventListener("click", (event) => {
+  if (event.target === authOverlay) {
+    closeAuthModal();
+  }
 });
 
 closeDialogBtn.addEventListener("click", () => {

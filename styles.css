@@ -281,6 +281,29 @@ h1, h2, h3 { margin: 0; }
   gap: 0.75rem;
 }
 
+.auth-card {
+  width: min(460px, 100%);
+}
+
+.auth-panel {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.auth-copy {
+  margin: 0;
+  color: rgba(63, 46, 35, 0.74);
+  line-height: 1.55;
+}
+
+.auth-provider-btn {
+  justify-self: start;
+}
+
+.auth-form {
+  margin-top: 0.2rem;
+}
+
 .book-form label {
   display: grid;
   gap: 0.35rem;

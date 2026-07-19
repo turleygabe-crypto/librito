@@ -4,6 +4,7 @@ create table if not exists public.profiles (
   id uuid primary key default uuid_generate_v4(),
   email text unique,
   full_name text,
+  favorite_shelf text,
   created_at timestamptz default now()
 );
 
