@@ -122,6 +122,7 @@ const bookProfileContent = document.getElementById("bookProfileContent");
 let cameraStream = null;
 let barcodeLoopTimer = null;
 let selectedBook = null;
+let authPrompted = false;
 
 function loadBooks() {
   try {
@@ -344,6 +345,12 @@ function closeAuthModal() {
   profileForm.reset();
 }
 
+function promptForProfile() {
+  authPrompted = true;
+  openAuthModal();
+  showToast("Signed in. Create your username to finish setup.");
+}
+
 function showToast(message) {
   toast.textContent = message;
   toast.classList.remove("hidden");
@@ -469,8 +476,12 @@ async function initializeSupabase() {
         state.books = [];
         state.shelves = [];
         render();
+        if (!authPrompted) {
+          promptForProfile();
+        }
         loadFromSupabase();
       } else {
+        authPrompted = false;
         state.books = loadBooks();
         state.shelves = [];
         render();
@@ -671,10 +682,14 @@ googleAuthBtn.addEventListener("click", async () => {
     await initializeSupabase();
   }
 
+  googleAuthBtn.disabled = true;
+  googleAuthBtn.textContent = "Connecting…";
+
+  const redirectTo = `${window.location.origin}${window.location.pathname}`;
   const { data, error } = await state.supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: window.location.origin,
+      redirectTo,
       queryParams: {
         access_type: "offline",
         prompt: "consent",
@@ -683,12 +698,19 @@ googleAuthBtn.addEventListener("click", async () => {
   });
 
   if (error) {
-    showToast("Unable to start Google sign-in");
+    console.error(error);
+    showToast("Unable to start Google sign-in. Please check your Supabase provider setup.");
+    googleAuthBtn.disabled = false;
+    googleAuthBtn.textContent = "Continue with Google";
     return;
   }
 
   if (data?.url) {
     window.location.assign(data.url);
+  } else {
+    showToast("Google sign-in is not available right now.");
+    googleAuthBtn.disabled = false;
+    googleAuthBtn.textContent = "Continue with Google";
   }
 });
 
@@ -709,6 +731,7 @@ profileForm.addEventListener("submit", async (event) => {
   }
 
   await ensureProfile(displayName, favoriteShelf);
+  authPrompted = false;
   closeAuthModal();
   showToast("Profile ready");
 });
