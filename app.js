@@ -107,8 +107,9 @@ const scanStatus = document.getElementById("scanStatus");
 const authButton = document.getElementById("authButton");
 const authOverlay = document.getElementById("authOverlay");
 const closeAuthBtn = document.getElementById("closeAuthBtn");
-const googleAuthBtn = document.getElementById("googleAuthBtn");
-const profileForm = document.getElementById("profileForm");
+const authForm = document.getElementById("authForm");
+const authSubmitBtn = document.getElementById("authSubmitBtn");
+const toggleAuthModeBtn = document.getElementById("toggleAuthModeBtn");
 const displayNameInput = document.getElementById("displayNameInput");
 const newShelfInput = document.getElementById("newShelfInput");
 const shelfColorInput = document.getElementById("shelfColorInput");
@@ -123,6 +124,7 @@ let cameraStream = null;
 let barcodeLoopTimer = null;
 let selectedBook = null;
 let authPrompted = false;
+let authMode = "signup";
 
 function loadBooks() {
   try {
@@ -252,7 +254,7 @@ function renderBooks() {
   }
 
   if (hasSession && !state.books.length) {
-    bookList.innerHTML = '<div class="empty-state-card"><h4>Your library is ready</h4><p>Sign in with Google and start building a fresh shelf of books.</p></div>';
+    bookList.innerHTML = '<div class="empty-state-card"><h4>Your library is ready</h4><p>Sign in with email and password and start building a fresh shelf of books.</p></div>';
     return;
   }
 
@@ -342,13 +344,29 @@ function openAuthModal() {
 
 function closeAuthModal() {
   authOverlay.classList.add("hidden");
-  profileForm.reset();
+  authForm.reset();
+  authMode = "signup";
+  authSubmitBtn.textContent = "Create account";
+  toggleAuthModeBtn.textContent = "Already have an account?";
 }
 
 function promptForProfile() {
   authPrompted = true;
   openAuthModal();
   showToast("Signed in. Create your username to finish setup.");
+}
+
+function setAuthMode(nextMode) {
+  authMode = nextMode;
+  if (nextMode === "signin") {
+    authSubmitBtn.textContent = "Sign in";
+    toggleAuthModeBtn.textContent = "Need an account?";
+    displayNameInput.closest("label").style.display = "none";
+  } else {
+    authSubmitBtn.textContent = "Create account";
+    toggleAuthModeBtn.textContent = "Already have an account?";
+    displayNameInput.closest("label").style.display = "grid";
+  }
 }
 
 function showToast(message) {
@@ -677,63 +695,68 @@ authButton.addEventListener("click", async () => {
   openAuthModal();
 });
 
-googleAuthBtn.addEventListener("click", async () => {
+toggleAuthModeBtn.addEventListener("click", () => {
+  setAuthMode(authMode === "signup" ? "signin" : "signup");
+});
+
+authForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
   if (!state.supabase) {
     await initializeSupabase();
   }
 
-  googleAuthBtn.disabled = true;
-  googleAuthBtn.textContent = "Connecting…";
-
-  const redirectTo = `${window.location.origin}${window.location.pathname}`;
-  const { data, error } = await state.supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo,
-      queryParams: {
-        access_type: "offline",
-        prompt: "consent",
-      },
-    },
-  });
-
-  if (error) {
-    console.error(error);
-    showToast("Unable to start Google sign-in. Please check your Supabase provider setup.");
-    googleAuthBtn.disabled = false;
-    googleAuthBtn.textContent = "Continue with Google";
-    return;
-  }
-
-  if (data?.url) {
-    window.location.assign(data.url);
-  } else {
-    showToast("Google sign-in is not available right now.");
-    googleAuthBtn.disabled = false;
-    googleAuthBtn.textContent = "Continue with Google";
-  }
-});
-
-profileForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!state.session) {
-    showToast("Sign in first");
-    return;
-  }
-
-  const formData = new FormData(profileForm);
+  const formData = new FormData(authForm);
   const displayName = formData.get("displayName").toString().trim();
+  const email = formData.get("email").toString().trim();
+  const password = formData.get("password").toString();
   const favoriteShelf = formData.get("favoriteShelf").toString().trim();
 
-  if (!displayName) {
-    showToast("Add a display name");
+  if (!email || !password) {
+    showToast("Email and password are required.");
     return;
   }
 
-  await ensureProfile(displayName, favoriteShelf);
-  authPrompted = false;
-  closeAuthModal();
-  showToast("Profile ready");
+  if (authMode === "signup" && !displayName) {
+    showToast("Add a username to create your account.");
+    return;
+  }
+
+  authSubmitBtn.disabled = true;
+  authSubmitBtn.textContent = authMode === "signup" ? "Creating…" : "Signing in…";
+
+  try {
+    if (authMode === "signup") {
+      const { data, error } = await state.supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: displayName },
+        },
+      });
+      if (error) throw error;
+      state.session = data.session;
+      updateAuthButton();
+      await ensureProfile(displayName, favoriteShelf);
+      authPrompted = false;
+      closeAuthModal();
+      showToast("Account created");
+    } else {
+      const { data, error } = await state.supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      state.session = data.session;
+      updateAuthButton();
+      await ensureProfile(displayName || data.user?.user_metadata?.full_name || "", favoriteShelf);
+      authPrompted = false;
+      closeAuthModal();
+      showToast("Signed in");
+    }
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || "Authentication failed");
+  } finally {
+    authSubmitBtn.disabled = false;
+    authSubmitBtn.textContent = authMode === "signup" ? "Create account" : "Sign in";
+  }
 });
 
 closeAuthBtn.addEventListener("click", () => {

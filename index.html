@@ -126,19 +126,29 @@
           <button id="closeAuthBtn" class="icon-btn" aria-label="Close">✕</button>
         </div>
         <div class="auth-panel">
-          <p class="auth-copy">Sign in with Google to keep your shelves and books synced across devices.</p>
-          <button id="googleAuthBtn" class="action-btn auth-provider-btn" type="button">Continue with Google</button>
-          <form id="profileForm" class="book-form auth-form">
+          <p class="auth-copy">Create an account or sign in with email and password to keep your shelves and books synced.</p>
+          <form id="authForm" class="book-form auth-form">
             <label>
               Username
               <input id="displayNameInput" name="displayName" placeholder="Mina" />
             </label>
             <label>
+              Email
+              <input name="email" type="email" placeholder="your@email.com" required />
+            </label>
+            <label>
+              Password
+              <input name="password" type="password" placeholder="••••••••" required />
+            </label>
+            <label>
               Favorite shelf
               <input name="favoriteShelf" placeholder="Currently Reading" />
             </label>
+            <div class="auth-mode-switch">
+              <button id="toggleAuthModeBtn" class="secondary-btn" type="button">Already have an account?</button>
+            </div>
             <div class="form-actions">
-              <button type="submit" class="secondary-btn">Save profile</button>
+              <button id="authSubmitBtn" type="submit" class="action-btn">Create account</button>
             </div>
           </form>
         </div>
