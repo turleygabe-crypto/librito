@@ -1,0 +1,16 @@
+{
+  "name": "Librito",
+  "short_name": "Librito",
+  "description": "A cozy home library platform for scanning, organizing, and tracking books.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7efe5",
+  "theme_color": "#8b5e3c",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect width='96' height='96' rx='24' fill='%238b5e3c'/%3E%3Cpath d='M24 24h20v48H24zM48 24h24v48H48z' fill='%23fff8ef'/%3E%3C/svg%3E",
+      "sizes": "96x96",
+      "type": "image/svg+xml"
+    }
+  ]
+}
