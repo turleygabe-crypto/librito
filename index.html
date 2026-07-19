@@ -58,7 +58,6 @@
             <span id="recentBook">Newly added</span>
           </div>
           <div class="shelf-controls">
-            <input id="newShelfInput" placeholder="New shelf name" />
             <button id="createShelfBtn" type="button" class="secondary-btn">Create shelf</button>
           </div>
           <div id="shelfList" class="shelf-list"></div>
@@ -72,6 +71,31 @@
           <div id="bookList" class="book-list"></div>
         </section>
       </main>
+    </div>
+
+    <div id="shelfDrawerOverlay" class="dialog-overlay drawer-overlay hidden">
+      <div class="dialog-card drawer-card" role="dialog" aria-modal="true" aria-labelledby="shelfDrawerTitle">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow">Shelf builder</p>
+            <h3 id="shelfDrawerTitle">Create a new shelf</h3>
+          </div>
+          <button id="closeShelfDrawerBtn" class="icon-btn" aria-label="Close">✕</button>
+        </div>
+        <form id="shelfForm" class="book-form">
+          <label>
+            Shelf name
+            <input id="newShelfInput" name="shelfName" placeholder="Cozy Reads" required />
+          </label>
+          <label>
+            Color
+            <input id="shelfColorInput" name="shelfColor" type="color" value="#8b5e3c" />
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="action-btn">Save shelf</button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <div id="authOverlay" class="dialog-overlay hidden">
@@ -155,6 +179,19 @@
             <button type="submit" class="action-btn">Save to Library</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <div id="bookProfileOverlay" class="dialog-overlay hidden">
+      <div class="dialog-card profile-card" role="dialog" aria-modal="true" aria-labelledby="bookProfileHeading">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow">Book profile</p>
+            <h3 id="bookProfileHeading">Details</h3>
+          </div>
+          <button id="closeBookProfileBtn" class="icon-btn" aria-label="Close">✕</button>
+        </div>
+        <div id="bookProfileContent" class="profile-content"></div>
       </div>
     </div>
 

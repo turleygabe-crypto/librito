@@ -57,9 +57,17 @@ const googleAuthBtn = document.getElementById("googleAuthBtn");
 const profileForm = document.getElementById("profileForm");
 const displayNameInput = document.getElementById("displayNameInput");
 const newShelfInput = document.getElementById("newShelfInput");
+const shelfColorInput = document.getElementById("shelfColorInput");
 const createShelfBtn = document.getElementById("createShelfBtn");
+const shelfDrawerOverlay = document.getElementById("shelfDrawerOverlay");
+const closeShelfDrawerBtn = document.getElementById("closeShelfDrawerBtn");
+const shelfForm = document.getElementById("shelfForm");
+const bookProfileOverlay = document.getElementById("bookProfileOverlay");
+const closeBookProfileBtn = document.getElementById("closeBookProfileBtn");
+const bookProfileContent = document.getElementById("bookProfileContent");
 let cameraStream = null;
 let barcodeLoopTimer = null;
+let selectedBook = null;
 
 function loadBooks() {
   try {
@@ -134,6 +142,42 @@ function renderShelves() {
     .join("");
 }
 
+function openBookProfile(book) {
+  selectedBook = book;
+  bookProfileContent.innerHTML = `
+    <div class="profile-field">
+      <strong>Title</strong>
+      <span>${book.title}</span>
+    </div>
+    <div class="profile-field">
+      <strong>Author</strong>
+      <span>${book.author || "Unknown author"}</span>
+    </div>
+    <div class="profile-field">
+      <strong>Shelf</strong>
+      <span>${book.shelf || "Uncategorized"}</span>
+    </div>
+    <div class="profile-field">
+      <strong>Cost</strong>
+      <span>${formatCurrency(book.cost)}</span>
+    </div>
+    <div class="profile-field">
+      <strong>Date added</strong>
+      <span>${formatDate(book.added || book.added_on)}</span>
+    </div>
+    <div class="profile-field">
+      <strong>Notes</strong>
+      <span>${book.notes || "No notes yet."}</span>
+    </div>
+  `;
+  bookProfileOverlay.classList.remove("hidden");
+}
+
+function closeBookProfile() {
+  selectedBook = null;
+  bookProfileOverlay.classList.add("hidden");
+}
+
 function renderBooks() {
   const bookList = document.getElementById("bookList");
   if (!state.books.length) {
@@ -145,7 +189,7 @@ function renderBooks() {
     .slice()
     .sort((a, b) => new Date(b.added || b.added_on || 0) - new Date(a.added || a.added_on || 0))
     .map((book) => `
-      <article class="book-card">
+      <article class="book-card" tabindex="0" role="button" data-book-id="${book.id}">
         <div>
           <strong>${book.title}</strong>
           <p>${book.author || "Unknown author"}</p>
@@ -158,6 +202,20 @@ function renderBooks() {
       </article>
     `)
     .join("");
+
+  bookList.querySelectorAll(".book-card").forEach((card) => {
+    card.addEventListener("click", () => {
+      const book = state.books.find((item) => item.id === card.dataset.bookId);
+      if (book) openBookProfile(book);
+    });
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        const book = state.books.find((item) => item.id === card.dataset.bookId);
+        if (book) openBookProfile(book);
+      }
+    });
+  });
 }
 
 function render() {
@@ -174,6 +232,17 @@ function openDialog() {
 function closeDialog() {
   dialogOverlay.classList.add("hidden");
   bookForm.reset();
+}
+
+function openShelfDrawer() {
+  shelfDrawerOverlay.classList.remove("hidden");
+  newShelfInput.focus();
+}
+
+function closeShelfDrawer() {
+  shelfDrawerOverlay.classList.add("hidden");
+  shelfForm.reset();
+  if (shelfColorInput) shelfColorInput.value = "#8b5e3c";
 }
 
 function openAuthModal() {
@@ -378,7 +447,7 @@ async function createShelfInSupabase() {
 
   const { data, error } = await state.supabase
     .from("shelves")
-    .insert({ name, user_id: state.session.user.id })
+    .insert({ name, color: shelfColorInput?.value || "#8b5e3c", user_id: state.session.user.id })
     .select("*")
     .single();
 
@@ -390,7 +459,9 @@ async function createShelfInSupabase() {
 
   state.shelves = [data, ...state.shelves.filter((item) => item.id !== data.id)];
   newShelfInput.value = "";
+  if (shelfColorInput) shelfColorInput.value = "#8b5e3c";
   render();
+  closeShelfDrawer();
   showToast("Shelf created");
 }
 
@@ -463,7 +534,22 @@ lookupIsbnBtn.addEventListener("click", () => {
 });
 
 createShelfBtn.addEventListener("click", () => {
-  createShelfInSupabase();
+  openShelfDrawer();
+});
+
+shelfForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await createShelfInSupabase();
+});
+
+closeShelfDrawerBtn.addEventListener("click", () => {
+  closeShelfDrawer();
+});
+
+shelfDrawerOverlay.addEventListener("click", (event) => {
+  if (event.target === shelfDrawerOverlay) {
+    closeShelfDrawer();
+  }
 });
 
 authButton.addEventListener("click", async () => {
@@ -547,6 +633,16 @@ dialogOverlay.addEventListener("click", (event) => {
   if (event.target === dialogOverlay) {
     stopCameraScan();
     closeDialog();
+  }
+});
+
+closeBookProfileBtn.addEventListener("click", () => {
+  closeBookProfile();
+});
+
+bookProfileOverlay.addEventListener("click", (event) => {
+  if (event.target === bookProfileOverlay) {
+    closeBookProfile();
   }
 });
 
