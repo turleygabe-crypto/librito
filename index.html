@@ -12,65 +12,83 @@
   </head>
   <body>
     <div class="app-shell">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">Cozy catalog</p>
-          <h1>Librito</h1>
-        </div>
-        <div class="topbar-actions">
-          <button id="authButton" class="secondary-btn">Sign in</button>
-          <button id="scanButton" class="action-btn">Scan a book</button>
-        </div>
-      </header>
-
-      <main class="content-grid">
-        <section class="hero-card">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">L</div>
           <div>
-            <p class="eyebrow">Your private bookshelf</p>
-            <h2>Your home library, beautifully organized.</h2>
-            <p class="hero-copy">
-              Capture books in seconds, track spending, and let every shelf tell a story.
-            </p>
-            <div class="hero-actions">
-              <button id="openModalBtn" class="action-btn">Add a title</button>
-              <button class="secondary-btn">Preview shelves</button>
-            </div>
+            <p class="eyebrow">cozy catalog</p>
+            <h2>Librito</h2>
           </div>
-          <div class="overview-stats">
-            <div class="stat-pill">
-              <span id="totalBooks">0</span>
-              <small>Books</small>
-            </div>
-            <div class="stat-pill">
-              <span id="totalSpent">$0</span>
-              <small>Spent</small>
-            </div>
-            <div class="stat-pill">
-              <span id="shelvesCount">0</span>
-              <small>Shelves</small>
-            </div>
-          </div>
-        </section>
+        </div>
+        <nav class="sidebar-nav" aria-label="Primary navigation">
+          <button class="nav-pill active" type="button">Home</button>
+          <button class="nav-pill" type="button">Your shelves</button>
+          <button class="nav-pill" type="button">Discover</button>
+          <button class="nav-pill" type="button">Stats</button>
+        </nav>
+        <div class="sidebar-card">
+          <p>Sign in with Google to build your own shelves.</p>
+          <button id="authButton" class="action-btn">Sign in</button>
+        </div>
+      </aside>
 
-        <section class="panel" data-panel="shelves">
-          <div class="panel-heading">
-            <h3>Shelves at a glance</h3>
-            <span id="recentBook">Newly added</span>
+      <div class="main-stage">
+        <header class="topbar">
+          <div class="topbar-search">Browse your cozy shelves</div>
+          <div class="topbar-actions">
+            <button id="scanButton" class="action-btn">Scan a book</button>
           </div>
-          <div class="shelf-controls">
-            <button id="createShelfBtn" type="button" class="secondary-btn">Create shelf</button>
-          </div>
-          <div id="shelfList" class="shelf-list"></div>
-        </section>
+        </header>
 
-        <section class="panel" data-panel="library">
-          <div class="panel-heading">
-            <h3>Library</h3>
-            <span>Recent additions</span>
-          </div>
-          <div id="bookList" class="book-list"></div>
-        </section>
-      </main>
+        <main class="content-grid">
+          <section class="hero-card">
+            <div class="hero-copy-block">
+              <p class="eyebrow">Your private bookshelf</p>
+              <h2>Cozy, curated, and beautifully yours.</h2>
+              <p class="hero-copy">
+                Capture books in seconds, track spending, and let every shelf feel like a reading nook.
+              </p>
+              <div class="hero-actions">
+                <button id="openModalBtn" class="action-btn">Add a title</button>
+                <button id="previewBtn" class="secondary-btn">Preview shelves</button>
+              </div>
+            </div>
+            <div class="overview-stats">
+              <div class="stat-pill">
+                <span id="totalBooks">0</span>
+                <small>Books</small>
+              </div>
+              <div class="stat-pill">
+                <span id="totalSpent">$0</span>
+                <small>Spent</small>
+              </div>
+              <div class="stat-pill">
+                <span id="shelvesCount">0</span>
+                <small>Shelves</small>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel" data-panel="library">
+            <div class="panel-heading">
+              <h3>For you</h3>
+              <span>Recently added</span>
+            </div>
+            <div id="bookList" class="book-list"></div>
+          </section>
+
+          <section class="panel" data-panel="shelves">
+            <div class="panel-heading">
+              <h3>Shelves</h3>
+              <span id="recentBook">Newly added</span>
+            </div>
+            <div class="shelf-controls">
+              <button id="createShelfBtn" type="button" class="secondary-btn">Create shelf</button>
+            </div>
+            <div id="shelfList" class="shelf-list"></div>
+          </section>
+        </main>
+      </div>
     </div>
 
     <div id="shelfDrawerOverlay" class="dialog-overlay drawer-overlay hidden">
