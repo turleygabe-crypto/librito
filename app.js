@@ -6,7 +6,7 @@ const defaultBooks = [
     id: crypto.randomUUID(),
     title: "The Midnight Library",
     author: "Matt Haig",
-    shelf: "Currently Reading",
+    shelf: "New Arrivals",
     cost: 18.99,
     added: "2026-07-11",
     notes: "A warm, reflective pick for rainy evenings.",
@@ -15,7 +15,7 @@ const defaultBooks = [
     id: crypto.randomUUID(),
     title: "Piranesi",
     author: "Susanna Clarke",
-    shelf: "Favorites",
+    shelf: "New Arrivals",
     cost: 14.5,
     added: "2026-07-08",
     notes: "Dreamlike architecture and lingering wonder.",
@@ -24,10 +24,64 @@ const defaultBooks = [
     id: crypto.randomUUID(),
     title: "Braiding Sweetgrass",
     author: "Robin Wall Kimmerer",
-    shelf: "Mindful Reads",
+    shelf: "New Arrivals",
     cost: 22.0,
     added: "2026-06-27",
     notes: "A grounding gift for slow afternoons.",
+  },
+  {
+    id: crypto.randomUUID(),
+    title: "The House of Doors",
+    author: "Tan Twan Eng",
+    shelf: "Cozy Recs",
+    cost: 24.0,
+    added: "2026-06-24",
+    notes: "Atmospheric and lush for slower evenings.",
+  },
+  {
+    id: crypto.randomUUID(),
+    title: "Anxious People",
+    author: "Fredrik Backman",
+    shelf: "Cozy Recs",
+    cost: 16.5,
+    added: "2026-06-21",
+    notes: "Witty, warm, and quietly comforting.",
+  },
+  {
+    id: crypto.randomUUID(),
+    title: "The Light We Carry",
+    author: "Michelle Obama",
+    shelf: "Cozy Recs",
+    cost: 20.0,
+    added: "2026-06-14",
+    notes: "Thoughtful notes for reflective mornings.",
+  },
+  {
+    id: crypto.randomUUID(),
+    title: "Educated",
+    author: "Tara Westover",
+    shelf: "Staff Picks",
+    cost: 19.75,
+    added: "2026-06-11",
+    notes: "A memoir that lingers long after the final page.",
+  },
+  {
+    id: crypto.randomUUID(),
+    title: "Tomorrow, and Tomorrow, and Tomorrow",
+    author: "Gabrielle Zevin",
+    shelf: "Staff Picks",
+    cost: 18.25,
+    added: "2026-06-05",
+    notes: "A crowd favorite for story lovers.",
+  },
+  {
+    id: crypto.randomUUID(),
+    title: "The Vanishing Half",
+    author: "Brit Bennett",
+    shelf: "Staff Picks",
+    cost: 17.5,
+    added: "2026-05-28",
+    notes: "A beautifully layered novel for book club.",
   },
 ];
 
@@ -142,6 +196,15 @@ function renderShelves() {
     .join("");
 }
 
+function groupBooksByShelf(books) {
+  return books.slice().sort((a, b) => new Date(b.added || b.added_on || 0) - new Date(a.added || a.added_on || 0)).reduce((acc, book) => {
+    const shelfName = book.shelf || "Uncategorized";
+    if (!acc[shelfName]) acc[shelfName] = [];
+    acc[shelfName].push(book);
+    return acc;
+  }, {});
+}
+
 function openBookProfile(book) {
   selectedBook = book;
   bookProfileContent.innerHTML = `
@@ -180,30 +243,46 @@ function closeBookProfile() {
 
 function renderBooks() {
   const bookList = document.getElementById("bookList");
-  if (!state.books.length) {
-    bookList.innerHTML = '<p>No books yet. Start by adding your first title.</p>';
+  const hasSession = Boolean(state.session);
+
+  if (!hasSession && !state.books.length) {
+    bookList.innerHTML = '<p class="empty-state">Preview is loading…</p>';
     return;
   }
 
-  bookList.innerHTML = state.books
-    .slice()
-    .sort((a, b) => new Date(b.added || b.added_on || 0) - new Date(a.added || a.added_on || 0))
-    .map((book) => `
-      <article class="book-card" tabindex="0" role="button" data-book-id="${book.id}">
-        <div>
-          <strong>${book.title}</strong>
-          <p>${book.author || "Unknown author"}</p>
-          <p>${book.shelf || "Uncategorized"} • Added ${formatDate(book.added || book.added_on)}</p>
-          <p>${book.notes || ""}</p>
+  if (hasSession && !state.books.length) {
+    bookList.innerHTML = '<div class="empty-state-card"><h4>Your library is ready</h4><p>Sign in with Google and start building a fresh shelf of books.</p></div>';
+    return;
+  }
+
+  const groupedBooks = groupBooksByShelf(state.books);
+  bookList.innerHTML = Object.entries(groupedBooks)
+    .map(([shelfName, booksForShelf]) => `
+      <section class="preview-shelf">
+        <div class="preview-shelf-header">
+          <h4>${shelfName}</h4>
+          <span>${booksForShelf.length} titles</span>
         </div>
-        <div>
-          <strong>${formatCurrency(book.cost)}</strong>
+        <div class="preview-scroll-row">
+          ${booksForShelf
+            .map((book) => `
+              <article class="book-cover-card" tabindex="0" role="button" data-book-id="${book.id}">
+                <div class="book-cover" style="background:${book.coverColor || "linear-gradient(135deg, #7a4a2d, #3f2e23)"};">
+                  <span class="book-cover-pill">${book.shelf || "Shelf"}</span>
+                  <strong>${book.title}</strong>
+                </div>
+                <div class="book-cover-meta">
+                  <p>${book.author || "Unknown author"}</p>
+                </div>
+              </article>
+            `)
+            .join("")}
         </div>
-      </article>
+      </section>
     `)
     .join("");
 
-  bookList.querySelectorAll(".book-card").forEach((card) => {
+  bookList.querySelectorAll(".book-cover-card").forEach((card) => {
     card.addEventListener("click", () => {
       const book = state.books.find((item) => item.id === card.dataset.bookId);
       if (book) openBookProfile(book);
@@ -225,6 +304,11 @@ function render() {
 }
 
 function openDialog() {
+  if (!state.session) {
+    showToast("Sign in with Google to start your library.");
+    openAuthModal();
+    return;
+  }
   dialogOverlay.classList.remove("hidden");
   bookForm.elements.title.focus();
 }
@@ -235,6 +319,11 @@ function closeDialog() {
 }
 
 function openShelfDrawer() {
+  if (!state.session) {
+    showToast("Sign in with Google to create shelves.");
+    openAuthModal();
+    return;
+  }
   shelfDrawerOverlay.classList.remove("hidden");
   newShelfInput.focus();
 }
@@ -377,9 +466,13 @@ async function initializeSupabase() {
       state.session = session;
       updateAuthButton();
       if (session) {
+        state.books = [];
+        state.shelves = [];
+        render();
         loadFromSupabase();
       } else {
         state.books = loadBooks();
+        state.shelves = [];
         render();
       }
     });
@@ -390,6 +483,9 @@ async function initializeSupabase() {
       return;
     }
 
+    state.books = [];
+    state.shelves = [];
+    render();
     await loadFromSupabase();
   } catch (error) {
     console.error(error);
@@ -560,6 +656,9 @@ authButton.addEventListener("click", async () => {
     await state.supabase.auth.signOut();
     state.session = null;
     state.profile = null;
+    state.books = loadBooks();
+    state.shelves = [];
+    render();
     updateAuthButton();
     showToast("Signed out");
     return;
@@ -648,6 +747,12 @@ bookProfileOverlay.addEventListener("click", (event) => {
 
 bookForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!state.session) {
+    showToast("Sign in with Google to save books.");
+    openAuthModal();
+    return;
+  }
+
   const formData = new FormData(bookForm);
   const book = {
     id: crypto.randomUUID(),
