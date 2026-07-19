@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#8b5e3c" />
+    <title>Librito | Cozy Home Library</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/config.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Cozy catalog</p>
+          <h1>Librito</h1>
+        </div>
+        <div class="topbar-actions">
+          <button id="authButton" class="secondary-btn">Sign in</button>
+          <button id="scanButton" class="action-btn">Scan a book</button>
+        </div>
+      </header>
+
+      <main class="content-grid">
+        <section class="hero-card">
+          <div>
+            <p class="eyebrow">Your private bookshelf</p>
+            <h2>Your home library, beautifully organized.</h2>
+            <p class="hero-copy">
+              Capture books in seconds, track spending, and let every shelf tell a story.
+            </p>
+            <div class="hero-actions">
+              <button id="openModalBtn" class="action-btn">Add a title</button>
+              <button class="secondary-btn">Preview shelves</button>
+            </div>
+          </div>
+          <div class="overview-stats">
+            <div class="stat-pill">
+              <span id="totalBooks">0</span>
+              <small>Books</small>
+            </div>
+            <div class="stat-pill">
+              <span id="totalSpent">$0</span>
+              <small>Spent</small>
+            </div>
+            <div class="stat-pill">
+              <span id="shelvesCount">0</span>
+              <small>Shelves</small>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h3>Shelves at a glance</h3>
+            <span id="recentBook">Newly added</span>
+          </div>
+          <div class="shelf-controls">
+            <input id="newShelfInput" placeholder="New shelf name" />
+            <button id="createShelfBtn" type="button" class="secondary-btn">Create shelf</button>
+          </div>
+          <div id="shelfList" class="shelf-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h3>Library</h3>
+            <span>Recent additions</span>
+          </div>
+          <div id="bookList" class="book-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <div id="dialogOverlay" class="dialog-overlay hidden">
+      <div class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="dialogTitle">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow">Scan & save</p>
+            <h3 id="dialogTitle">Add a new book</h3>
+          </div>
+          <button id="closeDialogBtn" class="icon-btn" aria-label="Close">✕</button>
+        </div>
+
+        <form id="bookForm" class="book-form">
+          <div class="scan-zone">
+            <label>
+              ISBN / barcode
+              <input id="isbnInput" name="isbn" placeholder="9780141036144" />
+            </label>
+            <div class="scan-actions">
+              <button id="scanIsbnBtn" type="button" class="secondary-btn">Scan ISBN</button>
+              <button id="lookupIsbnBtn" type="button" class="secondary-btn">Lookup</button>
+            </div>
+            <video id="scannerVideo" autoplay playsinline muted></video>
+            <p id="scanStatus" class="scan-status">Use your phone camera or enter the ISBN manually.</p>
+          </div>
+
+          <label>
+            Title
+            <input name="title" placeholder="The House of Doors" required />
+          </label>
+          <label>
+            Author
+            <input name="author" placeholder="Tan Twan Eng" required />
+          </label>
+          <label>
+            Shelf / Category
+            <input name="shelf" placeholder="Currently Reading" required />
+          </label>
+          <label>
+            Cost
+            <input name="cost" type="number" step="0.01" min="0" placeholder="18.99" required />
+          </label>
+          <label>
+            Date added
+            <input name="added" type="date" required />
+          </label>
+          <label>
+            Notes
+            <textarea name="notes" rows="3" placeholder="A favorite from the summer reading list"></textarea>
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="action-btn">Save to Library</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden">Book added</div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
