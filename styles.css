@@ -102,3 +102,81 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .scan-status { margin: 0.6rem 0 0; color: rgba(63,46,35,.74); }
 .toast { position: fixed; right: 1rem; bottom: 1rem; z-index: 20; padding: 0.7rem 0.95rem; border-radius: 999px; background: #30251f; color: #fff; }
 @media (max-width: 380px) { .featured-book { min-height: 14rem; } .featured-copy h2 { font-size: 1.05rem; } .now-reading { gap: 0.35rem; } .now-reading button { font-size: 1.15rem; } }
+
+@media (min-width: 900px) {
+  body {
+    background: radial-gradient(circle at 78% 0%, #5a3324 0%, #291712 34%, #160d0a 76%);
+  }
+
+  .app-shell {
+    display: grid;
+    grid-template-columns: 252px minmax(0, 1fr);
+    gap: 1.25rem;
+    padding: 1.25rem 1.5rem 1.5rem;
+  }
+
+  .sidebar {
+    display: flex;
+    min-height: calc(100vh - 2.5rem);
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 1.25rem;
+    border: 1px solid rgba(245, 221, 201, 0.12);
+    border-radius: 1.25rem;
+    background: rgba(31, 17, 13, 0.82);
+    box-shadow: 0 24px 60px rgba(12, 5, 3, 0.28);
+  }
+
+  .sidebar .brand {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(245, 221, 201, 0.1);
+  }
+
+  .sidebar .brand-mark { width: 2.9rem; height: 2.9rem; font-size: 1.6rem; }
+  .sidebar .eyebrow { margin: 0 0 0.15rem; color: #c29b82; font-size: 0.65rem; letter-spacing: 0.16em; }
+  .sidebar h2 { font-size: 1.4rem; }
+  .sidebar-nav { display: grid; gap: 0.35rem; }
+  .nav-pill { padding: 0.8rem 0.9rem; border: 0; border-radius: 0.6rem; background: transparent; color: #bca9a0; text-align: left; }
+  .nav-pill:hover, .nav-pill.active { background: #43271e; color: #fff; }
+  .sidebar-card { margin-top: auto; padding: 1rem; border-radius: 0.85rem; background: linear-gradient(145deg, #6d3820, #3c2018); }
+  .sidebar-card p { margin-bottom: 0.8rem; color: #f4dfd1; line-height: 1.45; }
+  .sidebar-card .action-btn { width: 100%; background: #d48b59; color: #25120d; }
+
+  .main-stage { width: auto; padding: 0 2.25rem; }
+  .spotify-topbar { padding: 1.25rem 0 1.5rem; }
+  .compact-mark { display: none; }
+  .spotify-topbar::before { content: "Your library"; color: #f8ede6; font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; }
+  .circle-btn { width: 2.4rem; height: 2.4rem; border-radius: 0.6rem; background: rgba(67,39,30,.72); color: #e7cfc1; }
+  .circle-btn:hover { background: #70402c; }
+  .spotify-home { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 2rem 1.5rem; align-items: start; }
+  .category-tabs, .quick-links, .ask-bar { grid-column: 1 / -1; }
+  .category-tabs { gap: 0.55rem; }
+  .category-tab { padding: 0.62rem 1.15rem; font-size: 0.92rem; background: #402a23; }
+  .quick-links { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+  .quick-link { min-height: 4.4rem; }
+  .quick-art { width: 4.4rem; height: 4.4rem; flex-basis: 4.4rem; }
+  .quick-link.author-link { grid-column: span 1; }
+  .ask-bar { width: min(680px, 100%); justify-self: start; padding: 0.85rem 1rem; }
+  .buzz-section { grid-column: 1 / span 7; }
+  .recommendation-section { grid-column: 8 / -1; }
+  .home-section h1, .section-heading-row h2 { font-size: 1.8rem; }
+  .featured-book { min-height: 22rem; grid-template-columns: 44% 1fr; }
+  .featured-cover { font-size: 1.5rem; }
+  .featured-copy { padding: 1.35rem 1rem; }
+  .featured-copy h2 { font-size: 1.45rem; }
+  .recommended-shelves { gap: 0.8rem; }
+  .recommendation-card strong { font-size: 1.5rem; }
+  .book-list { padding-top: 0.5rem; }
+  .preview-scroll-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: visible; }
+  .book-cover-card { min-width: 0; }
+  .book-cover { min-height: 10rem; }
+  .legacy-panel { display: block; grid-column: 1 / -1; padding: 1.25rem; border: 1px solid rgba(245,221,201,.1); border-radius: 1rem; background: rgba(42,24,18,.8); }
+  .legacy-panel .panel-heading { margin-bottom: 1rem; color: #f7e6dc; }
+  .shelf-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
+  .shelf-item { padding: 0.85rem; border-radius: 0.7rem; background: #39241d; color: #f5e3d8; }
+  .shelf-item span { color: #bca69b; }
+  .now-reading, .mobile-nav { display: none; }
+}

@@ -689,7 +689,7 @@ featuredAddBtn.addEventListener("click", () => {
 });
 
 featuredPlayBtn.addEventListener("click", () => {
-  showToast("Previewing featured book");
+  showToast("Book saved to your library");
 });
 
 openModalBtn.addEventListener("click", () => {
