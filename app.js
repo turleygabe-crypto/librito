@@ -6,6 +6,8 @@ const defaultBooks = [
     id: crypto.randomUUID(),
     title: "The Midnight Library",
     author: "Matt Haig",
+    genre: "Fiction",
+    isbn: "9780525559474",
     shelf: "New Arrivals",
     cost: 18.99,
     added: "2026-07-11",
@@ -15,6 +17,8 @@ const defaultBooks = [
     id: crypto.randomUUID(),
     title: "Piranesi",
     author: "Susanna Clarke",
+    genre: "Fiction",
+    isbn: "9781635575637",
     shelf: "New Arrivals",
     cost: 14.5,
     added: "2026-07-08",
@@ -24,6 +28,8 @@ const defaultBooks = [
     id: crypto.randomUUID(),
     title: "Braiding Sweetgrass",
     author: "Robin Wall Kimmerer",
+    genre: "Nonfiction",
+    isbn: "9781579654672",
     shelf: "New Arrivals",
     cost: 22.0,
     added: "2026-06-27",
@@ -33,6 +39,8 @@ const defaultBooks = [
     id: crypto.randomUUID(),
     title: "The House of Doors",
     author: "Tan Twan Eng",
+    genre: "Fiction",
+    isbn: "9780593540465",
     shelf: "Cozy Recs",
     cost: 24.0,
     added: "2026-06-24",
@@ -42,6 +50,8 @@ const defaultBooks = [
     id: crypto.randomUUID(),
     title: "Anxious People",
     author: "Fredrik Backman",
+    genre: "Fiction",
+    isbn: "9781501160837",
     shelf: "Cozy Recs",
     cost: 16.5,
     added: "2026-06-21",
@@ -51,6 +61,8 @@ const defaultBooks = [
     id: crypto.randomUUID(),
     title: "The Light We Carry",
     author: "Michelle Obama",
+    genre: "Nonfiction",
+    isbn: "9780593237465",
     shelf: "Cozy Recs",
     cost: 20.0,
     added: "2026-06-14",
@@ -60,6 +72,8 @@ const defaultBooks = [
     id: crypto.randomUUID(),
     title: "Educated",
     author: "Tara Westover",
+    genre: "Nonfiction",
+    isbn: "9780399590504",
     shelf: "Staff Picks",
     cost: 19.75,
     added: "2026-06-11",
@@ -69,6 +83,8 @@ const defaultBooks = [
     id: crypto.randomUUID(),
     title: "Tomorrow, and Tomorrow, and Tomorrow",
     author: "Gabrielle Zevin",
+    genre: "Fiction",
+    isbn: "9780593321201",
     shelf: "Staff Picks",
     cost: 18.25,
     added: "2026-06-05",
@@ -78,6 +94,8 @@ const defaultBooks = [
     id: crypto.randomUUID(),
     title: "The Vanishing Half",
     author: "Brit Bennett",
+    genre: "Fiction",
+    isbn: "9780525536291",
     shelf: "Staff Picks",
     cost: 17.5,
     added: "2026-05-28",
@@ -85,12 +103,19 @@ const defaultBooks = [
   },
 ];
 
+const defaultBookMetadata = Object.fromEntries(defaultBooks.map((book) => [book.title, {
+  genre: book.genre,
+  isbn: book.isbn,
+}]));
+
 const state = {
   books: [],
   shelves: [],
   session: null,
   profile: null,
   supabase: null,
+  category: "All",
+  authorFilter: "",
 };
 
 const bookForm = document.getElementById("bookForm");
@@ -122,6 +147,9 @@ const closeBookProfileBtn = document.getElementById("closeBookProfileBtn");
 const bookProfileContent = document.getElementById("bookProfileContent");
 const featuredAddBtn = document.getElementById("featuredAddBtn");
 const featuredPlayBtn = document.getElementById("featuredPlayBtn");
+const authorQuickLink = document.getElementById("authorQuickLink");
+const savedBooksBtn = document.getElementById("savedBooksBtn");
+const settingsBtn = document.getElementById("settingsBtn");
 let cameraStream = null;
 let barcodeLoopTimer = null;
 let selectedBook = null;
@@ -131,7 +159,9 @@ let authMode = "signup";
 function loadBooks() {
   try {
     const saved = localStorage.getItem(storageKey);
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      return JSON.parse(saved).map((book) => ({ ...defaultBookMetadata[book.title], ...book }));
+    }
   } catch (error) {
     console.warn("Could not read saved library", error);
   }
@@ -260,7 +290,16 @@ function renderBooks() {
     return;
   }
 
-  const groupedBooks = groupBooksByShelf(state.books);
+  const visibleBooks = state.books.filter((book) => {
+    const matchesCategory = state.category === "All" || (book.genre || "").toLowerCase() === state.category.toLowerCase();
+    const matchesAuthor = !state.authorFilter || book.author === state.authorFilter;
+    return matchesCategory && matchesAuthor;
+  });
+  const groupedBooks = groupBooksByShelf(visibleBooks);
+  if (!visibleBooks.length) {
+    bookList.innerHTML = '<p class="empty-state">No books match this view yet.</p>';
+    return;
+  }
   bookList.innerHTML = Object.entries(groupedBooks)
     .map(([shelfName, booksForShelf]) => `
       <section class="preview-shelf">
@@ -272,7 +311,7 @@ function renderBooks() {
           ${booksForShelf
             .map((book) => `
               <article class="book-cover-card" tabindex="0" role="button" data-book-id="${book.id}">
-                <div class="book-cover" style="background:${book.coverColor || "linear-gradient(135deg, #7a4a2d, #3f2e23)"};">
+                <div class="book-cover" style="background-image:linear-gradient(160deg, rgba(43,22,14,.05), rgba(43,22,14,.82)), url('https://covers.openlibrary.org/isbn/${book.isbn || ""}-L.jpg'); background-color:${book.coverColor || "#7a4a2d"};">
                   <span class="book-cover-pill">${book.shelf || "Shelf"}</span>
                   <strong>${book.title}</strong>
                 </div>
@@ -634,6 +673,8 @@ async function loadFromSupabase() {
     id: book.id,
     title: book.title,
     author: book.author,
+    genre: book.genre || "",
+    isbn: book.isbn || "",
     shelf: book.shelf,
     cost: Number(book.cost || 0),
     added: book.added_on || book.created_at,
@@ -677,10 +718,65 @@ scanButton.addEventListener("click", () => {
   seedMockScan();
 });
 
+function setBookView(category = "All", author = "") {
+  state.category = category;
+  state.authorFilter = author;
+  document.querySelectorAll(".category-tab").forEach((item) => {
+    item.classList.toggle("active", item.textContent.trim() === category);
+  });
+  renderBooks();
+}
+
 document.querySelectorAll(".category-tab").forEach((tab) => {
   tab.addEventListener("click", () => {
-    document.querySelectorAll(".category-tab").forEach((item) => item.classList.remove("active"));
-    tab.classList.add("active");
+    setBookView(tab.textContent.trim());
+  });
+});
+
+authorQuickLink.addEventListener("click", () => {
+  setBookView("All", "Matt Haig");
+  showToast("Showing Matt Haig in your library");
+});
+
+savedBooksBtn.addEventListener("click", () => {
+  setBookView("All");
+  showToast("Your saved books are shown below");
+  document.querySelector(".recommendation-section")?.scrollIntoView({ behavior: "smooth" });
+});
+
+settingsBtn.addEventListener("click", () => {
+  authButton.click();
+});
+
+document.getElementById("previewBtn").addEventListener("click", () => {
+  openDialog();
+});
+
+document.querySelectorAll(".recommendation-card").forEach((card) => {
+  card.addEventListener("click", () => {
+    openShelfDrawer();
+    if (state.session) newShelfInput.value = card.querySelector("strong").textContent.replace(/\s+/g, " ").trim();
+  });
+});
+
+document.querySelectorAll(".mobile-nav-item").forEach((item) => {
+  item.addEventListener("click", () => {
+    document.querySelectorAll(".mobile-nav-item").forEach((navItem) => navItem.classList.remove("active"));
+    item.classList.add("active");
+    if (item.textContent.includes("Home")) window.scrollTo({ top: 0, behavior: "smooth" });
+    if (item.textContent.includes("Search")) openDialog();
+    if (item.textContent.includes("Shelves")) openShelfDrawer();
+    if (item.textContent.includes("Create")) openDialog();
+  });
+});
+
+document.querySelectorAll(".nav-pill").forEach((item) => {
+  item.addEventListener("click", () => {
+    document.querySelectorAll(".nav-pill").forEach((navItem) => navItem.classList.remove("active"));
+    item.classList.add("active");
+    if (item.textContent.includes("Your shelves")) openShelfDrawer();
+    if (item.textContent.includes("Discover")) openDialog();
+    if (item.textContent.includes("Stats")) document.querySelector(".legacy-panel")?.scrollIntoView({ behavior: "smooth" });
   });
 });
 
@@ -689,7 +785,13 @@ featuredAddBtn.addEventListener("click", () => {
 });
 
 featuredPlayBtn.addEventListener("click", () => {
-  showToast("Book saved to your library");
+  openDialog();
+  if (state.session) {
+    bookForm.elements.title.value = "How to Keep House While Drowning";
+    bookForm.elements.author.value = "KC Davis";
+    bookForm.elements.shelf.value = "Recommended for You";
+    bookForm.elements.added.value = new Date().toISOString().slice(0, 10);
+  }
 });
 
 openModalBtn.addEventListener("click", () => {

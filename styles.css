@@ -3,7 +3,7 @@
   --black: #160d0a;
   --panel: #281a16;
   --muted: #b8aaa3;
-  --green: #1ed760;
+  --accent: #c97b4d;
   --paper: #fff8ef;
   --ink: #3f2e23;
 }
@@ -20,22 +20,22 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .sidebar { display: none; }
 .main-stage { width: min(760px, 100%); min-height: 100vh; margin: 0 auto; padding: 0 1rem; }
 .spotify-topbar { display: flex; justify-content: space-between; align-items: center; padding: max(1rem, env(safe-area-inset-top)) 0 0.85rem; }
-.brand-mark { width: 3.6rem; height: 3.6rem; display: grid; place-items: center; border-radius: 50%; background: var(--green); color: #07170d; font-size: 2rem; font-weight: 700; }
+.brand-mark { width: 3.6rem; height: 3.6rem; display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: #2b130b; font-size: 2rem; font-weight: 700; }
 .topbar-actions { display: flex; align-items: center; gap: 0.9rem; }
 .circle-btn { width: 2rem; height: 2rem; padding: 0; border: 0; background: transparent; color: #fff; font-size: 1.45rem; }
 .spotify-home { display: grid; gap: 1.4rem; }
 .category-tabs { display: flex; gap: 0.75rem; overflow-x: auto; scrollbar-width: none; }
 .category-tabs::-webkit-scrollbar { display: none; }
 .category-tab { flex: 0 0 auto; border: 0; border-radius: 999px; padding: 0.72rem 1.35rem; background: #3a2722; color: #f5f5f5; font-size: 1.05rem; }
-.category-tab.active { background: var(--green); color: #07170d; }
+.category-tab.active { background: var(--accent); color: #2b130b; }
 .quick-links { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; }
 .quick-link { min-width: 0; display: flex; align-items: center; gap: 0.7rem; padding: 0; overflow: hidden; border: 0; border-radius: 0.5rem; background: #30201c; color: #f7f7f7; text-align: left; }
 .quick-link strong { font-size: clamp(0.82rem, 3.9vw, 1.1rem); }
 .quick-art { width: 4.2rem; height: 4.2rem; flex: 0 0 4.2rem; display: grid; place-items: center; font-size: 2.2rem; }
-.heart-art { background: linear-gradient(135deg, #4e17ed, #b8e8d8); }
+.heart-art { background: linear-gradient(135deg, #5b2636, #d18c5b); }
 .author-art { background: radial-gradient(circle at 62% 28%, #f0bd74 0 13%, transparent 14%), linear-gradient(135deg, #7d4a1d, #17130e); font-family: Georgia, serif; }
 .ask-bar { width: 100%; display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 0.9rem; border: 0; border-radius: 999px; background: #352420; color: var(--muted); font-size: 1.05rem; text-align: left; }
-.ask-orb { width: 2.2rem; height: 2.2rem; display: grid; place-items: center; border-radius: 50%; background: #0669cf; color: #36ef9d; font-size: 1.65rem; }
+.ask-orb { width: 2.2rem; height: 2.2rem; display: grid; place-items: center; border-radius: 50%; background: #9b593a; color: #f6d4a9; font-size: 1.65rem; }
 .ask-bar b { margin-left: auto; padding: 0.2rem 0.35rem; border-radius: 0.18rem; background: #c9c9c9; color: #111; font-size: 0.78rem; }
 .mic-icon { color: #c5c5c5; font-size: 1.65rem; }
 .home-section h1, .section-heading-row h2 { margin-bottom: 0; font-size: clamp(1.65rem, 7.2vw, 2.2rem); letter-spacing: -0.03em; }
@@ -43,7 +43,7 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .section-kicker span { margin-left: 0.3rem; }
 .featured-book { position: relative; display: grid; grid-template-columns: 42% 1fr; min-height: 16rem; overflow: hidden; border-radius: 0.75rem; background: var(--panel); }
 .featured-cover { display: flex; align-items: flex-end; padding: 0.9rem; color: #f4e3c4; font: 1.25rem/0.98 Georgia, serif; }
-.cover-night { background: linear-gradient(160deg, rgba(35,18,13,.1), rgba(35,18,13,.9)), radial-gradient(circle at 48% 32%, #d59b5e 0 14%, transparent 15%), linear-gradient(145deg, #56402e, #2a1712 55%, #8b5d40); }
+.cover-night { background-image: linear-gradient(160deg, rgba(35,18,13,.08), rgba(35,18,13,.76)), url("https://covers.openlibrary.org/isbn/9781950968228-L.jpg"); background-color: #56402e; background-position: center; background-size: cover; }
 .featured-copy { padding: 1rem 0.75rem; }
 .featured-copy h2 { margin: 0 1.2rem 0 0; font-size: 1.2rem; line-height: 1.15; }
 .featured-copy p { margin: 0.45rem 0; color: #b1afb1; font-size: 0.95rem; }
@@ -66,7 +66,7 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .preview-shelf-header h4 { margin: 0; color: #fff; }
 .preview-scroll-row { display: flex; gap: 0.8rem; overflow-x: auto; padding-bottom: 0.3rem; }
 .book-cover-card { min-width: 8.8rem; cursor: pointer; }
-.book-cover { min-height: 11rem; display: flex; flex-direction: column; justify-content: space-between; padding: 0.8rem; border-radius: 0.45rem; color: #fff; }
+.book-cover { min-height: 11rem; display: flex; flex-direction: column; justify-content: space-between; padding: 0.8rem; border-radius: 0.45rem; color: #fff; background-position: center; background-size: cover; }
 .book-cover-pill { align-self: flex-start; padding: 0.35rem 0.55rem; border-radius: 999px; background: rgba(255,255,255,.2); font-size: 0.65rem; }
 .book-cover strong { font-size: 0.95rem; line-height: 1.25; }
 .book-cover-meta p { margin: 0.4rem 0 0; color: var(--muted); font-size: 0.85rem; }
