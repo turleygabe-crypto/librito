@@ -120,6 +120,8 @@ const shelfForm = document.getElementById("shelfForm");
 const bookProfileOverlay = document.getElementById("bookProfileOverlay");
 const closeBookProfileBtn = document.getElementById("closeBookProfileBtn");
 const bookProfileContent = document.getElementById("bookProfileContent");
+const featuredAddBtn = document.getElementById("featuredAddBtn");
+const featuredPlayBtn = document.getElementById("featuredPlayBtn");
 let cameraStream = null;
 let barcodeLoopTimer = null;
 let selectedBook = null;
@@ -673,6 +675,21 @@ async function saveBookToSupabase(book) {
 scanButton.addEventListener("click", () => {
   openDialog();
   seedMockScan();
+});
+
+document.querySelectorAll(".category-tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".category-tab").forEach((item) => item.classList.remove("active"));
+    tab.classList.add("active");
+  });
+});
+
+featuredAddBtn.addEventListener("click", () => {
+  openDialog();
+});
+
+featuredPlayBtn.addEventListener("click", () => {
+  showToast("Previewing featured book");
 });
 
 openModalBtn.addEventListener("click", () => {

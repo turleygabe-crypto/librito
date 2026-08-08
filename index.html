@@ -33,61 +33,98 @@
       </aside>
 
       <div class="main-stage">
-        <header class="topbar">
-          <div class="topbar-search">Browse your cozy shelves</div>
+        <header class="topbar spotify-topbar">
+          <div class="brand-mark compact-mark">L</div>
           <div class="topbar-actions">
-            <button id="scanButton" class="action-btn">Scan a book</button>
+            <button class="circle-btn" type="button" aria-label="Notifications">♡</button>
+            <button id="scanButton" class="circle-btn" type="button" aria-label="Scan a book">＋</button>
+            <button class="circle-btn" type="button" aria-label="Settings">⚙</button>
           </div>
         </header>
 
-        <main class="content-grid">
-          <section class="hero-card">
-            <div class="hero-copy-block">
-              <p class="eyebrow">Your private bookshelf</p>
-              <h2>Cozy, curated, and beautifully yours.</h2>
-              <p class="hero-copy">
-                Capture books in seconds, track spending, and let every shelf feel like a reading nook.
-              </p>
-              <div class="hero-actions">
-                <button id="openModalBtn" class="action-btn">Add a title</button>
-                <button id="previewBtn" class="secondary-btn">Preview shelves</button>
-              </div>
-            </div>
-            <div class="overview-stats">
-              <div class="stat-pill">
-                <span id="totalBooks">0</span>
-                <small>Books</small>
-              </div>
-              <div class="stat-pill">
-                <span id="totalSpent">$0</span>
-                <small>Spent</small>
-              </div>
-              <div class="stat-pill">
-                <span id="shelvesCount">0</span>
-                <small>Shelves</small>
-              </div>
-            </div>
+        <main class="spotify-home">
+          <nav class="category-tabs" aria-label="Book categories">
+            <button class="category-tab active" type="button">All</button>
+            <button class="category-tab" type="button">Fiction</button>
+            <button class="category-tab" type="button">Nonfiction</button>
+            <button class="category-tab" type="button">Audiobooks</button>
+          </nav>
+
+          <section class="quick-links" aria-label="Shortcuts">
+            <button id="openModalBtn" class="quick-link liked-link" type="button">
+              <span class="quick-art heart-art">♥</span>
+              <strong>Liked Books</strong>
+            </button>
+            <button class="quick-link author-link" type="button">
+              <span class="quick-art author-art">M</span>
+              <strong>Matt Haig</strong>
+            </button>
           </section>
 
-          <section class="panel" data-panel="library">
-            <div class="panel-heading">
-              <h3>For you</h3>
-              <span>Recently added</span>
+          <button id="previewBtn" class="ask-bar" type="button">
+            <span class="ask-orb">◔</span>
+            <span>Ask for a book</span>
+            <b>Beta</b>
+            <span class="mic-icon">♩</span>
+          </button>
+
+          <section class="home-section buzz-section">
+            <h1>Getting buzz</h1>
+            <p class="section-kicker">Sponsored recommendation <span aria-hidden="true">ⓘ</span></p>
+            <article class="featured-book">
+              <div class="featured-cover cover-night">The<br />Creative<br />Act</div>
+              <div class="featured-copy">
+                <h2>How to Keep House While Drowning</h2>
+                <p>Book · KC Davis</p>
+                <button id="featuredAddBtn" class="add-circle" type="button" aria-label="Add featured book">＋</button>
+              </div>
+              <button id="featuredPlayBtn" class="play-circle" type="button" aria-label="Preview featured book">▶</button>
+              <button class="more-btn" type="button" aria-label="More options">⋮</button>
+            </article>
+          </section>
+
+          <section class="home-section recommendation-section">
+            <div class="section-heading-row">
+              <h2>Recommended Shelves</h2>
+              <button id="createShelfBtn" class="text-btn" type="button">Show all</button>
+            </div>
+            <div class="recommended-shelves">
+              <button class="recommendation-card lavender-card" type="button">
+                <span class="recommendation-label">LIBRITO</span>
+                <span class="recommendation-orbit">✦</span>
+                <strong>Late Night<br />Reading</strong>
+              </button>
+              <button class="recommendation-card coral-card" type="button">
+                <span class="recommendation-label">LIBRITO</span>
+                <span class="recommendation-orbit">◉</span>
+                <strong>New<br />Perspectives</strong>
+              </button>
             </div>
             <div id="bookList" class="book-list"></div>
           </section>
 
-          <section class="panel" data-panel="shelves">
-            <div class="panel-heading">
-              <h3>Shelves</h3>
-              <span id="recentBook">Newly added</span>
-            </div>
-            <div class="shelf-controls">
-              <button id="createShelfBtn" type="button" class="secondary-btn">Create shelf</button>
-            </div>
+          <section class="panel legacy-panel" data-panel="shelves">
+            <div class="panel-heading"><h3>Shelves</h3><span id="recentBook">Newly added</span></div>
             <div id="shelfList" class="shelf-list"></div>
           </section>
+          <div class="overview-stats" aria-hidden="true">
+            <span id="totalBooks">0</span><span id="totalSpent">$0</span><span id="shelvesCount">0</span>
+          </div>
         </main>
+
+        <div class="now-reading">
+          <div class="mini-cover">◉</div>
+          <div><strong>The Midnight Library</strong><span>Matt Haig</span></div>
+          <button type="button" aria-label="Connect device">▣</button>
+          <button type="button" aria-label="Add to shelf">＋</button>
+          <button type="button" aria-label="Play preview">▶</button>
+        </div>
+        <nav class="mobile-nav" aria-label="Mobile navigation">
+          <button class="mobile-nav-item active" type="button"><span>⌂</span>Home</button>
+          <button class="mobile-nav-item" type="button"><span>⌕</span>Search</button>
+          <button class="mobile-nav-item" type="button"><span>▥</span>Your Shelves</button>
+          <button class="mobile-nav-item" type="button"><span>＋</span>Create</button>
+        </nav>
       </div>
     </div>
 
