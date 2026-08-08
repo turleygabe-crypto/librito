@@ -852,6 +852,10 @@ authForm.addEventListener("submit", async (event) => {
   if (!state.supabase) {
     await initializeSupabase();
   }
+  if (!state.supabase) {
+    showToast("Authentication is not configured. Check the Supabase settings.");
+    return;
+  }
 
   const formData = new FormData(authForm);
   const displayName = formData.get("displayName").toString().trim();
@@ -871,6 +875,7 @@ authForm.addEventListener("submit", async (event) => {
 
   authSubmitBtn.disabled = true;
   authSubmitBtn.textContent = authMode === "signup" ? "Creating…" : "Signing in…";
+  authPrompted = true;
 
   try {
     if (authMode === "signup") {
@@ -882,10 +887,16 @@ authForm.addEventListener("submit", async (event) => {
         },
       });
       if (error) throw error;
+
+      if (!data.session) {
+        closeAuthModal();
+        showToast("Account created. Check your email to confirm it, then sign in.");
+        return;
+      }
+
       state.session = data.session;
       updateAuthButton();
       await ensureProfile(displayName, favoriteShelf);
-      authPrompted = false;
       closeAuthModal();
       showToast("Account created");
     } else {
@@ -894,13 +905,16 @@ authForm.addEventListener("submit", async (event) => {
       state.session = data.session;
       updateAuthButton();
       await ensureProfile(displayName || data.user?.user_metadata?.full_name || "", favoriteShelf);
-      authPrompted = false;
       closeAuthModal();
       showToast("Signed in");
     }
   } catch (error) {
     console.error(error);
-    showToast(error.message || "Authentication failed");
+    authPrompted = false;
+    const message = error.message?.toLowerCase().includes("fetch")
+      ? "Could not reach Supabase. Check that the project is running and try again."
+      : error.message || "Authentication failed";
+    showToast(message);
   } finally {
     authSubmitBtn.disabled = false;
     authSubmitBtn.textContent = authMode === "signup" ? "Create account" : "Sign in";
