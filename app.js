@@ -135,6 +135,9 @@ const closeAuthBtn = document.getElementById("closeAuthBtn");
 const authForm = document.getElementById("authForm");
 const authSubmitBtn = document.getElementById("authSubmitBtn");
 const toggleAuthModeBtn = document.getElementById("toggleAuthModeBtn");
+const forgotPasswordBtn = document.getElementById("forgotPasswordBtn");
+const authTitle = document.getElementById("authTitle");
+const authCopy = document.getElementById("authCopy");
 const displayNameInput = document.getElementById("displayNameInput");
 const newShelfInput = document.getElementById("newShelfInput");
 const shelfColorInput = document.getElementById("shelfColorInput");
@@ -154,7 +157,7 @@ let cameraStream = null;
 let barcodeLoopTimer = null;
 let selectedBook = null;
 let authPrompted = false;
-let authMode = "signup";
+let authMode = "signin";
 
 function loadBooks() {
   try {
@@ -379,16 +382,15 @@ function closeShelfDrawer() {
 }
 
 function openAuthModal() {
+  setAuthMode("signin");
   authOverlay.classList.remove("hidden");
-  displayNameInput.focus();
+  authForm.elements.email.focus();
 }
 
 function closeAuthModal() {
   authOverlay.classList.add("hidden");
   authForm.reset();
-  authMode = "signup";
-  authSubmitBtn.textContent = "Create account";
-  toggleAuthModeBtn.textContent = "Already have an account?";
+  setAuthMode("signin");
 }
 
 function promptForProfile() {
@@ -399,14 +401,37 @@ function promptForProfile() {
 
 function setAuthMode(nextMode) {
   authMode = nextMode;
-  if (nextMode === "signin") {
+  authForm.elements.password.required = nextMode !== "reset";
+  if (nextMode === "reset") {
+    authTitle.textContent = "Reset your password";
+    authCopy.textContent = "Enter your email and we will send you a secure password reset link.";
+    authSubmitBtn.textContent = "Send reset link";
+    toggleAuthModeBtn.textContent = "Back to sign in";
+    toggleAuthModeBtn.style.display = "inline-flex";
+    forgotPasswordBtn.style.display = "none";
+    displayNameInput.closest("label").style.display = "none";
+    authForm.elements.favoriteShelf.closest("label").style.display = "none";
+    authForm.elements.password.closest("label").style.display = "none";
+  } else if (nextMode === "signin") {
+    authTitle.textContent = "Sign in to Librito";
+    authCopy.textContent = "Sign in with email and password to keep your shelves and books synced.";
     authSubmitBtn.textContent = "Sign in";
     toggleAuthModeBtn.textContent = "Need an account?";
+    toggleAuthModeBtn.style.display = "inline-flex";
+    forgotPasswordBtn.style.display = "inline-flex";
     displayNameInput.closest("label").style.display = "none";
+    authForm.elements.favoriteShelf.closest("label").style.display = "none";
+    authForm.elements.password.closest("label").style.display = "grid";
   } else {
+    authTitle.textContent = "Create your Librito profile";
+    authCopy.textContent = "Create an account with email and password to keep your shelves and books synced.";
     authSubmitBtn.textContent = "Create account";
     toggleAuthModeBtn.textContent = "Already have an account?";
+    toggleAuthModeBtn.style.display = "inline-flex";
+    forgotPasswordBtn.style.display = "none";
     displayNameInput.closest("label").style.display = "grid";
+    authForm.elements.favoriteShelf.closest("label").style.display = "grid";
+    authForm.elements.password.closest("label").style.display = "grid";
   }
 }
 
@@ -844,7 +869,12 @@ authButton.addEventListener("click", async () => {
 });
 
 toggleAuthModeBtn.addEventListener("click", () => {
-  setAuthMode(authMode === "signup" ? "signin" : "signup");
+  setAuthMode(authMode === "reset" ? "signin" : authMode === "signup" ? "signin" : "signup");
+});
+
+forgotPasswordBtn.addEventListener("click", () => {
+  setAuthMode("reset");
+  authForm.elements.email.focus();
 });
 
 authForm.addEventListener("submit", async (event) => {
@@ -863,8 +893,13 @@ authForm.addEventListener("submit", async (event) => {
   const password = formData.get("password").toString();
   const favoriteShelf = formData.get("favoriteShelf").toString().trim();
 
-  if (!email || !password) {
-    showToast("Email and password are required.");
+  if (!email) {
+    showToast("Email is required.");
+    return;
+  }
+
+  if (authMode !== "reset" && !password) {
+    showToast("Password is required.");
     return;
   }
 
@@ -874,7 +909,7 @@ authForm.addEventListener("submit", async (event) => {
   }
 
   authSubmitBtn.disabled = true;
-  authSubmitBtn.textContent = authMode === "signup" ? "Creating…" : "Signing in…";
+  authSubmitBtn.textContent = authMode === "signup" ? "Creating…" : authMode === "reset" ? "Sending…" : "Signing in…";
   authPrompted = true;
 
   try {
@@ -899,6 +934,13 @@ authForm.addEventListener("submit", async (event) => {
       await ensureProfile(displayName, favoriteShelf);
       closeAuthModal();
       showToast("Account created");
+    } else if (authMode === "reset") {
+      const { error } = await state.supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}${window.location.pathname}`,
+      });
+      if (error) throw error;
+      closeAuthModal();
+      showToast("Check your email for a password reset link.");
     } else {
       const { data, error } = await state.supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
@@ -917,7 +959,7 @@ authForm.addEventListener("submit", async (event) => {
     showToast(message);
   } finally {
     authSubmitBtn.disabled = false;
-    authSubmitBtn.textContent = authMode === "signup" ? "Create account" : "Sign in";
+    authSubmitBtn.textContent = authMode === "signup" ? "Create account" : authMode === "reset" ? "Send reset link" : "Sign in";
   }
 });
 

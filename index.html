@@ -157,12 +157,12 @@
         <div class="dialog-head">
           <div>
             <p class="eyebrow">Welcome</p>
-            <h3 id="authTitle">Create your Librito profile</h3>
+            <h3 id="authTitle">Sign in to Librito</h3>
           </div>
           <button id="closeAuthBtn" class="icon-btn" aria-label="Close">✕</button>
         </div>
         <div class="auth-panel">
-          <p class="auth-copy">Create an account or sign in with email and password to keep your shelves and books synced.</p>
+          <p id="authCopy" class="auth-copy">Sign in with email and password to keep your shelves and books synced.</p>
           <form id="authForm" class="book-form auth-form">
             <label>
               Username
@@ -181,7 +181,8 @@
               <input name="favoriteShelf" placeholder="Currently Reading" />
             </label>
             <div class="auth-mode-switch">
-              <button id="toggleAuthModeBtn" class="secondary-btn" type="button">Already have an account?</button>
+              <button id="forgotPasswordBtn" class="secondary-btn" type="button">Forgot password?</button>
+              <button id="toggleAuthModeBtn" class="secondary-btn" type="button">Need an account?</button>
             </div>
             <div class="form-actions">
               <button id="authSubmitBtn" type="submit" class="action-btn">Create account</button>
