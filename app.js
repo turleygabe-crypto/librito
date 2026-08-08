@@ -387,18 +387,36 @@ async function lookupBookByIsbn(isbn) {
 
   scanStatus.textContent = `Looking up ${normalized}…`;
   try {
-    const response = await fetch(`/api/scan?isbn=${encodeURIComponent(normalized)}`);
-    if (!response.ok) throw new Error("Lookup failed");
-    const payload = await response.json();
-    const bookData = payload.data;
+    let bookData = null;
+
+    try {
+      const response = await fetch(`/api/scan?isbn=${encodeURIComponent(normalized)}`);
+      if (response.ok) {
+        const payload = await response.json();
+        bookData = payload.data;
+      }
+    } catch (error) {
+      console.warn("Local API lookup failed, falling back to Open Library", error);
+    }
+
+    if (!bookData) {
+      const openLibraryResponse = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(normalized)}&format=json&jscmd=data`);
+      if (!openLibraryResponse.ok) throw new Error("Lookup failed");
+      const openLibraryPayload = await openLibraryResponse.json();
+      bookData = openLibraryPayload[`ISBN:${normalized}`] || null;
+    }
 
     if (!bookData) {
       scanStatus.textContent = "No metadata found for that ISBN. You can enter the details manually.";
       return;
     }
 
+    const authors = Array.isArray(bookData.authors)
+      ? bookData.authors.map((author) => author.name).filter(Boolean)
+      : [];
+
     bookForm.elements.title.value = bookData.title || "";
-    bookForm.elements.author.value = (bookData.authors || []).map((author) => author.name).join(", ") || "";
+    bookForm.elements.author.value = authors.join(", ") || "";
     bookForm.elements.notes.value = bookData.publish_date ? `Published ${bookData.publish_date}` : "";
     bookForm.elements.added.value = new Date().toISOString().slice(0, 10);
     scanStatus.textContent = `Loaded ${bookData.title}`;
@@ -443,7 +461,18 @@ async function startCameraScan() {
       };
       runDetection();
     } else {
-      scanStatus.textContent = "Camera scanning is not supported in this browser. Enter the ISBN manually.";
+      const { BrowserMultiFormatReader } = await import("https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm");
+      const reader = new BrowserMultiFormatReader();
+      scanStatus.textContent = "Scanning… point the camera at the barcode.";
+      reader.decodeFromVideoElement(scannerVideo, async (result) => {
+        if (!result || !cameraStream) return;
+        const value = result.getText();
+        isbnInput.value = value;
+        scanStatus.textContent = `Detected ${value}`;
+        await lookupBookByIsbn(value);
+        reader.reset();
+        stopCameraScan();
+      });
     }
   } catch (error) {
     console.error(error);
