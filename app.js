@@ -1089,6 +1089,15 @@ function buildSuggestedShelves(genres, recommendations, authorRecommendations = 
       });
     }
   });
+  if (!suggestions.length && recommendations.length) {
+    suggestions.push({
+      key: "more-to-explore",
+      name: "More to explore",
+      subtitle: "A mix of books picked for your library",
+      color: "#4c7083",
+      books: recommendations.map(({ book }) => book),
+    });
+  }
   return suggestions.map((shelf) => ({
     type: "suggested-shelf",
     ...shelf,
