@@ -311,6 +311,7 @@ function findBookForRoute(params) {
   const books = [
     ...state.books,
     ...(state.searchResults || []),
+    ...state.catalogBooks,
     ...discoveryBooks,
   ];
   return books.find((book) => id
