@@ -674,9 +674,9 @@ function createBookCover(book, className = "") {
   const coverSize = className.includes("book-detail-cover") ? "L" : "M";
   const coverUrl = book.cover_i
     ? `https://covers.openlibrary.org/b/id/${book.cover_i}-${coverSize}.jpg?default=false`
-    : isbn
+    : book.cover_url || (isbn
       ? `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(isbn)}-${coverSize}.jpg?default=false`
-      : "";
+      : "");
   if (coverUrl) {
     const image = document.createElement("img");
     let currentCoverSize = coverSize;
@@ -1182,6 +1182,8 @@ function markBookAsOwned(book) {
   bookForm.elements.isbn.value = Array.isArray(book.isbn)
     ? book.isbn[0] || ""
     : book.isbn || "";
+  bookForm.elements.cover_url.value = book.cover_url
+    || (book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-L.jpg?default=false` : "");
   bookForm.elements.genre.value = book.genre || "";
   bookForm.elements.page_count.value = String(book.page_count || book.pages || "");
   bookForm.elements.added.value = new Date().toISOString().slice(0, 10);
@@ -1807,6 +1809,10 @@ function renderBookPage(book) {
       bookForm.elements.title.value = book.title || "";
       bookForm.elements.author.value = book.author || "";
       bookForm.elements.isbn.value = book.isbn || "";
+      bookForm.elements.cover_url.value = book.cover_url
+        || (book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-L.jpg?default=false` : "");
+      bookForm.elements.genre.value = book.genre || "";
+      bookForm.elements.page_count.value = String(book.page_count || book.pages || "");
     }
   });
   const like = document.createElement("button");
@@ -1877,8 +1883,180 @@ function renderBookPage(book) {
   }
   layout.append(cover, content);
   page.append(header, layout);
+  page.append(createBookEditionPicker(book));
   const similar = discoveryBooks.filter((item) => item.genre === book.genre && getBookKey(item) !== getBookKey(book));
   if (similar.length) page.append(createCardRow("More like this", similar.slice(0, 6).map((item) => ({ type: "book", book: item }))));
+}
+
+function createBookEditionPicker(book) {
+  const section = document.createElement("section");
+  section.className = "edition-picker";
+  const heading = document.createElement("h2");
+  heading.textContent = "Choose an edition and cover";
+  const description = document.createElement("p");
+  description.className = "page-description";
+  description.textContent = `Browse ${getOpenLibraryLanguageName(getDefaultBookLanguage())} editions and choose the cover you prefer.`;
+  const loadButton = document.createElement("button");
+  loadButton.type = "button";
+  loadButton.className = "secondary-btn";
+  loadButton.textContent = "Show editions and covers";
+  const status = document.createElement("p");
+  status.className = "edition-picker-status";
+  status.setAttribute("role", "status");
+  const choices = document.createElement("div");
+  choices.className = "edition-cover-choices";
+  section.append(heading, description, loadButton, status, choices);
+
+  loadButton.addEventListener("click", async () => {
+    loadButton.disabled = true;
+    status.textContent = "Finding editions…";
+    choices.replaceChildren();
+    try {
+      const editions = await getOpenLibraryEditionsForBook(book);
+      if (!editions.length) {
+        status.textContent = `No ${getOpenLibraryLanguageName(getDefaultBookLanguage())} editions with covers were found.`;
+        return;
+      }
+      status.textContent = `Choose from ${editions.length} edition${editions.length === 1 ? "" : "s"} and available cover${editions.length === 1 ? "" : "s"}.`;
+      editions.forEach((edition) => {
+        const choice = document.createElement("button");
+        choice.type = "button";
+        choice.className = "edition-cover-choice";
+        choice.setAttribute("aria-pressed", String(
+          book.cover_url === edition.coverUrl && book.isbn === edition.isbn
+        ));
+        choice.append(createBookCover({
+          title: edition.title,
+          cover_url: edition.coverUrl,
+        }));
+        const copy = document.createElement("span");
+        copy.className = "edition-cover-copy";
+        const title = document.createElement("strong");
+        title.textContent = edition.title;
+        const metadata = document.createElement("span");
+        metadata.textContent = [
+          edition.publishDate,
+          edition.publisher,
+          edition.isbn && `ISBN ${edition.isbn}`,
+        ].filter(Boolean).join(" · ") || `${getOpenLibraryLanguageName(getDefaultBookLanguage())} edition`;
+        copy.append(title, metadata);
+        choice.append(copy);
+        choice.addEventListener("click", async () => {
+          choice.disabled = true;
+          const fields = {
+            title: edition.title || book.title,
+            isbn: edition.isbn || book.isbn || "",
+            cover_url: edition.coverUrl,
+            ...(edition.pageCount ? { page_count: edition.pageCount } : {}),
+          };
+          const ownedBook = state.books.find((item) =>
+            (book.id && item.id === book.id) || getBookKey(item) === getBookKey(book)
+          );
+          if (ownedBook && !await updateBookFields(ownedBook, fields)) {
+            choice.disabled = false;
+            return;
+          }
+          Object.assign(book, fields);
+          if (ownedBook && ownedBook !== book) {
+            Object.assign(ownedBook, fields);
+            delete ownedBook.cover_i;
+          }
+          delete book.cover_i;
+          updateBookPageDetails(book);
+          choices.querySelectorAll(".edition-cover-choice").forEach((button) => {
+            button.setAttribute("aria-pressed", String(button === choice));
+          });
+          choice.disabled = false;
+          showToast(ownedBook ? "Edition updated" : "Edition selected");
+        });
+        choices.append(choice);
+      });
+    } catch (error) {
+      console.error(error);
+      status.textContent = "Could not load editions. Check your connection and try again.";
+    } finally {
+      loadButton.disabled = false;
+    }
+  });
+  return section;
+}
+
+function updateBookPageDetails(book) {
+  state.currentBook = book;
+  const page = document.getElementById("pageView");
+  const heading = page.querySelector(".page-header h1");
+  if (heading) heading.textContent = book.title || "Untitled";
+  const existingCover = page.querySelector(".book-detail-cover");
+  if (existingCover) existingCover.replaceWith(createBookCover(book, "book-detail-cover"));
+  const values = {
+    ISBN: book.isbn || "—",
+    Pages: book.page_count || book.pages || "—",
+  };
+  page.querySelectorAll(".book-detail-content > p").forEach((field) => {
+    const label = field.querySelector("strong")?.textContent.trim();
+    if (!label || !(label in values)) return;
+    field.replaceChildren(field.querySelector("strong"), document.createTextNode(` ${values[label]}`));
+  });
+}
+
+async function getOpenLibraryEditionsForBook(book) {
+  let workKeys = [];
+  const isbn = (book.isbn || "").replace(/[^0-9Xx]/g, "");
+  if (isbn) {
+    const response = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(isbn)}&format=json&jscmd=data`);
+    if (!response.ok) throw new Error(`Open Library ISBN lookup responded with ${response.status}`);
+    const result = await response.json();
+    const editionKey = result[`ISBN:${isbn}`]?.key;
+    if (editionKey && /^\/books\/[^/]+$/.test(editionKey)) {
+      const editionResponse = await fetch(`https://openlibrary.org${editionKey}.json`);
+      if (!editionResponse.ok) throw new Error(`Open Library edition responded with ${editionResponse.status}`);
+      const edition = await editionResponse.json();
+      workKeys = (edition.works || []).map((work) => work.key).filter((key) => /^\/works\/[^/]+$/.test(key));
+    }
+  }
+
+  if (!workKeys.length) {
+    const params = new URLSearchParams({
+      q: `${book.title || ""} ${book.author || ""} language:${getDefaultBookLanguage()}`.trim(),
+      fields: "key,title,author_name",
+      limit: "10",
+    });
+    const response = await fetch(`https://openlibrary.org/search.json?${params}`);
+    if (!response.ok) throw new Error(`Open Library search responded with ${response.status}`);
+    const result = await response.json();
+    const works = Array.isArray(result.docs) ? result.docs : [];
+    const normalizedAuthor = (book.author || "").toLowerCase();
+    const matchingWork = works.find((work) =>
+      (work.author_name || []).some((author) => author.toLowerCase() === normalizedAuthor)
+    ) || works[0];
+    if (matchingWork?.key && /^\/works\/[^/]+$/.test(matchingWork.key)) workKeys = [matchingWork.key];
+  }
+
+  const results = await Promise.all(workKeys.map(async (workKey) => {
+    const response = await fetch(`https://openlibrary.org${workKey}/editions.json?limit=100`);
+    if (!response.ok) throw new Error(`Open Library editions responded with ${response.status}`);
+    const payload = await response.json();
+    return Array.isArray(payload.entries) ? payload.entries : [];
+  }));
+  const language = getDefaultBookLanguage();
+  const choices = results.flat().flatMap((edition) => {
+    const languages = (edition.languages || []).map((entry) => entry.key.split("/").pop());
+    if (!languages.includes(language)) return [];
+    const isbn = [...(edition.isbn_13 || []), ...(edition.isbn_10 || [])][0] || "";
+    return (edition.covers || [])
+      .filter((coverId) => Number.isInteger(coverId) && coverId > 0)
+      .map((coverId) => ({
+        title: edition.title || book.title || "Untitled",
+        isbn,
+        coverUrl: `https://covers.openlibrary.org/b/id/${coverId}-L.jpg?default=false`,
+        publisher: edition.publishers?.[0] || "",
+        publishDate: edition.publish_date || "",
+        pageCount: Number(edition.number_of_pages) || null,
+      }));
+  });
+  return choices.filter((edition, index, all) =>
+    all.findIndex((candidate) => candidate.coverUrl === edition.coverUrl && candidate.isbn === edition.isbn) === index
+  );
 }
 
 function showSearchPage(query = "") {
@@ -2317,11 +2495,12 @@ function showToast(message) {
   }, 1800);
 }
 
-function fillBookDetails({ title, authors = [], isbn = "", publishDate = "", genre = "" }) {
+function fillBookDetails({ title, authors = [], isbn = "", publishDate = "", genre = "", coverUrl = "" }) {
   bookForm.elements.title.value = title || "";
   bookForm.elements.author.value = authors.join(", ");
   bookForm.elements.genre.value = genre;
   if (isbn) isbnInput.value = isbn;
+  bookForm.elements.cover_url.value = coverUrl;
   bookForm.elements.notes.value = publishDate ? `Published ${publishDate}` : "";
   bookForm.elements.added.value = new Date().toISOString().slice(0, 10);
   showBookDetails();
@@ -2413,6 +2592,9 @@ function renderSelectedBookConfirmation() {
       isbn: Array.isArray(result.isbn) ? result.isbn[0] || "" : "",
       publishDate: result.first_publish_year ? String(result.first_publish_year) : "",
       genre: Array.isArray(result.subject) ? result.subject[0] || "" : "",
+      coverUrl: result.cover_i
+        ? `https://covers.openlibrary.org/b/id/${result.cover_i}-L.jpg?default=false`
+        : "",
     });
     selectedTitleResult = null;
     titleSearchResults = [];
@@ -2539,7 +2721,13 @@ async function lookupBookByIsbn(isbn) {
       ? bookData.authors.map((author) => author.name).filter(Boolean)
       : [];
 
-    fillBookDetails({ title: bookData.title, authors, isbn: normalized, publishDate: bookData.publish_date || "" });
+    fillBookDetails({
+      title: bookData.title,
+      authors,
+      isbn: normalized,
+      publishDate: bookData.publish_date || "",
+      coverUrl: bookData.cover?.large || "",
+    });
     scanStatus.textContent = `Loaded ${bookData.title}`;
     showToast("Book profile filled from ISBN lookup");
   } catch (error) {
@@ -2800,6 +2988,7 @@ async function loadFromSupabase() {
     author: book.author,
     genre: book.genre || "",
     isbn: book.isbn || "",
+    cover_url: book.cover_url || "",
     shelf: book.shelf,
     reading_status: book.reading_status || "",
     disposition: book.disposition || "",
@@ -2861,6 +3050,7 @@ async function saveBookToSupabase(book) {
     author: book.author,
     genre: book.genre || null,
     isbn: book.isbn || null,
+    cover_url: book.cover_url || null,
     shelf: book.shelf || null,
     reading_status: book.reading_status || null,
     disposition: book.disposition || null,
@@ -3293,6 +3483,7 @@ bookForm.addEventListener("submit", async (event) => {
     added: formData.get("added").toString().trim(),
     notes: formData.get("notes").toString().trim(),
     isbn: formData.get("isbn").toString().trim(),
+    cover_url: formData.get("cover_url").toString().trim(),
     genre: formData.get("genre").toString().trim(),
     page_count: Number(formData.get("page_count") || 0) || null,
     shelves: [],
