@@ -1,6 +1,68 @@
 import { createSupabaseClient } from "./lib/supabase-client.js";
 
 const storageKey = "librito-library-v1";
+const openLibraryLanguages = [
+  ["eng", "English"],
+  ["spa", "Spanish"],
+  ["fre", "French"],
+  ["ger", "German"],
+  ["ita", "Italian"],
+  ["por", "Portuguese"],
+  ["dut", "Dutch"],
+  ["jpn", "Japanese"],
+  ["chi", "Chinese"],
+  ["kor", "Korean"],
+  ["rus", "Russian"],
+  ["ara", "Arabic"],
+  ["hin", "Hindi"],
+  ["swe", "Swedish"],
+  ["ben", "Bengali"],
+  ["cze", "Czech"],
+  ["dan", "Danish"],
+  ["fin", "Finnish"],
+  ["gre", "Greek"],
+  ["heb", "Hebrew"],
+  ["hun", "Hungarian"],
+  ["ind", "Indonesian"],
+  ["nor", "Norwegian"],
+  ["pol", "Polish"],
+  ["rum", "Romanian"],
+  ["tha", "Thai"],
+  ["tur", "Turkish"],
+  ["ukr", "Ukrainian"],
+  ["vie", "Vietnamese"],
+];
+const browserLanguageCodes = {
+  ar: "ara",
+  bn: "ben",
+  cs: "cze",
+  da: "dan",
+  de: "ger",
+  en: "eng",
+  es: "spa",
+  fi: "fin",
+  fr: "fre",
+  el: "gre",
+  hi: "hin",
+  he: "heb",
+  hu: "hun",
+  id: "ind",
+  it: "ita",
+  ja: "jpn",
+  ko: "kor",
+  nl: "dut",
+  no: "nor",
+  pl: "pol",
+  pt: "por",
+  ro: "rum",
+  ru: "rus",
+  sv: "swe",
+  th: "tha",
+  tr: "tur",
+  uk: "ukr",
+  vi: "vie",
+  zh: "chi",
+};
 const defaultBooks = [
   {
     id: crypto.randomUUID(),
@@ -119,7 +181,6 @@ const state = {
 
 const bookForm = document.getElementById("bookForm");
 const dialogOverlay = document.getElementById("dialogOverlay");
-const scanButton = document.getElementById("scanButton");
 const openModalBtn = document.getElementById("openModalBtn");
 const closeDialogBtn = document.getElementById("closeDialogBtn");
 const toast = document.getElementById("toast");
@@ -128,6 +189,7 @@ const titleLookupPanel = document.getElementById("titleLookupPanel");
 const isbnLookupPanel = document.getElementById("isbnLookupPanel");
 const lookupTitleInput = document.getElementById("lookupTitleInput");
 const lookupAuthorInput = document.getElementById("lookupAuthorInput");
+const lookupLanguage = document.getElementById("lookupLanguage");
 const lookupTitleBtn = document.getElementById("lookupTitleBtn");
 const titleLookupResults = document.getElementById("titleLookupResults");
 const selectedBookConfirmation = document.getElementById("selectedBookConfirmation");
@@ -137,6 +199,7 @@ const isbnInput = document.getElementById("isbnInput");
 const scannerVideo = document.getElementById("scannerVideo");
 const scanStatus = document.getElementById("scanStatus");
 const authButton = document.getElementById("authButton");
+const sidebarAuthCopy = document.getElementById("sidebarAuthCopy");
 const authOverlay = document.getElementById("authOverlay");
 const closeAuthBtn = document.getElementById("closeAuthBtn");
 const authForm = document.getElementById("authForm");
@@ -162,8 +225,6 @@ const nowReadingCover = document.getElementById("nowReadingCover");
 const nowReadingBook = document.getElementById("nowReadingBook");
 const featuredAddBtn = document.getElementById("featuredAddBtn");
 const featuredPlayBtn = document.getElementById("featuredPlayBtn");
-const savedBooksBtn = document.getElementById("savedBooksBtn");
-const settingsBtn = document.getElementById("settingsBtn");
 let cameraStream = null;
 let barcodeLoopTimer = null;
 let selectedBook = null;
@@ -229,6 +290,26 @@ function createBookCover(book, className = "") {
 
 function updateAuthButton() {
   authButton.textContent = state.session ? "Sign out" : "Sign in";
+  sidebarAuthCopy.textContent = state.session
+    ? "You're signed in. Your shelves are saved to your account."
+    : "Sign in to build your own shelves.";
+}
+
+function getDefaultBookLanguage() {
+  const language = navigator.language.split("-")[0].toLowerCase();
+  return browserLanguageCodes[language] || "eng";
+}
+
+function initializeBookLanguageOptions() {
+  const defaultLanguage = getDefaultBookLanguage();
+  const defaultName = openLibraryLanguages.find(([code]) => code === defaultLanguage)?.[1]
+    || new Intl.DisplayNames([navigator.language], { type: "language" }).of(navigator.language.split("-")[0])
+    || defaultLanguage;
+  lookupLanguage.replaceChildren(new Option(`Default (${defaultName})`, "default"));
+  openLibraryLanguages
+    .filter(([code]) => code !== defaultLanguage)
+    .forEach(([code, name]) => lookupLanguage.add(new Option(name, code)));
+  lookupLanguage.add(new Option("Any language", "all"));
 }
 
 function renderStats() {
@@ -534,6 +615,10 @@ function getBookDescription(result) {
   return metadata.join(" · ") || "No description available.";
 }
 
+function getOpenLibraryLanguageName(code) {
+  return openLibraryLanguages.find(([languageCode]) => languageCode === code)?.[1] || code;
+}
+
 function renderTitleSearchResults() {
   titleLookupResults.replaceChildren();
   titleSearchResults.forEach((result, index) => {
@@ -551,7 +636,8 @@ function renderTitleSearchResults() {
     const authorLine = document.createElement("span");
     authorLine.textContent = authors.join(", ") || "Unknown author";
     const description = document.createElement("span");
-    description.textContent = getBookDescription(result);
+    const languageName = result.language?.[0] ? getOpenLibraryLanguageName(result.language[0]) : "";
+    description.textContent = [languageName && `${languageName} edition`, getBookDescription(result)].filter(Boolean).join(" · ");
     copy.append(title, authorLine, description);
     button.append(copy);
     button.addEventListener("click", () => {
@@ -616,10 +702,16 @@ async function lookupBooksByTitleOrAuthor() {
     return;
   }
 
+  const selectedLanguage = lookupLanguage.value === "all"
+    ? ""
+    : lookupLanguage.value === "default"
+      ? getDefaultBookLanguage()
+      : lookupLanguage.value;
+  const searchTerms = [title, author].filter(Boolean).join(" ");
   const params = new URLSearchParams({
-    q: [title, author].filter(Boolean).join(" "),
+    q: selectedLanguage ? `${searchTerms} language:${selectedLanguage}` : searchTerms,
     limit: "10",
-    fields: "key,title,author_name,isbn,first_publish_year,cover_i,first_sentence,subject",
+    fields: "key,title,author_name,first_publish_year,first_sentence,subject",
   });
   scanStatus.textContent = "Searching books…";
   titleSearchResults = [];
@@ -631,14 +723,51 @@ async function lookupBooksByTitleOrAuthor() {
     const response = await fetch(`https://openlibrary.org/search.json?${params}`);
     if (!response.ok) throw new Error(`Open Library responded with ${response.status}`);
     const payload = await response.json();
-    titleSearchResults = Array.isArray(payload.docs) ? payload.docs : [];
+    const works = Array.isArray(payload.docs) ? payload.docs : [];
+    const editionResults = await Promise.allSettled(works.map(async (work) => {
+      if (!work.key) return null;
+      const editionsResponse = await fetch(`https://openlibrary.org${work.key}/editions.json?limit=100`);
+      if (!editionsResponse.ok) throw new Error(`Open Library editions responded with ${editionsResponse.status}`);
+      const editionPayload = await editionsResponse.json();
+      const editions = Array.isArray(editionPayload.entries) ? editionPayload.entries : [];
+      const matchingEditions = editions.filter((edition) => {
+        const editionLanguages = (edition.languages || []).map((language) => language.key.split("/").pop());
+        return !selectedLanguage || editionLanguages.includes(selectedLanguage);
+      });
+      matchingEditions.sort((first, second) => {
+        const editionScore = (edition) => Number(Boolean(edition.covers?.length)) * 2 + Number(Boolean(edition.isbn_13?.length));
+        return editionScore(second) - editionScore(first);
+      });
+      const edition = matchingEditions[0];
+      if (!edition) return null;
+      const editionLanguages = (edition.languages || []).map((language) => language.key.split("/").pop());
+      return {
+        ...work,
+        title: edition.title || work.title,
+        isbn: [...(edition.isbn_13 || []), ...(edition.isbn_10 || [])],
+        cover_i: edition.covers?.[0],
+        language: editionLanguages,
+        first_publish_year: edition.publish_date || work.first_publish_year,
+      };
+    }));
+    let editionLookupFailures = 0;
+    titleSearchResults = editionResults.flatMap((result) => {
+      if (result.status === "rejected") {
+        editionLookupFailures += 1;
+        console.error(result.reason);
+        return [];
+      }
+      return result.value ? [result.value] : [];
+    });
     if (!titleSearchResults.length) {
-      scanStatus.textContent = "No matching books found. You can enter the details manually.";
+      scanStatus.textContent = editionLookupFailures
+        ? "Could not verify the language of matching editions. Try again or enter the details manually."
+        : `No matching editions found in ${selectedLanguage ? getOpenLibraryLanguageName(selectedLanguage) : "any language"}. You can enter the details manually.`;
       return;
     }
 
     renderTitleSearchResults();
-    scanStatus.textContent = `${titleSearchResults.length} matching books. Select a cover to review and confirm.`;
+    scanStatus.textContent = `${titleSearchResults.length} matching editions${editionLookupFailures ? "; some editions could not be checked" : ""}. Select a cover to review and confirm.`;
   } catch (error) {
     console.error(error);
     scanStatus.textContent = "Book search failed. Try again or enter the details manually.";
@@ -759,22 +888,6 @@ function stopCameraScan() {
   }
   scannerVideo.style.display = "none";
   scannerVideo.srcObject = null;
-}
-
-function seedMockScan() {
-  const samples = [
-    { title: "Anxious People", author: "Fredrik Backman", shelf: "Cozy Reads", cost: 16.5, added: new Date().toISOString().slice(0, 10), notes: "A warm, witty story for book club night." },
-    { title: "The House of Doors", author: "Tan Twan Eng", shelf: "Currently Reading", cost: 24.0, added: new Date().toISOString().slice(0, 10), notes: "A lush, atmospheric story." },
-    { title: "The Light We Carry", author: "Michelle Obama", shelf: "Inspiration", cost: 20.0, added: new Date().toISOString().slice(0, 10), notes: "Perfect for thoughtful evenings." },
-  ];
-
-  const sample = samples[Math.floor(Math.random() * samples.length)];
-  bookForm.elements.title.value = sample.title;
-  bookForm.elements.author.value = sample.author;
-  bookForm.elements.shelf.value = state.shelves.some((shelf) => shelf.name === sample.shelf) ? sample.shelf : "";
-  bookForm.elements.cost.value = sample.cost;
-  bookForm.elements.added.value = sample.added;
-  bookForm.elements.notes.value = sample.notes;
 }
 
 async function initializeSupabase() {
@@ -946,11 +1059,6 @@ async function saveBookToSupabase(book) {
   await loadFromSupabase();
 }
 
-scanButton.addEventListener("click", () => {
-  openDialog();
-  seedMockScan();
-});
-
 function setBookView(category = "All") {
   state.category = category;
   document.querySelectorAll(".category-tab").forEach((item) => {
@@ -963,16 +1071,6 @@ document.querySelectorAll(".category-tab").forEach((tab) => {
   tab.addEventListener("click", () => {
     setBookView(tab.textContent.trim());
   });
-});
-
-savedBooksBtn.addEventListener("click", () => {
-  setBookView("All");
-  showToast("Your saved books are shown below");
-  document.querySelector(".recommendation-section")?.scrollIntoView({ behavior: "smooth" });
-});
-
-settingsBtn.addEventListener("click", () => {
-  authButton.click();
 });
 
 document.getElementById("previewBtn").addEventListener("click", () => {
@@ -1294,6 +1392,8 @@ bookForm.addEventListener("submit", async (event) => {
   await saveBookToSupabase(book);
 });
 
+initializeBookLanguageOptions();
+updateAuthButton();
 render();
 initializeSupabase();
 

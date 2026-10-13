@@ -27,7 +27,7 @@
           <button class="nav-pill" type="button">Stats</button>
         </nav>
         <div class="sidebar-card">
-          <p>Sign in with Google to build your own shelves.</p>
+          <p id="sidebarAuthCopy">Sign in to build your own shelves.</p>
           <button id="authButton" class="action-btn">Sign in</button>
         </div>
       </aside>
@@ -35,11 +35,6 @@
       <div class="main-stage">
         <header class="topbar spotify-topbar">
           <div class="brand-mark compact-mark">L</div>
-          <div class="topbar-actions">
-            <button id="savedBooksBtn" class="circle-btn" type="button" aria-label="Saved books">♡</button>
-            <button id="scanButton" class="circle-btn" type="button" aria-label="Scan a book">＋</button>
-            <button id="settingsBtn" class="circle-btn" type="button" aria-label="Account settings">⚙</button>
-          </div>
         </header>
 
         <main class="spotify-home">
@@ -215,6 +210,14 @@
               <label>
                 Author (optional)
                 <input id="lookupAuthorInput" placeholder="Author name" />
+              </label>
+              <label>
+                Book language
+                <select id="lookupLanguage">
+                  <option value="default">Default language</option>
+                  <option value="all">Any language</option>
+                </select>
+                <span class="field-hint">Results use your browser language by default. Choose another language or any language to include other editions.</span>
               </label>
               <div class="scan-actions">
                 <button id="lookupTitleBtn" type="button" class="secondary-btn">Search books</button>
