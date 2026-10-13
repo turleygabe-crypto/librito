@@ -261,6 +261,7 @@ let bookProfileReturnFocus = null;
 const oauthRedirectKey = "librito-oauth-redirect";
 let authPrompted = sessionStorage.getItem(oauthRedirectKey) === "true";
 let authMode = "signin";
+let supabaseInitialization = null;
 
 function loadBooks() {
   try {
@@ -2085,7 +2086,14 @@ function stopCameraScan() {
   scannerVideo.srcObject = null;
 }
 
-async function initializeSupabase() {
+function initializeSupabase() {
+  if (!supabaseInitialization) {
+    supabaseInitialization = initializeSupabaseOnce();
+  }
+  return supabaseInitialization;
+}
+
+async function initializeSupabaseOnce() {
   try {
     state.supabase = createSupabaseClient();
     const { data: { session } } = await state.supabase.auth.getSession();
@@ -2145,6 +2153,17 @@ async function initializeSupabase() {
   }
 }
 
+async function refreshAuthSession() {
+  await initializeSupabase();
+  if (!state.supabase) return null;
+
+  const { data, error } = await state.supabase.auth.getSession();
+  if (error) throw error;
+  state.session = data.session;
+  updateAuthButton();
+  return state.session;
+}
+
 async function ensureProfile(displayName = "") {
   if (!state.supabase || !state.session) return;
   const user = state.session.user;
@@ -2185,14 +2204,23 @@ async function createShelfInSupabase() {
     showToast("Name your shelf first.");
     return;
   }
-  if (!state.supabase || !state.session) {
+  let session;
+  try {
+    session = await refreshAuthSession();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || "Could not check your account. Try again.");
+    return;
+  }
+  if (!session) {
     showToast("Sign in to save shelves.");
+    openAuthModal();
     return;
   }
 
   const { data, error } = await state.supabase
     .from("shelves")
-    .insert({ name, color: shelfColorInput?.value || "#8b5e3c", user_id: state.session.user.id })
+    .insert({ name, color: shelfColorInput?.value || "#8b5e3c", user_id: session.user.id })
     .select("*")
     .single();
 
@@ -2479,11 +2507,23 @@ shelfDrawerOverlay.addEventListener("click", (event) => {
 });
 
 authButton.addEventListener("click", async () => {
-  if (!state.supabase) {
-    await initializeSupabase();
+  let session;
+  try {
+    session = await refreshAuthSession();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || "Could not check your account. Try again.");
+    return;
   }
-  if (state.session) {
-    await state.supabase.auth.signOut();
+  if (session) {
+    try {
+      const { error } = await state.supabase.auth.signOut();
+      if (error) throw error;
+    } catch (error) {
+      console.error(error);
+      showToast(error.message || "Could not sign out.");
+      return;
+    }
     state.session = null;
     state.profile = null;
     state.books = loadBooks();
@@ -2501,9 +2541,7 @@ toggleAuthModeBtn.addEventListener("click", () => {
 });
 
 googleAuthBtn.addEventListener("click", async () => {
-  if (!state.supabase) {
-    await initializeSupabase();
-  }
+  await initializeSupabase();
   if (!state.supabase) {
     showToast("Authentication is not configured. Check the Supabase settings.");
     return;
@@ -2536,9 +2574,7 @@ forgotPasswordBtn.addEventListener("click", () => {
 
 authForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!state.supabase) {
-    await initializeSupabase();
-  }
+  await initializeSupabase();
   if (!state.supabase) {
     showToast("Authentication is not configured. Check the Supabase settings.");
     return;
