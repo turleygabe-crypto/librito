@@ -158,6 +158,9 @@ const shelfForm = document.getElementById("shelfForm");
 const bookProfileOverlay = document.getElementById("bookProfileOverlay");
 const closeBookProfileBtn = document.getElementById("closeBookProfileBtn");
 const bookProfileContent = document.getElementById("bookProfileContent");
+const featuredBookCover = document.getElementById("featuredBookCover");
+const nowReadingCover = document.getElementById("nowReadingCover");
+const nowReadingBook = document.getElementById("nowReadingBook");
 const featuredAddBtn = document.getElementById("featuredAddBtn");
 const featuredPlayBtn = document.getElementById("featuredPlayBtn");
 const authorQuickLink = document.getElementById("authorQuickLink");
@@ -196,6 +199,34 @@ function formatCurrency(value) {
 function formatDate(value) {
   if (!value) return "—";
   return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function createBookCover(book, className = "") {
+  const cover = document.createElement("div");
+  cover.className = `book-cover-art ${className}`.trim();
+  const title = document.createElement("span");
+  title.className = "book-cover-placeholder";
+  title.textContent = book.title || "Book cover";
+  cover.append(title);
+
+  const isbn = Array.isArray(book.isbn)
+    ? book.isbn[0]
+    : book.isbn || (Array.isArray(book.isbnList) ? book.isbnList[0] : "");
+  const coverUrl = book.cover_i
+    ? `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg?default=false`
+    : isbn
+      ? `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(isbn)}-M.jpg?default=false`
+      : "";
+  if (coverUrl) {
+    const image = document.createElement("img");
+    image.src = coverUrl;
+    image.alt = `${book.title || "Book"} cover`;
+    image.loading = "lazy";
+    image.addEventListener("load", () => cover.classList.add("has-cover"), { once: true });
+    image.addEventListener("error", () => image.remove(), { once: true });
+    cover.prepend(image);
+  }
+  return cover;
 }
 
 function updateAuthButton() {
@@ -264,32 +295,31 @@ function renderShelfOptions() {
 
 function openBookProfile(book) {
   selectedBook = book;
-  bookProfileContent.innerHTML = `
-    <div class="profile-field">
-      <strong>Title</strong>
-      <span>${book.title}</span>
-    </div>
-    <div class="profile-field">
-      <strong>Author</strong>
-      <span>${book.author || "Unknown author"}</span>
-    </div>
-    <div class="profile-field">
-      <strong>Shelf</strong>
-      <span>${book.shelf || "Library (no shelf)"}</span>
-    </div>
-    <div class="profile-field">
-      <strong>Cost</strong>
-      <span>${formatCurrency(book.cost)}</span>
-    </div>
-    <div class="profile-field">
-      <strong>Date added</strong>
-      <span>${formatDate(book.added || book.added_on)}</span>
-    </div>
-    <div class="profile-field">
-      <strong>Notes</strong>
-      <span>${book.notes || "No notes yet."}</span>
-    </div>
-  `;
+  bookProfileContent.replaceChildren();
+  const profile = document.createElement("div");
+  profile.className = "book-profile-layout";
+  profile.append(createBookCover(book, "profile-book-cover"));
+  const details = document.createElement("div");
+  details.className = "book-profile-details";
+  [
+    ["Title", book.title],
+    ["Author", book.author || "Unknown author"],
+    ["Shelf", book.shelf || "Library (no shelf)"],
+    ["Cost", formatCurrency(book.cost)],
+    ["Date added", formatDate(book.added || book.added_on)],
+    ["Notes", book.notes || "No notes yet."],
+  ].forEach(([label, value]) => {
+    const field = document.createElement("div");
+    field.className = "profile-field";
+    const heading = document.createElement("strong");
+    heading.textContent = label;
+    const content = document.createElement("span");
+    content.textContent = value;
+    field.append(heading, content);
+    details.append(field);
+  });
+  profile.append(details);
+  bookProfileContent.append(profile);
   bookProfileOverlay.classList.remove("hidden");
 }
 
@@ -329,24 +359,31 @@ function renderBooks() {
           <h4>${shelfName}</h4>
           <span>${booksForShelf.length} titles</span>
         </div>
-        <div class="preview-scroll-row">
-          ${booksForShelf
-            .map((book) => `
-              <article class="book-cover-card" tabindex="0" role="button" data-book-id="${book.id}">
-                <div class="book-cover" style="background-image:linear-gradient(160deg, rgba(43,22,14,.05), rgba(43,22,14,.82)), url('https://covers.openlibrary.org/isbn/${book.isbn || ""}-L.jpg'); background-color:${book.coverColor || "#7a4a2d"};">
-                  <span class="book-cover-pill">${book.shelf || "Library"}</span>
-                  <strong>${book.title}</strong>
-                </div>
-                <div class="book-cover-meta">
-                  <p>${book.author || "Unknown author"}</p>
-                </div>
-              </article>
-            `)
-            .join("")}
-        </div>
+        <div class="preview-scroll-row"></div>
       </section>
     `)
     .join("");
+
+  const shelves = [...bookList.querySelectorAll(".preview-shelf")];
+  Object.values(groupedBooks).forEach((booksForShelf, shelfIndex) => {
+    const row = shelves[shelfIndex].querySelector(".preview-scroll-row");
+    booksForShelf.forEach((book) => {
+      const card = document.createElement("article");
+      card.className = "book-cover-card";
+      card.tabIndex = 0;
+      card.setAttribute("role", "button");
+      card.dataset.bookId = book.id;
+      card.append(createBookCover(book));
+      const title = document.createElement("strong");
+      title.className = "book-cover-title";
+      title.textContent = book.title;
+      const author = document.createElement("span");
+      author.className = "book-cover-author";
+      author.textContent = book.author || "Unknown author";
+      card.append(title, author);
+      row.append(card);
+    });
+  });
 
   bookList.querySelectorAll(".book-cover-card").forEach((card) => {
     card.addEventListener("click", () => {
@@ -368,6 +405,23 @@ function render() {
   renderStats();
   renderShelves();
   renderBooks();
+  renderFeaturedBook();
+  renderNowReadingBook();
+}
+
+function renderFeaturedBook() {
+  const featuredBook = {
+    title: "The Midnight Library",
+    author: "Matt Haig",
+    isbn: "9780525559474",
+  };
+  featuredBookCover.replaceChildren(createBookCover(featuredBook));
+}
+
+function renderNowReadingBook() {
+  const book = state.books[0];
+  nowReadingCover.replaceChildren(...(book ? [createBookCover(book)] : []));
+  nowReadingBook.textContent = book ? `${book.title} · ${book.author || "Unknown author"}` : "Your library is waiting for its first book";
 }
 
 function openDialog() {
@@ -483,32 +537,6 @@ function getBookDescription(result) {
   return metadata.join(" · ") || "No description available.";
 }
 
-function createLookupCover(result) {
-  const cover = document.createElement("div");
-  cover.className = "lookup-cover";
-  const isbn = Array.isArray(result.isbn) ? result.isbn[0] : "";
-  const coverUrl = result.cover_i
-    ? `https://covers.openlibrary.org/b/id/${result.cover_i}-M.jpg`
-    : isbn
-      ? `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(isbn)}-M.jpg`
-      : "";
-  if (!coverUrl) {
-    cover.textContent = "Cover unavailable";
-    return cover;
-  }
-
-  const image = document.createElement("img");
-  image.src = coverUrl;
-  image.alt = "";
-  image.loading = "lazy";
-  image.addEventListener("error", () => {
-    cover.replaceChildren();
-    cover.textContent = "Cover unavailable";
-  }, { once: true });
-  cover.append(image);
-  return cover;
-}
-
 function renderTitleSearchResults() {
   titleLookupResults.replaceChildren();
   titleSearchResults.forEach((result, index) => {
@@ -516,7 +544,7 @@ function renderTitleSearchResults() {
     button.type = "button";
     button.className = "lookup-result";
     button.setAttribute("aria-pressed", String(selectedTitleResult === result));
-    button.append(createLookupCover(result));
+    button.append(createBookCover({ ...result, isbnList: result.isbn }));
 
     const copy = document.createElement("span");
     copy.className = "lookup-result-copy";
@@ -546,7 +574,7 @@ function renderSelectedBookConfirmation() {
   if (!selectedTitleResult) return;
 
   const result = selectedTitleResult;
-  selectedBookConfirmation.append(createLookupCover(result));
+  selectedBookConfirmation.append(createBookCover({ ...result, isbnList: result.isbn }));
   const message = document.createElement("p");
   const authors = Array.isArray(result.author_name) ? result.author_name : [];
   message.textContent = `Use “${result.title || "Untitled"}” by ${authors.join(", ") || "Unknown author"}?`;
@@ -995,9 +1023,9 @@ featuredAddBtn.addEventListener("click", () => {
 featuredPlayBtn.addEventListener("click", () => {
   openDialog();
   if (state.session) {
-    bookForm.elements.title.value = "How to Keep House While Drowning";
-    bookForm.elements.author.value = "KC Davis";
-    bookForm.elements.shelf.value = state.shelves.some((shelf) => shelf.name === "Recommended for You") ? "Recommended for You" : "";
+    bookForm.elements.title.value = "The Midnight Library";
+    bookForm.elements.author.value = "Matt Haig";
+    bookForm.elements.shelf.value = "";
     bookForm.elements.added.value = new Date().toISOString().slice(0, 10);
   }
 });
