@@ -35,7 +35,6 @@
         <section class="sidebar-library" aria-labelledby="libraryHeading">
           <div class="library-heading">
             <h2 id="libraryHeading">Your Library</h2>
-            <button id="createShelfBtn" class="create-shelf-btn" type="button">＋ Create</button>
           </div>
           <nav class="category-tabs sidebar-filters" aria-label="Filter shelves">
             <button class="category-tab active" type="button" aria-pressed="true">All</button>
@@ -54,11 +53,10 @@
           <button id="topHomeBtn" class="home-button" type="button" aria-label="Home">⌂</button>
           <form id="globalSearchForm" class="global-search" role="search">
             <label class="visually-hidden" for="globalSearchInput">Find a book</label>
-            <span aria-hidden="true">⌕</span>
-            <input id="globalSearchInput" type="search" placeholder="Find a book for your shelves" autocomplete="off" />
-            <button id="previewBtn" type="submit">Search</button>
+            <input id="globalSearchInput" type="search" placeholder="Find a book" autocomplete="off" />
+            <button id="previewBtn" type="submit" aria-label="Search books"><span class="search-icon" aria-hidden="true"></span></button>
           </form>
-          <button id="openModalBtn" class="add-book-btn" type="button">＋ Add book</button>
+          <button id="openModalBtn" class="add-book-btn" type="button" aria-label="Add book"><span aria-hidden="true">＋</span><span class="add-book-label">Add book</span></button>
           <details class="account-menu">
             <summary aria-label="Open account menu">
               <span class="account-avatar" aria-hidden="true">L</span>
@@ -79,12 +77,6 @@
           </div>
         </main>
 
-        <nav class="mobile-nav" aria-label="Mobile navigation">
-          <button class="mobile-nav-item active" type="button"><span>⌂</span>Home</button>
-          <button class="mobile-nav-item" type="button"><span>⌕</span>Search</button>
-          <button class="mobile-nav-item" type="button"><span>▥</span>Your Shelves</button>
-          <button class="mobile-nav-item" type="button"><span>＋</span>Create</button>
-        </nav>
       </div>
     </div>
 

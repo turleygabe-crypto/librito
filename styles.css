@@ -16,7 +16,7 @@ button { cursor: pointer; }
 .hidden { display: none !important; }
 h1, h2, h3, h4, p { margin-top: 0; }
 
-.app-shell { min-height: 100vh; padding-bottom: 7.6rem; }
+.app-shell { min-height: 100vh; }
 .sidebar { display: none; }
 .main-stage { width: min(760px, 100%); min-height: 100vh; margin: 0 auto; padding: 0 1rem; }
 .spotify-topbar { display: flex; justify-content: space-between; align-items: center; padding: max(1rem, env(safe-area-inset-top)) 0 0.85rem; }
@@ -83,11 +83,6 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .featured-cover .book-cover-art { height: 100%; }
 .featured-cover .book-cover-placeholder { font-size: clamp(1rem, 2.2vw, 1.5rem); }
 .legacy-panel, .overview-stats { display: none; }
-.mobile-nav { position: fixed; z-index: 4; right: 0; bottom: 0; left: 0; display: grid; grid-template-columns: repeat(4, 1fr); padding: 0.6rem 0 max(0.7rem, env(safe-area-inset-bottom)); background: rgba(22,11,8,.98); }
-.mobile-nav-item { display: grid; gap: 0.2rem; justify-items: center; border: 0; background: transparent; color: var(--muted); font-size: 0.75rem; }
-.mobile-nav-item span { font-size: 1.8rem; line-height: 1; }
-.mobile-nav-item.active { color: #fff; }
-
 .dialog-overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 1rem; background: rgba(24,12,8,.72); }
 .drawer-overlay { justify-content: end; align-items: stretch; padding: 0; }
 .dialog-card { width: min(560px, 100%); max-height: 95vh; overflow: auto; padding: 1rem; border-radius: 1rem; background: var(--paper); color: var(--ink); }
@@ -221,7 +216,6 @@ h1, h2, h3, h4, p { margin-top: 0; }
   .shelf-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
   .shelf-item { padding: 0.85rem; border-radius: 0.7rem; background: #39241d; color: #f5e3d8; }
   .shelf-item span { color: #bca69b; }
-  .mobile-nav { display: none; }
 }
 
 .visually-hidden {
@@ -325,14 +319,10 @@ h1, h2, h3, h4, p { margin-top: 0; }
   box-shadow: 0 0 0 2px rgba(201, 123, 77, 0.2);
 }
 
-.global-search > span {
-  font-size: 1.4rem;
-  line-height: 1;
-}
-
 .global-search input {
   width: 100%;
   min-width: 0;
+  flex: 1 1 auto;
   border: 0;
   outline: 0;
   background: transparent;
@@ -343,18 +333,49 @@ h1, h2, h3, h4, p { margin-top: 0; }
   color: #c1b3ac;
 }
 
-.global-search button,
-.create-shelf-btn {
+.global-search button {
   flex: 0 0 auto;
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
   border: 0;
   border-radius: 999px;
-  padding: 0.55rem 0.9rem;
+  padding: 0;
   background: var(--accent);
   color: #24130d;
+  font-size: 1.65rem;
   font-weight: 700;
+  line-height: 1;
+  place-items: center;
+}
+
+.search-icon {
+  position: relative;
+  display: block;
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+
+.search-icon::after {
+  position: absolute;
+  right: -0.38rem;
+  bottom: -0.22rem;
+  width: 0.48rem;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  content: "";
+  transform: rotate(48deg);
+  transform-origin: left center;
 }
 
 .add-book-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
   flex: 0 0 auto;
   border: 1px solid rgba(245, 221, 201, 0.18);
   border-radius: 999px;
@@ -423,11 +444,6 @@ h1, h2, h3, h4, p { margin-top: 0; }
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 1.5rem;
-  padding-bottom: 6rem;
-}
-
-.mobile-nav {
-  display: grid;
 }
 
 .sidebar-library,
@@ -456,13 +472,6 @@ h1, h2, h3, h4, p { margin-top: 0; }
   margin: 0;
   color: #f8ede6;
   font-size: 1rem;
-}
-
-.create-shelf-btn {
-  padding: 0.45rem 0.65rem;
-  background: #3c2a23;
-  color: #f7e8de;
-  font-size: 0.82rem;
 }
 
 .sidebar-filters {
@@ -593,18 +602,33 @@ h1, h2, h3, h4, p { margin-top: 0; }
     padding: 0.3rem 0.65rem;
   }
 
-  .global-search button {
-    padding: 0.45rem 0.6rem;
-    font-size: 0.8rem;
+  .global-search input {
+    font-size: 0.9rem;
   }
 
-  .add-book-btn,
   .account-menu-label {
     display: none;
   }
 
-  .account-avatar,
   .home-button {
+    display: none;
+  }
+
+  .add-book-btn {
+    width: 2.35rem;
+    height: 2.35rem;
+    padding: 0;
+    border-radius: 50%;
+    background: #34231d;
+    color: #fff7f0;
+    font-size: 1.5rem;
+  }
+
+  .add-book-label {
+    display: none;
+  }
+
+  .account-avatar {
     width: 2.35rem;
     height: 2.35rem;
   }
@@ -740,10 +764,6 @@ h1, h2, h3, h4, p { margin-top: 0; }
 
   .shelf-item-copy > span {
     font-size: 0.8rem;
-  }
-
-  .mobile-nav {
-    display: none;
   }
 
 }

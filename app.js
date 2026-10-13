@@ -245,7 +245,6 @@ const authCopy = document.getElementById("authCopy");
 const displayNameInput = document.getElementById("displayNameInput");
 const newShelfInput = document.getElementById("newShelfInput");
 const shelfColorInput = document.getElementById("shelfColorInput");
-const createShelfBtn = document.getElementById("createShelfBtn");
 const shelfDrawerOverlay = document.getElementById("shelfDrawerOverlay");
 const closeShelfDrawerBtn = document.getElementById("closeShelfDrawerBtn");
 const globalSearchForm = document.getElementById("globalSearchForm");
@@ -1219,7 +1218,7 @@ function createShelfCard(shelf, { compact = false } = {}) {
   open.type = "button";
   open.className = "card-open-button";
   const name = shelf.name || shelf.title;
-  open.setAttribute("aria-label", `${isSuggestion ? "Create" : "Open"} shelf ${name}`);
+  open.setAttribute("aria-label", `${isSuggestion ? "View" : "Open"} shelf ${name}`);
   const cover = document.createElement("span");
   cover.className = "shelf-card-art";
   cover.style.setProperty("--shelf-color", shelf.color);
@@ -1236,12 +1235,8 @@ function createShelfCard(shelf, { compact = false } = {}) {
   subtitle.textContent = isSuggestion ? shelf.subtitle : `${shelf.count} books`;
   open.append(cover, title, subtitle);
   open.addEventListener("click", () => {
-    if (isSuggestion) {
-      openShelfDrawer();
-      if (state.session) newShelfInput.value = name;
-    } else {
-      navigateTo("shelf", { name });
-    }
+    if (isSuggestion) navigateTo("shelves");
+    else navigateTo("shelf", { name });
   });
   card.append(open);
   if (cover.hasAttribute("data-reading-shelf-card-cover")) updateReadingShelfCovers();
@@ -1287,11 +1282,6 @@ function updateActiveNavigation(label) {
     item.classList.toggle("active", active);
     if (active) item.setAttribute("aria-current", "page");
     else item.removeAttribute("aria-current");
-  });
-  document.querySelectorAll(".mobile-nav-item").forEach((item) => {
-    const mobileLabel = label === "Discover" ? "Search" : label;
-    item.classList.toggle("active", Boolean(mobileLabel)
-      && item.textContent.trim().toLowerCase().includes(mobileLabel.toLowerCase()));
   });
 }
 
@@ -1591,7 +1581,16 @@ function createCurrentlyReadingList(books) {
 function showShelvesPage() {
   updateActiveNavigation("Your shelves");
   const page = showPage("shelves");
-  page.append(createPageHeader("Your Library", "Your shelves", "Your books, gathered into collections."));
+  const header = createPageHeader("Your Library", "Your shelves", "Your books, gathered into collections.");
+  const createShelf = document.createElement("button");
+  createShelf.type = "button";
+  createShelf.className = "action-btn";
+  createShelf.textContent = "＋ Create shelf";
+  createShelf.addEventListener("click", openShelfDrawer);
+  const toolbar = document.createElement("div");
+  toolbar.className = "page-toolbar";
+  toolbar.append(createShelf);
+  page.append(header, toolbar);
   const libraryBooks = getLibraryBooks();
   const tiles = [
     {
@@ -1631,14 +1630,6 @@ function showShelvesPage() {
     })),
   ];
   page.append(createCardRow("Collections", tiles));
-  if (!state.shelves.length) {
-    const create = document.createElement("button");
-    create.type = "button";
-    create.className = "action-btn";
-    create.textContent = "＋ Create your first shelf";
-    create.addEventListener("click", openShelfDrawer);
-    page.append(create);
-  }
 }
 
 function createBookTable(books) {
@@ -2895,17 +2886,6 @@ libraryToggleBtn.addEventListener("click", () => {
 document.getElementById("closeLibraryBtn").addEventListener("click", () => setLibraryDrawerOpen(false));
 sidebarBackdrop.addEventListener("click", () => setLibraryDrawerOpen(false));
 
-document.querySelectorAll(".mobile-nav-item").forEach((item) => {
-  item.addEventListener("click", () => {
-    document.querySelectorAll(".mobile-nav-item").forEach((navItem) => navItem.classList.remove("active"));
-    item.classList.add("active");
-    if (item.textContent.includes("Home")) navigateTo("home");
-    if (item.textContent.includes("Search")) runNaturalSearch("");
-    if (item.textContent.includes("Shelves")) navigateTo("shelves");
-    if (item.textContent.includes("Create")) openDialog();
-  });
-});
-
 document.querySelectorAll(".nav-pill").forEach((item) => {
   item.addEventListener("click", () => {
     if (window.matchMedia("(max-width: 899px)").matches) setLibraryDrawerOpen(false);
@@ -3038,10 +3018,6 @@ isbnInput.addEventListener("keydown", (event) => {
 
 lookupIsbnBtn.addEventListener("click", () => {
   lookupBookByIsbn(isbnInput.value || "");
-});
-
-createShelfBtn.addEventListener("click", () => {
-  openShelfDrawer();
 });
 
 shelfForm.addEventListener("submit", async (event) => {
