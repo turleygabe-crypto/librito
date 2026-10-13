@@ -314,9 +314,20 @@ function findBookForRoute(params) {
     ...state.catalogBooks,
     ...discoveryBooks,
   ];
-  return books.find((book) => id
+  const matchingBook = books.find((book) => id
     ? book.id === id
     : book.title === title && book.author === author);
+  if (matchingBook) return matchingBook;
+  if (!title || (id && state.loading)) return null;
+  return {
+    title,
+    author: author || "",
+    genre: params.get("genre") || "",
+    isbn: params.get("isbn") || "",
+    cover_url: params.get("cover_url") || "",
+    cover_i: params.get("cover_i") || "",
+    page_count: Number(params.get("page_count")) || null,
+  };
 }
 
 function renderBookRoute(params = new URLSearchParams(window.location.hash.split("?")[1] || "")) {
@@ -950,6 +961,11 @@ function openBookProfile(book) {
     id: book.id || "",
     title: book.title || "",
     author: book.author || "",
+    genre: book.genre || "",
+    isbn: Array.isArray(book.isbn) ? book.isbn[0] || "" : book.isbn || "",
+    cover_url: book.cover_url || "",
+    cover_i: book.cover_i || "",
+    page_count: book.page_count || book.pages || "",
   });
 }
 
