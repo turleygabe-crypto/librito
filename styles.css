@@ -91,7 +91,8 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .icon-btn { border: 0; border-radius: 999px; padding: 0.55rem 0.8rem; background: rgba(139,94,60,.1); }
 .book-form { display: grid; gap: 0.75rem; }
 .book-form label { display: grid; gap: 0.35rem; }
-.book-form input, .book-form textarea { padding: 0.78rem 0.9rem; border: 1px solid rgba(139,94,60,.18); border-radius: 0.75rem; background: #fff; color: var(--ink); }
+.book-form input, .book-form textarea, .book-form select { padding: 0.78rem 0.9rem; border: 1px solid rgba(139,94,60,.18); border-radius: 0.75rem; background: #fff; color: var(--ink); }
+.field-hint { color: rgba(63,46,35,.74); font-size: 0.85rem; }
 .form-actions { display: flex; justify-content: end; margin-top: 0.25rem; }
 .action-btn, .secondary-btn { padding: 0.75rem 1rem; border: 0; border-radius: 999px; }
 .action-btn { background: #7a4a2d; color: #fff; }

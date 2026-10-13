@@ -195,26 +195,22 @@ function updateAuthButton() {
 function renderStats() {
   const totalBooks = state.books.length;
   const totalSpent = state.books.reduce((sum, book) => sum + Number(book.cost || 0), 0);
-  const shelfCounts = state.books.reduce((acc, book) => {
-    acc[book.shelf || "Uncategorized"] = (acc[book.shelf || "Uncategorized"] || 0) + 1;
-    return acc;
-  }, {});
 
   document.getElementById("totalBooks").textContent = totalBooks;
   document.getElementById("totalSpent").textContent = formatCurrency(totalSpent);
-  document.getElementById("shelvesCount").textContent = `${Object.keys(shelfCounts).length} shelves`;
+  document.getElementById("shelvesCount").textContent = `${state.shelves.length} shelves`;
   document.getElementById("recentBook").textContent = state.books[0]?.title || "No books yet";
 }
 
 function renderShelves() {
   const shelfList = document.getElementById("shelfList");
   const shelfCounts = state.books.reduce((acc, book) => {
-    const shelfName = book.shelf || "Uncategorized";
+    const shelfName = book.shelf || "Library";
     acc[shelfName] = (acc[shelfName] || 0) + 1;
     return acc;
   }, {});
   const spentByShelf = state.books.reduce((acc, book) => {
-    const shelfName = book.shelf || "Uncategorized";
+    const shelfName = book.shelf || "Library";
     acc[shelfName] = (acc[shelfName] || 0) + Number(book.cost || 0);
     return acc;
   }, {});
@@ -239,11 +235,21 @@ function renderShelves() {
 
 function groupBooksByShelf(books) {
   return books.slice().sort((a, b) => new Date(b.added || b.added_on || 0) - new Date(a.added || a.added_on || 0)).reduce((acc, book) => {
-    const shelfName = book.shelf || "Uncategorized";
+    const shelfName = book.shelf || "Library";
     if (!acc[shelfName]) acc[shelfName] = [];
     acc[shelfName].push(book);
     return acc;
   }, {});
+}
+
+function renderShelfOptions() {
+  const shelfSelect = bookForm.elements.shelf;
+  const selectedShelf = shelfSelect.value;
+  shelfSelect.replaceChildren(new Option("Library (no shelf)", ""));
+  state.shelves.forEach((shelf) => {
+    shelfSelect.add(new Option(shelf.name, shelf.name));
+  });
+  shelfSelect.value = state.shelves.some((shelf) => shelf.name === selectedShelf) ? selectedShelf : "";
 }
 
 function openBookProfile(book) {
@@ -259,7 +265,7 @@ function openBookProfile(book) {
     </div>
     <div class="profile-field">
       <strong>Shelf</strong>
-      <span>${book.shelf || "Uncategorized"}</span>
+      <span>${book.shelf || "Library (no shelf)"}</span>
     </div>
     <div class="profile-field">
       <strong>Cost</strong>
@@ -292,7 +298,7 @@ function renderBooks() {
   }
 
   if (hasSession && !state.books.length) {
-    bookList.innerHTML = '<div class="empty-state-card"><h4>Your library is ready</h4><p>Sign in with email and password and start building a fresh shelf of books.</p></div>';
+    bookList.innerHTML = '<div class="empty-state-card"><h4>Your library is ready</h4><p>Start building your home book inventory. You can organize books on shelves whenever you like.</p></div>';
     return;
   }
 
@@ -318,7 +324,7 @@ function renderBooks() {
             .map((book) => `
               <article class="book-cover-card" tabindex="0" role="button" data-book-id="${book.id}">
                 <div class="book-cover" style="background-image:linear-gradient(160deg, rgba(43,22,14,.05), rgba(43,22,14,.82)), url('https://covers.openlibrary.org/isbn/${book.isbn || ""}-L.jpg'); background-color:${book.coverColor || "#7a4a2d"};">
-                  <span class="book-cover-pill">${book.shelf || "Shelf"}</span>
+                  <span class="book-cover-pill">${book.shelf || "Library"}</span>
                   <strong>${book.title}</strong>
                 </div>
                 <div class="book-cover-meta">
@@ -348,6 +354,7 @@ function renderBooks() {
 }
 
 function render() {
+  renderShelfOptions();
   renderStats();
   renderShelves();
   renderBooks();
@@ -567,7 +574,7 @@ function seedMockScan() {
   const sample = samples[Math.floor(Math.random() * samples.length)];
   bookForm.elements.title.value = sample.title;
   bookForm.elements.author.value = sample.author;
-  bookForm.elements.shelf.value = sample.shelf;
+  bookForm.elements.shelf.value = state.shelves.some((shelf) => shelf.name === sample.shelf) ? sample.shelf : "";
   bookForm.elements.cost.value = sample.cost;
   bookForm.elements.added.value = sample.added;
   bookForm.elements.notes.value = sample.notes;
@@ -724,7 +731,7 @@ async function saveBookToSupabase(book) {
     title: book.title,
     author: book.author,
     isbn: book.isbn || null,
-    shelf: book.shelf,
+    shelf: book.shelf || null,
     cost: Number(book.cost || 0),
     added_on: book.added,
     notes: book.notes || null,
@@ -818,7 +825,7 @@ featuredPlayBtn.addEventListener("click", () => {
   if (state.session) {
     bookForm.elements.title.value = "How to Keep House While Drowning";
     bookForm.elements.author.value = "KC Davis";
-    bookForm.elements.shelf.value = "Recommended for You";
+    bookForm.elements.shelf.value = state.shelves.some((shelf) => shelf.name === "Recommended for You") ? "Recommended for You" : "";
     bookForm.elements.added.value = new Date().toISOString().slice(0, 10);
   }
 });
@@ -1046,7 +1053,7 @@ bookForm.addEventListener("submit", async (event) => {
     isbn: formData.get("isbn").toString().trim(),
   };
 
-  if (!book.title || !book.author || !book.shelf || !book.added) {
+  if (!book.title || !book.author || !book.added) {
     showToast("Fill in the essentials first.");
     return;
   }

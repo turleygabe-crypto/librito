@@ -225,8 +225,11 @@
             <input name="author" placeholder="Tan Twan Eng" required />
           </label>
           <label>
-            Shelf / Category
-            <input name="shelf" placeholder="Currently Reading" required />
+            Shelf (optional)
+            <select name="shelf">
+              <option value="">Library (no shelf)</option>
+            </select>
+            <span class="field-hint">Books stay in your library even when they aren't on a shelf.</span>
           </label>
           <label>
             Cost
