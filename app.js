@@ -1287,6 +1287,14 @@ function wireCardPopover(menu, summary, panel) {
   const repositionPanel = () => {
     if (menu.open) positionPanel();
   };
+  const handleScroll = (event) => {
+    if (!menu.open) return;
+    if (event.target instanceof Element && event.target.closest(".card-row")) {
+      menu.open = false;
+      return;
+    }
+    repositionPanel();
+  };
   menu.addEventListener("toggle", () => {
     menu.closest(".media-card")?.classList.toggle("card-menu-open", menu.open);
     if (menu.open) {
@@ -1297,12 +1305,12 @@ function wireCardPopover(menu, summary, panel) {
       document.body.append(panel);
       positionPanel();
       window.addEventListener("resize", repositionPanel);
-      window.addEventListener("scroll", repositionPanel, true);
+      window.addEventListener("scroll", handleScroll, true);
     } else {
       panel.hidden = true;
       menu.append(panel);
       window.removeEventListener("resize", repositionPanel);
-      window.removeEventListener("scroll", repositionPanel, true);
+      window.removeEventListener("scroll", handleScroll, true);
     }
   });
 }
