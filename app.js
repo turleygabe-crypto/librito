@@ -187,6 +187,12 @@ const state = {
   loadError: "",
   shelfFilter: "All",
   dismissedRecommendations: new Set(),
+  catalogBooks: [],
+  catalogLibraryKey: "",
+  catalogRequestKey: "",
+  catalogLoading: false,
+  catalogError: "",
+  recommendationPool: [],
   shelfSort: { key: "added", direction: "desc" },
 };
 
@@ -957,10 +963,14 @@ function renderBooks() {
   }
 
   const libraryBooks = getLibraryBooks();
+  if (!state.loading) ensureHomeRecommendations(libraryBooks);
   const orderedBooks = libraryBooks.slice().sort((a, b) =>
     new Date(b.added || b.added_on || 0) - new Date(a.added || a.added_on || 0));
   const recommendations = getBookRecommendations(libraryBooks);
-  const moreByOwnedAuthors = recommendations.filter(({ book }) =>
+  const pickedRecommendations = recommendations.slice(0, 8);
+  const pickedKeys = new Set(pickedRecommendations.map(({ book }) => getBookKey(book)));
+  const shelfRecommendations = recommendations.filter(({ book }) => !pickedKeys.has(getBookKey(book)));
+  const moreByOwnedAuthors = shelfRecommendations.filter(({ book }) =>
     libraryBooks.some((owned) => owned.author && owned.author.toLowerCase() === book.author.toLowerCase()));
   const shelfTiles = state.shelves.map((shelf) => ({
     name: shelf.name,
@@ -983,12 +993,18 @@ function renderBooks() {
         compact: true,
         emptyMessage: state.loading ? "Loading your shelves and books…" : "",
       })],
-    ["Picked for your library", () => createCardRow("Picked for your library", recommendations.slice(0, 8)
-      .map(({ book, reason }) => ({ type: "book", book, subtitle: reason, recommendation: true })))],
+    ["Picked for your library", () => createCardRow("Picked for your library", pickedRecommendations
+      .map(({ book, reason }) => ({ type: "book", book, subtitle: reason, recommendation: true })), {
+        emptyMessage: state.catalogLoading
+          ? "Finding books for your library…"
+          : state.catalogError || "No new books to suggest right now.",
+      })],
     ["Shelves for your taste", () => createCardRow("Shelves for your taste",
-      buildSuggestedShelves(genres, recommendations, moreByOwnedAuthors), {
-        emptyMessage: state.loading
+      buildSuggestedShelves(genres, shelfRecommendations, moreByOwnedAuthors), {
+        emptyMessage: state.loading || state.catalogLoading
           ? "Finding books for your shelves…"
+          : state.catalogError
+            ? "Could not load suggested shelves. Check your connection and try again."
           : libraryBooks.length
             ? "No suggested shelves for your library just yet."
             : "Add books to your library to get personalized suggestions.",
@@ -1003,9 +1019,9 @@ function renderBooks() {
       })],
     ["More by authors you own", () => createCardRow("More by authors you own", moreByOwnedAuthors.slice(0, 8)
       .map(({ book }) => ({ type: "book", book })), {
-        emptyMessage: state.loading
-          ? "Loading your library…"
-          : "Add books by an author you love to find more of their work.",
+        emptyMessage: state.catalogLoading
+          ? "Finding books by authors in your library…"
+          : state.catalogError || "No more books by your authors found in the catalog yet.",
       })],
     ["Browse by genre", () => createCardRow("Browse by genre", genreTiles.map((genre) => ({ type: "genre", ...genre })))],
   ];
@@ -1029,10 +1045,130 @@ function renderBooks() {
   if (hadSectionError) showToast("Some home sections could not be displayed.");
 }
 
+function shuffleBooks(books) {
+  const shuffled = books.slice();
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
+}
+
+function rotateRecommendationPool() {
+  const uniqueBooks = new Map([...discoveryBooks, ...state.catalogBooks]
+    .map((book) => [getRecommendationKey(book), book]));
+  state.recommendationPool = shuffleBooks([...uniqueBooks.values()]);
+}
+
+function getRecommendationKey(book) {
+  return `${(book.title || "").trim().toLowerCase()}|${(book.author || "").trim().toLowerCase()}`;
+}
+
+function isSameBookWork(first, second) {
+  return getBookKey(first) === getBookKey(second)
+    || getRecommendationKey(first) === getRecommendationKey(second);
+}
+
+function getLibraryDiscoveryKey(libraryBooks) {
+  return JSON.stringify(libraryBooks.map((book) => [
+    getBookKey(book),
+    (book.author || "").trim().toLowerCase(),
+    (book.genre || "").trim().toLowerCase(),
+  ]).sort((a, b) => a[0].localeCompare(b[0])));
+}
+
+async function fetchOpenLibraryRecommendations({ genre = "", author = "" }) {
+  const query = genre
+    ? `subject:${JSON.stringify(genre)}`
+    : `author:${JSON.stringify(author)}`;
+  const normalizedAuthor = author.toLowerCase();
+  const mapWorks = (works) => works.flatMap((work) => {
+    const authors = Array.isArray(work.author_name) ? work.author_name : [];
+    if (!work.title || !authors.length
+      || (author && !authors.some((name) => name.toLowerCase() === normalizedAuthor))) return [];
+    const isbn = Array.isArray(work.isbn) ? work.isbn[0] || "" : "";
+    return [{
+      title: work.title,
+      author: authors[0],
+      genre: genre || work.subject?.[0] || "",
+      subjects: Array.isArray(work.subject) ? work.subject : [],
+      isbn,
+      cover_i: work.cover_i,
+      pages: work.number_of_pages_median,
+      page_count: work.number_of_pages_median,
+      first_publish_year: work.first_publish_year,
+    }];
+  });
+  const fetchWorks = async (offset) => {
+    const params = new URLSearchParams({
+      q: `${query} language:${getDefaultBookLanguage()}`,
+      fields: "key,title,author_name,isbn,cover_i,subject,number_of_pages_median,first_publish_year",
+      limit: "40",
+      offset: String(offset),
+    });
+    const response = await fetch(`https://openlibrary.org/search.json?${params}`);
+    if (!response.ok) throw new Error(`Open Library recommendation search failed with ${response.status}`);
+    const data = await response.json();
+    return Array.isArray(data.docs) ? data.docs : [];
+  };
+  const offset = Math.floor(Math.random() * 5) * 40;
+  const matches = mapWorks(await fetchWorks(offset));
+  return matches.length || !offset ? matches : mapWorks(await fetchWorks(0));
+}
+
+async function ensureHomeRecommendations(libraryBooks) {
+  const libraryKey = getLibraryDiscoveryKey(libraryBooks);
+  if (state.catalogLibraryKey === libraryKey || state.catalogRequestKey === libraryKey) return;
+
+  state.catalogRequestKey = libraryKey;
+  state.catalogBooks = [];
+  state.catalogError = "";
+  state.catalogLoading = true;
+  const uniqueGenres = [...new Set(libraryBooks.map((book) => book.genre?.trim()).filter(Boolean))];
+  const uniqueAuthors = [...new Set(libraryBooks.map((book) => book.author?.trim()).filter(Boolean))];
+  const queries = [
+    ...shuffleBooks(uniqueGenres).slice(0, 5).map((genre) => ({ genre })),
+    ...shuffleBooks(uniqueAuthors).slice(0, 5).map((author) => ({ author })),
+  ];
+  if (!queries.length) {
+    state.catalogLibraryKey = libraryKey;
+    state.catalogRequestKey = "";
+    state.catalogLoading = false;
+    return;
+  }
+
+  const results = await Promise.allSettled(queries.map(fetchOpenLibraryRecommendations));
+  if (state.catalogRequestKey !== libraryKey) return;
+  let failures = 0;
+  state.catalogBooks = results.flatMap((result) => {
+    if (result.status === "rejected") {
+      failures += 1;
+      console.error("Could not load personalized book suggestions.", result.reason);
+      return [];
+    }
+    return result.value;
+  });
+  state.catalogError = failures === results.length
+    ? "Book suggestions are temporarily unavailable. Check your connection and try again."
+    : "";
+  state.catalogLibraryKey = libraryKey;
+  state.catalogRequestKey = "";
+  state.catalogLoading = false;
+  rotateRecommendationPool();
+  if (state.view === "home" && getLibraryDiscoveryKey(getLibraryBooks()) === libraryKey) renderBooks();
+  else if (state.view === "suggested-shelf") {
+    const [path, query] = window.location.hash.slice(1).split("?");
+    if (path === "/suggested-shelf") {
+      showSuggestedShelfPage(new URLSearchParams(query).get("key") || "");
+    }
+  }
+}
+
 function getBookRecommendations(libraryBooks = getLibraryBooks()) {
-  const ownedKeys = new Set(libraryBooks.map(getBookKey));
-  return scoreRecommendations(discoveryBooks.filter((book) =>
-    !ownedKeys.has(getBookKey(book)) && !state.dismissedRecommendations.has(getBookKey(book))));
+  if (!state.recommendationPool.length) rotateRecommendationPool();
+  return scoreRecommendations(state.recommendationPool.filter((book) =>
+    !libraryBooks.some((owned) => isSameBookWork(owned, book))
+      && !state.dismissedRecommendations.has(getBookKey(book))));
 }
 
 function scoreRecommendations(candidates) {
@@ -1057,7 +1193,7 @@ function scoreRecommendations(candidates) {
           ? `Because you enjoy ${book.genre}`
           : `A ${book.genre.toLowerCase()} pick for your library`,
     };
-  }).sort((a, b) => b.score - a.score || a.book.title.localeCompare(b.book.title));
+  }).sort((a, b) => b.score - a.score);
 }
 
 function getBookKey(book) {
@@ -1396,11 +1532,15 @@ function createShelfCard(shelf, { compact = false } = {}) {
 
 function showSuggestedShelfPage(key) {
   const libraryBooks = getLibraryBooks();
+  if (!state.loading) ensureHomeRecommendations(libraryBooks);
   const recommendations = getBookRecommendations(libraryBooks);
   const genres = [...new Set(libraryBooks.map((book) => book.genre).filter(Boolean))];
+  const pickedKeys = new Set(recommendations.slice(0, 8).map(({ book }) => getBookKey(book)));
+  const shelfRecommendations = recommendations.filter(({ book }) => !pickedKeys.has(getBookKey(book)));
   const authorRecommendations = recommendations.filter(({ book }) =>
-    libraryBooks.some((owned) => owned.author && owned.author.toLowerCase() === book.author.toLowerCase()));
-  const shelf = buildSuggestedShelves(genres, recommendations, authorRecommendations)
+    !pickedKeys.has(getBookKey(book))
+      && libraryBooks.some((owned) => owned.author && owned.author.toLowerCase() === book.author.toLowerCase()));
+  const shelf = buildSuggestedShelves(genres, shelfRecommendations, authorRecommendations)
     .find((suggestion) => suggestion.key === key);
   const page = showPage("suggested-shelf");
   updateActiveNavigation("Home");
@@ -1438,6 +1578,7 @@ function showHomePage() {
   state.view = "home";
   state.currentShelf = "";
   state.currentBook = null;
+  rotateRecommendationPool();
   document.getElementById("homeRows").classList.remove("hidden");
   document.getElementById("pageView").classList.add("hidden");
   updateActiveNavigation("Home");
@@ -2347,59 +2488,89 @@ async function runNaturalSearch(query, { updateHistory = true } = {}) {
   }
 
   const parsed = parseNaturalSearch(state.searchQuery);
-  if (state.searchResults.length && !parsed.pageLimit) {
-    showSearchPage(state.searchQuery);
-    return;
-  }
+  const searchGenre = parsed.genre
+    || [...getLibraryBooks().map((book) => book.genre), "Fiction", "Nonfiction", "Mystery", "Fantasy", "Essays"]
+      .find((genre) => genre?.toLowerCase() === state.searchQuery.toLowerCase())
+    || "";
   state.searchLoading = true;
   showSearchPage(state.searchQuery);
   const searchTerms = [...new Set(parsed.queryTerms)];
   try {
-    const params = new URLSearchParams({
-      q: `${searchTerms.join(" ") || state.searchQuery} language:${getDefaultBookLanguage()}`,
-      fields: "key,title,author_name,isbn,cover_i,subject,number_of_pages_median",
-      limit: "24",
-    });
-    const response = await fetch(`https://openlibrary.org/search.json?${params}`);
-    if (!response.ok) throw new Error(`Open Library search failed with ${response.status}`);
-    const data = await response.json();
-    const works = Array.isArray(data.docs) ? data.docs : [];
-    const editionResults = await Promise.allSettled(works.map(async (work) => {
-      if (!work.key) return null;
-      const edition = await getMatchingOpenLibraryEdition(work.key, getDefaultBookLanguage());
-      if (!edition) return null;
-      const isbnList = [...(edition.isbn_13 || []), ...(edition.isbn_10 || [])];
-      return {
-        title: edition.title || work.title || "Untitled",
-        author: work.author_name?.[0] || "Unknown author",
-        author_name: work.author_name || [],
-        isbn: isbnList[0] || "",
-        isbnList,
-        cover_i: edition.covers?.[0],
-        subjects: work.subject || [],
-        genre: parsed.genre || work.subject?.[0] || "",
-        pages: work.number_of_pages_median,
-        page_count: work.number_of_pages_median,
-      };
-    }));
+    const catalogQuery = searchGenre
+      ? `subject:${JSON.stringify(searchGenre)}`
+      : searchTerms.join(" ") || state.searchQuery;
+    const offset = searchGenre ? Math.floor(Math.random() * 10) * 24 : 0;
+    const fetchWorks = async (searchOffset) => {
+      const params = new URLSearchParams({
+        q: `${catalogQuery} language:${getDefaultBookLanguage()}`,
+        fields: "key,title,author_name,isbn,cover_i,subject,number_of_pages_median",
+        limit: "24",
+        offset: String(searchOffset),
+      });
+      const response = await fetch(`https://openlibrary.org/search.json?${params}`);
+      if (!response.ok) throw new Error(`Open Library search failed with ${response.status}`);
+      const data = await response.json();
+      return Array.isArray(data.docs) ? data.docs : [];
+    };
+    let works = await fetchWorks(offset);
+    if (!works.length && offset) works = await fetchWorks(0);
+    let externalBooks = [];
     let editionLookupFailures = 0;
-    const externalBooks = editionResults.flatMap((result) => {
-      if (result.status === "rejected") {
-        editionLookupFailures += 1;
-        console.error(result.reason);
-        return [];
-      }
-      const book = result.value;
-      return book && (!parsed.pageLimit || (book.pages && book.pages <= parsed.pageLimit)) ? [book] : [];
-    });
+    if (searchGenre) {
+      externalBooks = shuffleBooks(works).flatMap((work) => {
+        const book = {
+          title: work.title || "Untitled",
+          author: work.author_name?.[0] || "Unknown author",
+          author_name: work.author_name || [],
+          isbn: work.isbn?.[0] || "",
+          cover_i: work.cover_i,
+          subjects: work.subject || [],
+          genre: searchGenre,
+          pages: work.number_of_pages_median,
+          page_count: work.number_of_pages_median,
+        };
+        return !parsed.pageLimit || (book.pages && book.pages <= parsed.pageLimit) ? [book] : [];
+      });
+    } else {
+      const editionResults = await Promise.allSettled(works.map(async (work) => {
+        if (!work.key) return null;
+        const edition = await getMatchingOpenLibraryEdition(work.key, getDefaultBookLanguage());
+        if (!edition) return null;
+        const isbnList = [...(edition.isbn_13 || []), ...(edition.isbn_10 || [])];
+        return {
+          title: edition.title || work.title || "Untitled",
+          author: work.author_name?.[0] || "Unknown author",
+          author_name: work.author_name || [],
+          isbn: isbnList[0] || "",
+          isbnList,
+          cover_i: edition.covers?.[0],
+          subjects: work.subject || [],
+          genre: work.subject?.[0] || "",
+          pages: work.number_of_pages_median,
+          page_count: work.number_of_pages_median,
+        };
+      }));
+      externalBooks = editionResults.flatMap((result) => {
+        if (result.status === "rejected") {
+          editionLookupFailures += 1;
+          console.error(result.reason);
+          return [];
+        }
+        const book = result.value;
+        return book && (!parsed.pageLimit || (book.pages && book.pages <= parsed.pageLimit)) ? [book] : [];
+      });
+    }
     state.searchResults = [...state.searchResults, ...externalBooks]
-      .filter((book, index, all) => all.findIndex((candidate) => getBookKey(candidate) === getBookKey(book)) === index);
+      .filter((book, index, all) =>
+        all.findIndex((candidate) => isSameBookWork(candidate, book)) === index);
     if (editionLookupFailures) {
       const languageName = getOpenLibraryLanguageName(getDefaultBookLanguage());
       state.searchMessage = `Some matching ${languageName} editions could not be checked; showing verified editions only.`;
     }
     if (!state.searchResults.length && parsed.pageLimit) {
       state.searchMessage = `No results with a verified page count under ${parsed.pageLimit} pages.`;
+    } else if (!state.searchResults.length && searchGenre) {
+      state.searchMessage = `No books found for ${searchGenre} in ${getOpenLibraryLanguageName(getDefaultBookLanguage())}.`;
     } else if (!state.searchResults.length && works.length && !externalBooks.length && !editionLookupFailures) {
       state.searchMessage = `No matching editions found in ${getOpenLibraryLanguageName(getDefaultBookLanguage())}.`;
     }
