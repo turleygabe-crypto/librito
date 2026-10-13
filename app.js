@@ -2113,7 +2113,7 @@ async function initializeSupabaseOnce() {
         state.books = [];
         state.shelves = [];
         render();
-        loadFromSupabase();
+        loadFromSupabase().catch(handleLibraryLoadFailure);
       } else {
         authPrompted = false;
         state.loading = false;
@@ -2139,7 +2139,7 @@ async function initializeSupabaseOnce() {
     state.loading = true;
     state.loadError = "";
     render();
-    await loadFromSupabase();
+    loadFromSupabase().catch(handleLibraryLoadFailure);
   } catch (error) {
     console.error(error);
     state.loading = false;
@@ -2151,6 +2151,14 @@ async function initializeSupabaseOnce() {
     }
     showToast("Supabase is not configured yet. Using local demo data.");
   }
+}
+
+function handleLibraryLoadFailure(error) {
+  console.error(error);
+  state.loading = false;
+  state.loadError = "Your library could not be loaded. Check your connection and try again.";
+  render();
+  showToast("Could not load your books.");
 }
 
 async function refreshAuthSession() {
