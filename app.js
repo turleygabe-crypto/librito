@@ -612,6 +612,9 @@ async function initializeSupabase() {
     if (!session) {
       state.books = loadBooks();
       render();
+      if (!authPrompted) {
+        openAuthModal();
+      }
       return;
     }
 
@@ -623,6 +626,9 @@ async function initializeSupabase() {
     console.error(error);
     state.books = loadBooks();
     render();
+    if (!authPrompted) {
+      openAuthModal();
+    }
     showToast("Supabase is not configured yet. Using local demo data.");
   }
 }
