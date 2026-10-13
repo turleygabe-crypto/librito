@@ -215,7 +215,8 @@ const bookDetailsPanel = document.getElementById("bookDetailsPanel");
 const bookDetailsBackBtn = document.getElementById("bookDetailsBackBtn");
 const saveBookBtn = document.getElementById("saveBookBtn");
 const toast = document.getElementById("toast");
-const lookupMethod = document.getElementById("lookupMethod");
+const lookupSearchTab = document.getElementById("lookupSearchTab");
+const lookupScanTab = document.getElementById("lookupScanTab");
 const titleLookupPanel = document.getElementById("titleLookupPanel");
 const isbnLookupPanel = document.getElementById("isbnLookupPanel");
 const lookupTitleInput = document.getElementById("lookupTitleInput");
@@ -2138,7 +2139,27 @@ function startBookLookup() {
   bookEntryChoice.classList.add("hidden");
   bookLookupFlow.classList.remove("hidden");
   bookDetailsPanel.classList.add("hidden");
+  setLookupTab("search");
   lookupTitleInput.focus();
+}
+
+function setLookupTab(tab) {
+  const scanning = tab === "scan";
+  if (!scanning) stopCameraScan();
+  clearTitleLookupResults();
+  lookupSearchTab.classList.toggle("is-active", !scanning);
+  lookupSearchTab.setAttribute("aria-selected", String(!scanning));
+  lookupSearchTab.tabIndex = scanning ? -1 : 0;
+  lookupScanTab.classList.toggle("is-active", scanning);
+  lookupScanTab.setAttribute("aria-selected", String(scanning));
+  lookupScanTab.tabIndex = scanning ? 0 : -1;
+  titleLookupPanel.classList.toggle("hidden", scanning);
+  isbnLookupPanel.classList.toggle("hidden", !scanning);
+  if (scanning) {
+    scanStatus.textContent = "Enter an ISBN or scan the book's barcode with your camera.";
+  } else {
+    scanStatus.textContent = "Search by title, author, or both.";
+  }
 }
 
 function startManualEntry() {
@@ -2168,10 +2189,8 @@ function closeDialog() {
   selectedTitleResult = null;
   titleLookupResults.replaceChildren();
   renderSelectedBookConfirmation();
-  lookupMethod.value = "title";
-  titleLookupPanel.classList.remove("hidden");
-  isbnLookupPanel.classList.add("hidden");
-  scanStatus.textContent = "Search by title or author, or switch to ISBN to enter or scan a barcode.";
+  setLookupTab("search");
+  scanStatus.textContent = "Search by title or author.";
   showEntryChoice();
   if (dialogReturnFocus instanceof HTMLElement && dialogReturnFocus.isConnected) dialogReturnFocus.focus();
   dialogReturnFocus = null;
@@ -2954,30 +2973,43 @@ bookDetailsBackBtn.addEventListener("click", () => {
   if (bookEntryMode === "lookup") {
     bookDetailsPanel.classList.add("hidden");
     bookLookupFlow.classList.remove("hidden");
-    lookupMethod.focus();
+    (lookupScanTab.getAttribute("aria-selected") === "true" ? lookupScanTab : lookupSearchTab).focus();
   } else {
     showEntryChoice();
     manualBookOptionBtn.focus();
   }
 });
 
+lookupSearchTab.addEventListener("click", () => setLookupTab("search"));
+
+lookupScanTab.addEventListener("click", () => setLookupTab("scan"));
+
 scanIsbnBtn.addEventListener("click", () => {
   startCameraScan();
 });
 
-lookupMethod.addEventListener("change", () => {
-  const useIsbn = lookupMethod.value === "isbn";
-  if (!useIsbn) stopCameraScan();
-  titleLookupPanel.classList.toggle("hidden", useIsbn);
-  isbnLookupPanel.classList.toggle("hidden", !useIsbn);
+lookupSearchTab.addEventListener("keydown", (event) => {
+  if (event.key === "ArrowRight") {
+    event.preventDefault();
+    lookupScanTab.focus();
+    setLookupTab("scan");
+  }
+});
+
+lookupScanTab.addEventListener("keydown", (event) => {
+  if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    lookupSearchTab.focus();
+    setLookupTab("search");
+  }
+});
+
+function clearTitleLookupResults() {
   titleLookupResults.replaceChildren();
   titleSearchResults = [];
   selectedTitleResult = null;
   renderSelectedBookConfirmation();
-  scanStatus.textContent = useIsbn
-    ? "Enter an ISBN manually or scan the book's barcode with your camera."
-    : "Search by title, author, or both.";
-});
+}
 
 lookupTitleBtn.addEventListener("click", () => {
   lookupBooksByTitleOrAuthor();

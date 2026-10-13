@@ -180,14 +180,11 @@
 
           <section id="bookLookupFlow" class="hidden">
             <div class="scan-zone">
-              <label>
-                Find a book by
-                <select id="lookupMethod">
-                  <option value="title">Title and/or author</option>
-                  <option value="isbn">ISBN</option>
-                </select>
-              </label>
-              <div id="titleLookupPanel" class="lookup-panel">
+              <div class="lookup-tabs" role="tablist" aria-label="Book lookup method">
+                <button id="lookupSearchTab" type="button" class="lookup-tab is-active" role="tab" aria-selected="true" aria-controls="titleLookupPanel">Search</button>
+                <button id="lookupScanTab" type="button" class="lookup-tab" role="tab" aria-selected="false" aria-controls="isbnLookupPanel" tabindex="-1">Scan</button>
+              </div>
+              <div id="titleLookupPanel" class="lookup-panel" role="tabpanel" aria-labelledby="lookupSearchTab">
                 <label>
                   Title
                   <input id="lookupTitleInput" placeholder="Book title" />
@@ -210,7 +207,7 @@
                 <div id="titleLookupResults" class="lookup-results" aria-live="polite"></div>
                 <div id="selectedBookConfirmation" class="selected-book-confirmation hidden" aria-live="polite"></div>
               </div>
-              <div id="isbnLookupPanel" class="lookup-panel hidden">
+              <div id="isbnLookupPanel" class="lookup-panel hidden" role="tabpanel" aria-labelledby="lookupScanTab">
                 <label>
                   ISBN
                   <input id="isbnInput" name="isbn" placeholder="Enter ISBN" />
