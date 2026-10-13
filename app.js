@@ -2040,6 +2040,7 @@ function createBookEditionPicker(book) {
           choices.querySelectorAll(".edition-cover-choice").forEach((button) => {
             button.setAttribute("aria-pressed", String(button === choice));
           });
+          section.remove();
           choice.disabled = false;
           showToast(ownedBook ? "Edition updated" : "Edition selected");
         });
