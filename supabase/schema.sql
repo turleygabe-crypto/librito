@@ -17,6 +17,7 @@ create table if not exists public.books (
   isbn text,
   shelf text,
   reading_status text,
+  disposition text,
   current_page integer not null default 0,
   page_count integer,
   cost numeric(10,2) default 0,
@@ -28,6 +29,7 @@ create table if not exists public.books (
 
 alter table public.books add column if not exists genre text;
 alter table public.books add column if not exists reading_status text;
+alter table public.books add column if not exists disposition text;
 alter table public.books add column if not exists current_page integer not null default 0;
 alter table public.books add column if not exists page_count integer;
 

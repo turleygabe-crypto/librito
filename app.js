@@ -247,10 +247,12 @@ const shelfForm = document.getElementById("shelfForm");
 const bookProfileOverlay = document.getElementById("bookProfileOverlay");
 const closeBookProfileBtn = document.getElementById("closeBookProfileBtn");
 const bookProfileContent = document.getElementById("bookProfileContent");
-const nowReadingCover = document.getElementById("nowReadingCover");
-const nowReadingBook = document.getElementById("nowReadingBook");
 let cameraStream = null;
 let barcodeLoopTimer = null;
+let readingCoverCycleTimer = null;
+let readingCoverCycleBooks = [];
+let readingCoverCycleIndex = 0;
+let readingCoverCycleKey = "";
 let selectedBook = null;
 let titleSearchResults = [];
 let selectedTitleResult = null;
@@ -273,6 +275,10 @@ function loadBooks() {
     console.warn("Could not read saved library", error);
   }
   return defaultBooks;
+}
+
+function getLibraryBooks() {
+  return state.books.filter((book) => !book.disposition);
 }
 
 function saveBooks() {
@@ -327,9 +333,47 @@ async function setReadingStatus(book, status) {
   showToast(status === "reading" ? "Added to Currently Reading" : "Removed from Currently Reading");
 }
 
+async function markBookAsRead(book) {
+  const pageCount = Number(book.page_count || book.pages);
+  const fields = { reading_status: "completed" };
+  if (Number.isInteger(pageCount) && pageCount > 0) fields.current_page = pageCount;
+  const updated = await updateBookFields(book, fields);
+  if (!updated) return;
+  render();
+  showToast("Marked as complete");
+}
+
+async function readBookAgain(book) {
+  const updated = await updateBookFields(book, {
+    reading_status: "reading",
+    current_page: 0,
+    disposition: null,
+  });
+  if (!updated) return;
+  render();
+  showToast("Moved to Currently Reading");
+}
+
+async function setBookDisposition(book, disposition) {
+  const action = disposition === "sold" ? "sold" : "donated";
+  const confirmed = window.confirm(
+    `Mark “${book.title}” as ${action}? It will stay in Completed Books and be hidden from your active library.`
+  );
+  if (!confirmed) return;
+  const updated = await updateBookFields(book, { disposition });
+  if (!updated) return;
+  render();
+  showToast(`Marked as ${action}`);
+}
+
 async function saveCurrentPage(book, currentPage) {
   if (!Number.isInteger(currentPage) || currentPage < 0) {
     showToast("Enter a valid current page (0 or greater).");
+    return;
+  }
+  const pageCount = Number(book.page_count || book.pages);
+  if (Number.isInteger(pageCount) && pageCount > 0 && currentPage > pageCount) {
+    showToast(`Current page cannot exceed ${pageCount}.`);
     return;
   }
   const updated = await updateBookFields(book, { current_page: currentPage });
@@ -434,7 +478,7 @@ async function removeBookFromLibrary(book) {
 
 async function renameShelf(shelf, name) {
   if (!name
-    || name.toLowerCase() === "currently reading"
+    || ["currently reading", "completed books"].includes(name.toLowerCase())
     || state.shelves.some((item) => item.id !== shelf.id && item.name.toLowerCase() === name.toLowerCase())) {
     showToast("Choose a unique shelf name.");
     return;
@@ -570,8 +614,9 @@ function initializeBookLanguageOptions() {
 }
 
 function renderStats() {
-  const totalBooks = state.books.length;
-  const totalSpent = state.books.reduce((sum, book) => sum + Number(book.cost || 0), 0);
+  const libraryBooks = getLibraryBooks();
+  const totalBooks = libraryBooks.length;
+  const totalSpent = libraryBooks.reduce((sum, book) => sum + Number(book.cost || 0), 0);
 
   document.getElementById("totalBooks").textContent = totalBooks;
   document.getElementById("totalSpent").textContent = formatCurrency(totalSpent);
@@ -580,7 +625,8 @@ function renderStats() {
 
 function renderShelves() {
   const shelfList = document.getElementById("shelfList");
-  const shelfCounts = state.books.reduce((acc, book) => {
+  const libraryBooks = getLibraryBooks();
+  const shelfCounts = libraryBooks.reduce((acc, book) => {
     const shelfName = book.shelf || "Library";
     acc[shelfName] = (acc[shelfName] || 0) + 1;
     return acc;
@@ -589,23 +635,31 @@ function renderShelves() {
     ? state.shelves.map((shelf) => ({
         name: shelf.name,
         color: shelf.color || "#8b5e3c",
-        books: state.books.filter((book) => getBookShelfNames(book).includes(shelf.name)),
+        books: libraryBooks.filter((book) => getBookShelfNames(book).includes(shelf.name)),
       }))
     : Object.entries(shelfCounts).map(([name]) => ({
         name,
         color: "#8b5e3c",
-        books: state.books.filter((book) => (book.shelf || "Library") === name),
+        books: libraryBooks.filter((book) => (book.shelf || "Library") === name),
       }));
 
   shelfList.replaceChildren();
-  const likedBooks = state.books.filter((book) => book.liked);
-  const currentlyReadingBooks = state.books.filter((book) => book.reading_status === "reading");
+  const likedBooks = libraryBooks.filter((book) => book.liked);
+  const currentlyReadingBooks = libraryBooks.filter((book) => book.reading_status === "reading");
   shelfList.append(createShelfNavigationItem("Liked Books", String(likedBooks.length), "liked", likedBooks[0]));
   shelfList.append(createShelfNavigationItem(
     "Currently Reading",
     String(currentlyReadingBooks.length),
     "#496c5d",
     currentlyReadingBooks[0]
+  ));
+  startReadingCoverCycle(currentlyReadingBooks);
+  const completedBooks = state.books.filter((book) => book.reading_status === "completed");
+  shelfList.append(createShelfNavigationItem(
+    "Completed Books",
+    String(completedBooks.length),
+    "#8b5e3c",
+    completedBooks[0]
   ));
   const visibleShelves = shelvesToRender.filter(({ books }) => matchesShelfFilter(books));
   visibleShelves.forEach((shelf) => {
@@ -616,7 +670,7 @@ function renderShelves() {
     empty.className = "sidebar-empty";
     empty.textContent = "No shelves match this filter.";
     shelfList.append(empty);
-  } else if (!visibleShelves.length && state.books.length === 0) {
+  } else if (!visibleShelves.length && libraryBooks.length === 0) {
     const empty = document.createElement("p");
     empty.className = "sidebar-empty";
     empty.textContent = "Your shelves will appear here.";
@@ -666,7 +720,7 @@ function createShelfNavigationItem(name, count, color, book = null) {
   item.type = "button";
   item.addEventListener("click", () => {
     if (window.matchMedia("(max-width: 899px)").matches) setLibraryDrawerOpen(false);
-    if (name === "Liked Books" || name === "Currently Reading") {
+    if (name === "Liked Books" || name === "Currently Reading" || name === "Completed Books") {
       showShelfPage(name);
       return;
     }
@@ -675,7 +729,10 @@ function createShelfNavigationItem(name, count, color, book = null) {
 
   const thumbnail = document.createElement("span");
   thumbnail.className = "shelf-thumbnail";
-  if (book) {
+  if (name === "Currently Reading" && book) {
+    thumbnail.dataset.readingShelfCover = "true";
+    thumbnail.append(createBookCover(book, "shelf-thumb-art"));
+  } else if (book) {
     thumbnail.append(createBookCover(book, "shelf-thumb-art"));
   } else if (color === "liked") {
     thumbnail.classList.add("liked-thumbnail");
@@ -696,6 +753,42 @@ function createShelfNavigationItem(name, count, color, book = null) {
   copy.append(title, subtitle);
   item.append(thumbnail, copy);
   return item;
+}
+
+function startReadingCoverCycle(books) {
+  const cycleKey = books.map((book) => book.id || getBookKey(book)).join("|");
+  if (cycleKey === readingCoverCycleKey) {
+    updateReadingShelfCovers();
+    return;
+  }
+  readingCoverCycleKey = cycleKey;
+  window.clearInterval(readingCoverCycleTimer);
+  readingCoverCycleTimer = null;
+  readingCoverCycleBooks = books.slice();
+  for (let index = readingCoverCycleBooks.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [readingCoverCycleBooks[index], readingCoverCycleBooks[randomIndex]] =
+      [readingCoverCycleBooks[randomIndex], readingCoverCycleBooks[index]];
+  }
+  readingCoverCycleIndex = 0;
+  updateReadingShelfCovers();
+  if (readingCoverCycleBooks.length > 1) {
+    readingCoverCycleTimer = window.setInterval(() => {
+      readingCoverCycleIndex = (readingCoverCycleIndex + 1) % readingCoverCycleBooks.length;
+      updateReadingShelfCovers();
+    }, 5000);
+  }
+}
+
+function updateReadingShelfCovers() {
+  const book = readingCoverCycleBooks[readingCoverCycleIndex];
+  if (!book) return;
+  document.querySelectorAll("[data-reading-shelf-cover]").forEach((cover) => {
+    cover.replaceChildren(createBookCover(book, "shelf-thumb-art"));
+  });
+  document.querySelectorAll("[data-reading-shelf-card-cover]").forEach((cover) => {
+    cover.replaceChildren(createBookCover(book));
+  });
 }
 
 function groupBooksByShelf(books) {
@@ -745,24 +838,25 @@ function renderBooks() {
     container.removeAttribute("aria-busy");
   }
 
-  const orderedBooks = state.books.slice().sort((a, b) =>
+  const libraryBooks = getLibraryBooks();
+  const orderedBooks = libraryBooks.slice().sort((a, b) =>
     new Date(b.added || b.added_on || 0) - new Date(a.added || a.added_on || 0));
-  const ownedKeys = new Set(state.books.map(getBookKey));
+  const ownedKeys = new Set(libraryBooks.map(getBookKey));
   const recommendations = scoreRecommendations(discoveryBooks.filter((book) =>
     !ownedKeys.has(getBookKey(book)) && !state.dismissedRecommendations.has(getBookKey(book))));
   const moreByOwnedAuthors = recommendations.filter(({ book }) =>
-    state.books.some((owned) => owned.author && owned.author.toLowerCase() === book.author.toLowerCase()));
+    libraryBooks.some((owned) => owned.author && owned.author.toLowerCase() === book.author.toLowerCase()));
   const shelfTiles = state.shelves.map((shelf) => ({
     name: shelf.name,
-    count: state.books.filter((book) => book.shelf === shelf.name).length,
+    count: libraryBooks.filter((book) => book.shelf === shelf.name).length,
     color: shelf.color || "#8b5e3c",
-    book: state.books.find((book) => book.shelf === shelf.name),
+    book: libraryBooks.find((book) => book.shelf === shelf.name),
   }));
-  const genres = [...new Set(state.books.map((book) => book.genre).filter(Boolean))];
+  const genres = [...new Set(libraryBooks.map((book) => book.genre).filter(Boolean))];
   const genreTiles = [...new Set([...genres, "Fiction", "Nonfiction", "Mystery", "Fantasy", "Essays"])]
     .map((genre, index) => ({
       title: genre,
-      count: state.books.filter((book) => book.genre === genre).length,
+      count: libraryBooks.filter((book) => book.genre === genre).length,
       color: ["#8050a8", "#bf613f", "#3f7772", "#536c9e"][index % 4],
     }));
 
@@ -813,12 +907,13 @@ function renderBooks() {
 }
 
 function scoreRecommendations(candidates) {
-  const ownedGenres = new Set(state.books.map((book) => (book.genre || "").toLowerCase()).filter(Boolean));
-  const ownedAuthors = new Set(state.books.map((book) => (book.author || "").toLowerCase()).filter(Boolean));
+  const libraryBooks = getLibraryBooks();
+  const ownedGenres = new Set(libraryBooks.map((book) => (book.genre || "").toLowerCase()).filter(Boolean));
+  const ownedAuthors = new Set(libraryBooks.map((book) => (book.author || "").toLowerCase()).filter(Boolean));
   return candidates.map((book) => {
-    const authorSource = state.books.find((owned) =>
+    const authorSource = libraryBooks.find((owned) =>
       owned.author && owned.author.toLowerCase() === book.author.toLowerCase());
-    const genreSource = state.books.find((owned) =>
+    const genreSource = libraryBooks.find((owned) =>
       owned.genre && owned.genre.toLowerCase() === book.genre.toLowerCase());
     const authorMatch = ownedAuthors.has(book.author.toLowerCase());
     const genreMatch = ownedGenres.has(book.genre.toLowerCase());
@@ -948,7 +1043,7 @@ function createBookCard(book, { compact = false, subtitle = "", recommendation =
       openBookProfile(book);
     }
   });
-  const ownedBook = state.books.find((owned) => getBookKey(owned) === getBookKey(book));
+  const ownedBook = getLibraryBooks().find((owned) => getBookKey(owned) === getBookKey(book));
   if (ownedBook) {
     const like = document.createElement("button");
     like.type = "button";
@@ -1043,7 +1138,10 @@ function createShelfCard(shelf, { compact = false } = {}) {
   const cover = document.createElement("span");
   cover.className = "shelf-card-art";
   cover.style.setProperty("--shelf-color", shelf.color);
-  if (shelf.book) cover.append(createBookCover(shelf.book));
+  if (name === "Currently Reading" && shelf.book) {
+    cover.dataset.readingShelfCardCover = "true";
+    cover.append(createBookCover(shelf.book));
+  } else if (shelf.book) cover.append(createBookCover(shelf.book));
   else cover.textContent = name.slice(0, 1).toUpperCase();
   const title = document.createElement("strong");
   title.className = "book-cover-title";
@@ -1061,6 +1159,7 @@ function createShelfCard(shelf, { compact = false } = {}) {
     }
   });
   card.append(open);
+  if (cover.hasAttribute("data-reading-shelf-card-cover")) updateReadingShelfCovers();
   return card;
 }
 
@@ -1138,28 +1237,21 @@ function showShelfPage(shelfName) {
   updateActiveNavigation("Your shelves");
   const page = showPage("shelf");
   const shelf = state.shelves.find((item) => item.name === shelfName);
-  const books = state.books.filter((book) => shelfName === "Liked Books"
-    ? book.liked
-    : shelfName === "Currently Reading"
-      ? book.reading_status === "reading"
-      : shelfName === "Library"
-        ? getBookShelfNames(book).length === 0
-        : getBookShelfNames(book).includes(shelfName));
+  const books = shelfName === "Completed Books"
+    ? state.books.filter((book) => book.reading_status === "completed")
+    : getLibraryBooks().filter((book) => shelfName === "Liked Books"
+      ? book.liked
+      : shelfName === "Currently Reading"
+        ? book.reading_status === "reading"
+        : shelfName === "Library"
+          ? getBookShelfNames(book).length === 0
+          : getBookShelfNames(book).includes(shelfName));
   const coverBook = books[0] || { title: shelfName, author: "", isbn: "" };
   const totalValue = books.reduce((total, book) => total + Number(book.cost || 0), 0);
-  const header = createPageHeader("Shelf · Your library", shelfName, `${books.length} books · ${formatCurrency(totalValue)} total value`);
-  const hero = document.createElement("div");
-  hero.className = "shelf-hero";
-  const cover = createBookCover(coverBook, "shelf-hero-cover");
-  if (shelf) cover.style.setProperty("--cover-tint", shelf.color || "#8b5e3c");
-  const meta = document.createElement("div");
-  meta.className = "shelf-hero-meta";
-  const owner = document.createElement("span");
-  owner.textContent = state.profile?.full_name || state.session?.user?.email || "Your library";
-  const count = document.createElement("strong");
-  count.textContent = `${books.length} ${books.length === 1 ? "book" : "books"}`;
-  meta.append(owner, count);
-  hero.append(cover, meta);
+  const description = shelfName === "Currently Reading"
+    ? `${books.length} ${books.length === 1 ? "book" : "books"} in progress`
+    : `${books.length} books · ${formatCurrency(totalValue)} total value`;
+  const header = createPageHeader("Shelf · Your library", shelfName, description);
 
   const toolbar = document.createElement("div");
   toolbar.className = "page-toolbar";
@@ -1188,41 +1280,267 @@ function showShelfPage(shelfName) {
     });
     toolbar.append(rename, remove);
   }
+  if (shelfName === "Currently Reading") {
+    page.append(header, toolbar, createCurrentlyReadingList(books));
+    return;
+  }
+  if (shelfName === "Completed Books") {
+    page.append(header, createCompletedBooksList(books));
+    return;
+  }
+  const hero = document.createElement("div");
+  hero.className = "shelf-hero";
+  const cover = createBookCover(coverBook, "shelf-hero-cover");
+  if (shelf) cover.style.setProperty("--cover-tint", shelf.color || "#8b5e3c");
+  const meta = document.createElement("div");
+  meta.className = "shelf-hero-meta";
+  const owner = document.createElement("span");
+  owner.textContent = state.profile?.full_name || state.session?.user?.email || "Your library";
+  const count = document.createElement("strong");
+  count.textContent = `${books.length} ${books.length === 1 ? "book" : "books"}`;
+  meta.append(owner, count);
+  hero.append(cover, meta);
   page.append(header, hero, toolbar, createBookTable(books));
+}
+
+function createCompletedBooksList(books) {
+  const list = document.createElement("div");
+  list.className = "currently-reading-list";
+  list.setAttribute("aria-label", "Completed books");
+  if (!books.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state-card";
+    const title = document.createElement("h2");
+    title.textContent = "Your completed books will appear here";
+    const copy = document.createElement("p");
+    copy.textContent = "Mark a book as complete from Currently Reading to add it to this shelf.";
+    empty.append(title, copy);
+    list.append(empty);
+    return list;
+  }
+
+  books.forEach((book) => {
+    const row = document.createElement("article");
+    row.className = "currently-reading-row completed-book-row";
+    const coverButton = document.createElement("button");
+    coverButton.type = "button";
+    coverButton.className = "currently-reading-cover";
+    coverButton.setAttribute("aria-label", `Open ${book.title}`);
+    coverButton.append(createBookCover(book));
+    coverButton.addEventListener("click", () => openBookProfile(book));
+
+    const details = document.createElement("div");
+    details.className = "currently-reading-details";
+    const title = document.createElement("button");
+    title.type = "button";
+    title.className = "table-book-title";
+    title.textContent = book.title || "Untitled";
+    title.addEventListener("click", () => openBookProfile(book));
+    const author = document.createElement("span");
+    author.className = "currently-reading-author";
+    author.textContent = book.author || "Unknown author";
+    const status = document.createElement("span");
+    status.className = "currently-reading-progress";
+    status.textContent = book.disposition
+      ? `Completed · ${book.disposition === "sold" ? "Sold" : "Donated"}`
+      : `Completed · ${Number(book.current_page || 0)} pages read`;
+    details.append(title, author, status);
+
+    const actions = document.createElement("div");
+    actions.className = "currently-reading-controls completed-book-actions";
+    const readAgain = document.createElement("button");
+    readAgain.type = "button";
+    readAgain.className = "action-btn";
+    readAgain.textContent = "Read again";
+    readAgain.addEventListener("click", () => readBookAgain(book));
+    actions.append(readAgain);
+
+    if (!book.disposition) {
+      const options = document.createElement("details");
+      options.className = "completed-disposition";
+      const summary = document.createElement("summary");
+      summary.className = "secondary-btn";
+      summary.textContent = "Sell or donate";
+      const optionsGrid = document.createElement("div");
+      optionsGrid.className = "disposition-options";
+      [
+        {
+          heading: "Sell online",
+          description: "Compare buyback offers or list it for sale.",
+          links: [
+            ["BookScouter", "https://www.bookscouter.com/"],
+            ["Search eBay", `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent([book.title, book.author].filter(Boolean).join(" "))}`],
+          ],
+        },
+        {
+          heading: "Sell locally",
+          description: "Find nearby used bookstores.",
+          links: [["Search nearby", "https://www.google.com/maps/search/used+bookstores+near+me/"]],
+        },
+        {
+          heading: "Donate online",
+          description: "Find organizations accepting books by mail.",
+          links: [["Search donation programs", "https://www.google.com/search?q=donate+books+by+mail"]],
+        },
+        {
+          heading: "Donate locally",
+          description: "Find nearby book donation locations.",
+          links: [["Search nearby", "https://www.google.com/maps/search/book+donation+near+me/"]],
+        },
+      ].forEach(({ heading, description, links }) => {
+        const option = document.createElement("section");
+        option.className = "disposition-option";
+        const title = document.createElement("h3");
+        title.textContent = heading;
+        const copy = document.createElement("p");
+        copy.textContent = description;
+        const linkList = document.createElement("div");
+        linkList.className = "disposition-links";
+        links.forEach(([label, href]) => {
+          const link = document.createElement("a");
+          link.href = href;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.textContent = label;
+          linkList.append(link);
+        });
+        const mark = document.createElement("button");
+        mark.type = "button";
+        mark.className = "text-btn disposition-mark";
+        const disposition = heading.startsWith("Sell") ? "sold" : "donated";
+        mark.textContent = `Mark as ${disposition}`;
+        mark.addEventListener("click", () => setBookDisposition(book, disposition));
+        option.append(title, copy, linkList, mark);
+        optionsGrid.append(option);
+      });
+      options.append(summary, optionsGrid);
+      actions.append(options);
+    }
+    row.append(coverButton, details, actions);
+    list.append(row);
+  });
+  return list;
+}
+
+function createCurrentlyReadingList(books) {
+  const list = document.createElement("div");
+  list.className = "currently-reading-list";
+  list.setAttribute("aria-label", "Books currently being read");
+  if (!books.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state-card";
+    const title = document.createElement("h2");
+    title.textContent = "Nothing on your reading list yet";
+    const copy = document.createElement("p");
+    copy.textContent = "Open a book in your library and switch on Currently Reading to add it here.";
+    empty.append(title, copy);
+    list.append(empty);
+    return list;
+  }
+
+  books.forEach((book) => {
+    const row = document.createElement("article");
+    row.className = "currently-reading-row";
+    const coverButton = document.createElement("button");
+    coverButton.type = "button";
+    coverButton.className = "currently-reading-cover";
+    coverButton.setAttribute("aria-label", `Open ${book.title}`);
+    coverButton.append(createBookCover(book));
+    coverButton.addEventListener("click", () => openBookProfile(book));
+
+    const details = document.createElement("div");
+    details.className = "currently-reading-details";
+    const title = document.createElement("button");
+    title.type = "button";
+    title.className = "table-book-title";
+    title.textContent = book.title || "Untitled";
+    title.addEventListener("click", () => openBookProfile(book));
+    const author = document.createElement("span");
+    author.className = "currently-reading-author";
+    author.textContent = book.author || "Unknown author";
+    const pageCount = Number(book.page_count || book.pages);
+    const progress = document.createElement("span");
+    progress.className = "currently-reading-progress";
+    progress.textContent = Number.isInteger(pageCount) && pageCount > 0
+      ? `Page ${book.current_page || 0} of ${pageCount}`
+      : `Page ${book.current_page || 0}`;
+    details.append(title, author, progress);
+
+    const controls = document.createElement("div");
+    controls.className = "currently-reading-controls";
+    const pageInput = document.createElement("input");
+    pageInput.type = "number";
+    pageInput.min = "0";
+    if (Number.isInteger(pageCount) && pageCount > 0) pageInput.max = String(pageCount);
+    pageInput.step = "1";
+    pageInput.value = String(book.current_page || 0);
+    pageInput.setAttribute("aria-label", `Current page for ${book.title}`);
+    const savePage = document.createElement("button");
+    savePage.type = "button";
+    savePage.className = "secondary-btn";
+    savePage.textContent = "Save page";
+    savePage.addEventListener("click", () => saveCurrentPage(
+      book,
+      pageInput.value.trim() ? Number(pageInput.value) : Number.NaN
+    ));
+    const complete = document.createElement("button");
+    complete.type = "button";
+    complete.className = "action-btn";
+    complete.textContent = "Mark complete";
+    complete.addEventListener("click", () => markBookAsRead(book));
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "secondary-btn";
+    remove.textContent = "Remove";
+    remove.setAttribute("aria-label", `Remove ${book.title} from Currently Reading`);
+    remove.addEventListener("click", () => setReadingStatus(book, ""));
+    controls.append(pageInput, savePage, complete, remove);
+    row.append(coverButton, details, controls);
+    list.append(row);
+  });
+  return list;
 }
 
 function showShelvesPage() {
   updateActiveNavigation("Your shelves");
   const page = showPage("shelves");
   page.append(createPageHeader("Your Library", "Your shelves", "Your books, gathered into collections."));
+  const libraryBooks = getLibraryBooks();
   const tiles = [
     {
       type: "shelf",
       name: "Liked Books",
-      count: state.books.filter((book) => book.liked).length,
+      count: libraryBooks.filter((book) => book.liked).length,
       color: "#704052",
-      book: state.books.find((book) => book.liked),
+      book: libraryBooks.find((book) => book.liked),
     },
     {
       type: "shelf",
       name: "Currently Reading",
-      count: state.books.filter((book) => book.reading_status === "reading").length,
+      count: libraryBooks.filter((book) => book.reading_status === "reading").length,
       color: "#496c5d",
-      book: state.books.find((book) => book.reading_status === "reading"),
+      book: libraryBooks.find((book) => book.reading_status === "reading"),
+    },
+    {
+      type: "shelf",
+      name: "Completed Books",
+      count: state.books.filter((book) => book.reading_status === "completed").length,
+      color: "#8b5e3c",
+      book: state.books.find((book) => book.reading_status === "completed"),
     },
     {
       type: "shelf",
       name: "Library",
-      count: state.books.filter((book) => !getBookShelfNames(book).length).length,
+      count: libraryBooks.filter((book) => !getBookShelfNames(book).length).length,
       color: "#8b5e3c",
-      book: state.books.find((book) => !getBookShelfNames(book).length),
+      book: libraryBooks.find((book) => !getBookShelfNames(book).length),
     },
     ...state.shelves.map((shelf) => ({
       type: "shelf",
       name: shelf.name,
-      count: state.books.filter((book) => getBookShelfNames(book).includes(shelf.name)).length,
+      count: libraryBooks.filter((book) => getBookShelfNames(book).includes(shelf.name)).length,
       color: shelf.color || "#8b5e3c",
-      book: state.books.find((book) => getBookShelfNames(book).includes(shelf.name)),
+      book: libraryBooks.find((book) => getBookShelfNames(book).includes(shelf.name)),
     })),
   ];
   page.append(createCardRow("Collections", tiles));
@@ -1370,7 +1688,11 @@ function renderBookPage(book) {
   const add = document.createElement("button");
   add.type = "button";
   add.className = "action-btn";
-  add.textContent = ownedBook ? "Already in your library" : "＋ Mark as owned";
+  add.textContent = ownedBook?.disposition
+    ? "In Completed Books"
+    : ownedBook
+      ? "Already in your library"
+      : "＋ Mark as owned";
   add.disabled = Boolean(ownedBook);
   add.addEventListener("click", () => {
     openDialog();
@@ -1390,7 +1712,7 @@ function renderBookPage(book) {
     else showToast("Add this book to your library before liking it.");
   });
   actions.append(add, like);
-  if (ownedBook && state.shelves.length) {
+  if (ownedBook && !ownedBook.disposition && state.shelves.length) {
     const shelfSelect = document.createElement("select");
     shelfSelect.className = "page-shelf-select";
     shelfSelect.setAttribute("aria-label", "Choose a shelf");
@@ -1410,7 +1732,7 @@ function renderBookPage(book) {
     actions.append(shelfSelect, addToShelf);
   }
   content.append(actions);
-  if (ownedBook) {
+  if (ownedBook && !ownedBook.disposition) {
     const readingActions = document.createElement("div");
     readingActions.className = "reading-actions";
     const currentlyReadingLabel = document.createElement("label");
@@ -1462,10 +1784,11 @@ function showSearchPage(query = "") {
     state.searchResults = null;
     state.searchMessage = "";
     state.searchLoading = false;
-    const genres = [...new Set([...state.books.map((book) => book.genre).filter(Boolean), "Fiction", "Nonfiction", "Mystery", "Fantasy", "Essays"])];
+    const libraryBooks = getLibraryBooks();
+    const genres = [...new Set([...libraryBooks.map((book) => book.genre).filter(Boolean), "Fiction", "Nonfiction", "Mystery", "Fantasy", "Essays"])];
     const tiles = genres.map((genre, index) => ({
       title: genre,
-      count: state.books.filter((book) => book.genre === genre).length,
+      count: libraryBooks.filter((book) => book.genre === genre).length,
       color: ["#8050a8", "#bf613f", "#3f7772", "#536c9e"][index % 4],
     }));
     page.append(createCardRow("Explore genres", tiles.map((genre) => ({ type: "genre", ...genre }))));
@@ -1525,8 +1848,8 @@ function showSearchPage(query = "") {
       type: "shelf",
       name: shelf.name,
       color: shelf.color || "#8b5e3c",
-      count: state.books.filter((book) => getBookShelfNames(book).includes(shelf.name)).length,
-      book: state.books.find((book) => getBookShelfNames(book).includes(shelf.name)),
+      count: getLibraryBooks().filter((book) => getBookShelfNames(book).includes(shelf.name)).length,
+      book: getLibraryBooks().find((book) => getBookShelfNames(book).includes(shelf.name)),
     }))));
     page.append(section);
   }
@@ -1563,7 +1886,7 @@ function normalizeSearchText(query) {
 
 function findLocalSearchMatches(query) {
   const parsed = parseNaturalSearch(query);
-  const candidates = [...state.books, ...discoveryBooks].filter((book, index, all) =>
+  const candidates = [...getLibraryBooks(), ...discoveryBooks].filter((book, index, all) =>
     all.findIndex((candidate) => getBookKey(candidate) === getBookKey(book)) === index);
   return candidates.filter((book) => {
     const searchable = [book.title, book.author, book.genre, ...(book.subjects || [])]
@@ -1638,13 +1961,14 @@ function showStatsPage() {
   updateActiveNavigation("Stats");
   const page = showPage("stats");
   page.append(createPageHeader("Your library", "Your reading collection", "A little look back at the books you have gathered."));
-  const totalValue = state.books.reduce((sum, book) => sum + Number(book.cost || 0), 0);
-  const genreCounts = countBy(state.books, (book) => book.genre || "Uncatalogued");
-  const authorCounts = countBy(state.books, (book) => book.author || "Unknown author");
+  const libraryBooks = getLibraryBooks();
+  const totalValue = libraryBooks.reduce((sum, book) => sum + Number(book.cost || 0), 0);
+  const genreCounts = countBy(libraryBooks, (book) => book.genre || "Uncatalogued");
+  const authorCounts = countBy(libraryBooks, (book) => book.author || "Unknown author");
   const stats = document.createElement("div");
   stats.className = "stats-grid";
   [
-    ["Total books", String(state.books.length)],
+    ["Total books", String(libraryBooks.length)],
     ["Total value", formatCurrency(totalValue)],
     ["Shelves", String(state.shelves.length)],
     ["Top genre", topEntry(genreCounts)],
@@ -1698,22 +2022,6 @@ function render() {
   else if (state.view === "search") showSearchPage(state.searchQuery);
   else if (state.view === "stats") showStatsPage();
   else if (state.view === "book" && state.currentBook) renderBookPage(state.currentBook);
-  renderNowReadingBook();
-}
-
-function renderNowReadingBook() {
-  const book = state.books.find((item) => item.reading_status === "reading");
-  const bar = document.getElementById("nowReadingBar");
-  bar.hidden = !book;
-  if (!book) {
-    nowReadingCover.replaceChildren();
-    nowReadingBook.textContent = "";
-    return;
-  }
-  nowReadingCover.replaceChildren(createBookCover(book));
-  nowReadingBook.textContent = `${book.title} · ${book.author || "Unknown author"}`;
-  document.getElementById("nowReadingPage").textContent = `Current page: ${book.current_page || 0}`;
-  document.getElementById("nowReadingLikeBtn").textContent = book.liked ? "♥" : "♡";
 }
 
 function openDialog() {
@@ -2244,8 +2552,8 @@ async function createShelfInSupabase() {
     showToast("Name your shelf first.");
     return;
   }
-  if (name.toLowerCase() === "currently reading") {
-    showToast("Currently Reading is a generated shelf. Choose another name.");
+  if (["currently reading", "completed books"].includes(name.toLowerCase())) {
+    showToast(`${name} is a generated shelf. Choose another name.`);
     return;
   }
   let session;
@@ -2303,6 +2611,7 @@ async function loadFromSupabase() {
     isbn: book.isbn || "",
     shelf: book.shelf,
     reading_status: book.reading_status || "",
+    disposition: book.disposition || "",
     current_page: Number(book.current_page || 0),
     page_count: book.page_count ? Number(book.page_count) : null,
     cost: Number(book.cost || 0),
@@ -2363,6 +2672,7 @@ async function saveBookToSupabase(book) {
     isbn: book.isbn || null,
     shelf: book.shelf || null,
     reading_status: book.reading_status || null,
+    disposition: book.disposition || null,
     current_page: Number(book.current_page || 0),
     page_count: book.page_count || null,
     cost: Number(book.cost || 0),
@@ -2418,11 +2728,6 @@ libraryToggleBtn.addEventListener("click", () => {
 });
 document.getElementById("closeLibraryBtn").addEventListener("click", () => setLibraryDrawerOpen(false));
 sidebarBackdrop.addEventListener("click", () => setLibraryDrawerOpen(false));
-
-document.getElementById("nowReadingLikeBtn").addEventListener("click", () => {
-  const book = state.books.find((item) => item.reading_status === "reading");
-  if (book) toggleBookLike(book);
-});
 
 document.querySelectorAll(".mobile-nav-item").forEach((item) => {
   item.addEventListener("click", () => {

@@ -6,7 +6,7 @@ Librito is a cozy, mobile-first library platform concept for scanning books, org
 - Mobile-first layout with cozy, bookish styling
 - Local demo library with mock data
 - Books are added to the library by default and can optionally be assigned to user-created shelves
-- A Currently Reading toggle creates a generated Currently Reading shelf, and a Current Page field remembers the last page read
+- Currently Reading and Completed Books are dedicated shelves; completed books can be restarted or managed for selling or donating
 - Welcome prompt for visitors to sign in or create an account, with the option to continue browsing
 - Book lookup by title and/or author defaults to the browser language and lets users choose another language or any language; results use edition-specific covers. ISBN lookup uses Open Library metadata.
 - Camera-based barcode scan attempt on supported mobile browsers
@@ -24,7 +24,7 @@ Then open http://127.0.0.1:3000/.
 
 ## Supabase setup
 1. Create a new Supabase project.
-2. For a new project, open SQL Editor and run [supabase/schema.sql](supabase/schema.sql), then [supabase/auth-setup.sql](supabase/auth-setup.sql). For a project that already has the original books and shelves schema, run [the latest migration](supabase/migrations/20261013192727_library_progress_and_likes.sql) in SQL Editor to add reading-progress fields, shelf memberships, and likes without replacing existing rows. The schema script is also safe to re-run on existing projects. The auth script creates a profile for each newly registered Supabase user.
+2. For a new project, open SQL Editor and run [supabase/schema.sql](supabase/schema.sql), then [supabase/auth-setup.sql](supabase/auth-setup.sql). For an existing project, run [the progress and shelves migration](supabase/migrations/20261013192727_library_progress_and_likes.sql), followed by [the completed-book disposition migration](supabase/migrations/20261013195700_completed_book_disposition.sql) in SQL Editor; they add fields without replacing existing rows. The completed-book migration renames any user-created “Completed Books” shelf so the generated shelf can use that name. The schema script is also safe to re-run on existing projects. The auth script creates a profile for each newly registered Supabase user.
 3. Set the project's URL and anon key in `config.js`. Users can choose Google or email/password to register or sign in; these are alternative methods, so Google users do not need to provide a separate email/password in Librito. If email confirmation is enabled, email/password users must confirm their email before signing in. Signed-in books and shelves are loaded from Supabase.
 4. To enable Google sign-in, create a Google OAuth client and add the callback URL shown under Supabase Authentication > Providers > Google as an authorized redirect URI in Google Cloud. Add the client ID and secret to that Google provider in Supabase, then enable it.
 5. In Supabase Authentication > URL Configuration, set the site URL to the deployed app URL and add the deployed URL and local preview URL (for example, `http://localhost:3000/`) to the allowed redirect URLs. The Google button uses the current app URL as its post-login redirect.
