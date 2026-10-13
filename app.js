@@ -728,7 +728,6 @@ function renderBooks() {
   const container = document.getElementById("homeRows");
   if (state.view !== "home") return;
   container.replaceChildren();
-
   if (state.loading) {
     container.setAttribute("aria-busy", "true");
     const status = document.createElement("p");
@@ -736,25 +735,9 @@ function renderBooks() {
     status.setAttribute("role", "status");
     status.textContent = "Loading your library";
     container.append(status);
-    for (let index = 0; index < 4; index += 1) {
-      const section = document.createElement("section");
-      section.className = "home-section card-row-section skeleton-section";
-      const title = document.createElement("div");
-      title.className = "skeleton skeleton-heading";
-      const row = document.createElement("div");
-      row.className = "card-row";
-      for (let cardIndex = 0; cardIndex < 5; cardIndex += 1) {
-        const card = document.createElement("div");
-        card.className = "skeleton skeleton-card";
-        card.setAttribute("aria-hidden", "true");
-        row.append(card);
-      }
-      section.append(title, row);
-      container.append(section);
-    }
-    return;
+  } else {
+    container.removeAttribute("aria-busy");
   }
-  container.removeAttribute("aria-busy");
 
   const orderedBooks = state.books.slice().sort((a, b) =>
     new Date(b.added || b.added_on || 0) - new Date(a.added || a.added_on || 0));
@@ -780,18 +763,27 @@ function renderBooks() {
   container.append(
     createCardRow("Jump back in", shelfTiles.length
       ? shelfTiles.slice(0, 6).map((shelf) => ({ type: "shelf", ...shelf }))
-      : orderedBooks.slice(0, 6).map((book) => ({ type: "compact-book", book })), { compact: true }),
+      : orderedBooks.slice(0, 6).map((book) => ({ type: "compact-book", book })), {
+        compact: true,
+        emptyMessage: state.loading ? "Loading your shelves and books…" : "",
+      }),
     createCardRow("Picked for your library", recommendations.slice(0, 8)
       .map(({ book, reason }) => ({ type: "book", book, subtitle: reason, recommendation: true }))),
     createCardRow("Shelves for your taste", buildSuggestedShelves(genres)),
     createCardRow("Recently added", orderedBooks.slice(0, 10)
       .map((book) => ({ type: "book", book })), {
-        emptyMessage: state.loadError || "Add your first book to start building your library.",
-        emptyActionLabel: "＋ Add your first book",
-        emptyAction: openDialog,
+        emptyMessage: state.loading
+          ? "Loading your library…"
+          : state.loadError || "Add your first book to start building your library.",
+        emptyActionLabel: state.loading ? "" : "＋ Add your first book",
+        emptyAction: state.loading ? null : openDialog,
       }),
     createCardRow("More by authors you own", moreByOwnedAuthors.slice(0, 8)
-      .map(({ book }) => ({ type: "book", book })), { emptyMessage: "Add books by an author you love to find more of their work." }),
+      .map(({ book }) => ({ type: "book", book })), {
+        emptyMessage: state.loading
+          ? "Loading your library…"
+          : "Add books by an author you love to find more of their work.",
+      }),
     createCardRow("Browse by genre", genreTiles.map((genre) => ({ type: "genre", ...genre })))
   );
 }

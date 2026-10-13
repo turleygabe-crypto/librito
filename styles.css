@@ -252,8 +252,11 @@ h1, h2, h3, h4, p { margin-top: 0; }
   display: flex;
   gap: 0.75rem;
   align-items: center;
-  padding: max(0.75rem, env(safe-area-inset-top)) 0 0.85rem;
-  background: rgba(22, 13, 10, 0.96);
+  margin-bottom: 1rem;
+  padding: max(0.55rem, env(safe-area-inset-top)) 0.7rem 0.55rem;
+  border: 1px solid rgba(245, 221, 201, 0.1);
+  border-radius: 1rem;
+  background: rgba(37, 24, 19, 0.97);
   backdrop-filter: blur(14px);
 }
 
@@ -299,39 +302,6 @@ h1, h2, h3, h4, p { margin-top: 0; }
   padding: 0.75rem 0.5rem;
   color: var(--muted);
   font-size: 0.82rem;
-}
-
-.skeleton-section {
-  overflow: hidden;
-}
-
-.skeleton {
-  position: relative;
-  overflow: hidden;
-  border-radius: 0.65rem;
-  background: rgba(245, 221, 201, 0.09);
-}
-
-.skeleton::after {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.09), transparent);
-  content: "";
-  animation: skeleton-shimmer 1.5s infinite;
-}
-
-.skeleton-heading {
-  width: min(14rem, 45%);
-  height: 1.5rem;
-  margin-bottom: 0.9rem;
-}
-
-.skeleton-card {
-  aspect-ratio: 0.85;
-}
-
-@keyframes skeleton-shimmer {
-  to { transform: translateX(100%); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -745,7 +715,7 @@ h1, h2, h3, h4, p { margin-top: 0; }
   }
 
   .spotify-topbar {
-    padding: 0.85rem 0 1rem;
+    padding: 0.65rem 0.7rem;
   }
 
   .spotify-home {
