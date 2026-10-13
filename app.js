@@ -115,7 +115,6 @@ const state = {
   profile: null,
   supabase: null,
   category: "All",
-  authorFilter: "",
 };
 
 const bookForm = document.getElementById("bookForm");
@@ -163,7 +162,6 @@ const nowReadingCover = document.getElementById("nowReadingCover");
 const nowReadingBook = document.getElementById("nowReadingBook");
 const featuredAddBtn = document.getElementById("featuredAddBtn");
 const featuredPlayBtn = document.getElementById("featuredPlayBtn");
-const authorQuickLink = document.getElementById("authorQuickLink");
 const savedBooksBtn = document.getElementById("savedBooksBtn");
 const settingsBtn = document.getElementById("settingsBtn");
 let cameraStream = null;
@@ -344,8 +342,7 @@ function renderBooks() {
 
   const visibleBooks = state.books.filter((book) => {
     const matchesCategory = state.category === "All" || (book.genre || "").toLowerCase() === state.category.toLowerCase();
-    const matchesAuthor = !state.authorFilter || book.author === state.authorFilter;
-    return matchesCategory && matchesAuthor;
+    return matchesCategory;
   });
   const groupedBooks = groupBooksByShelf(visibleBooks);
   if (!visibleBooks.length) {
@@ -954,9 +951,8 @@ scanButton.addEventListener("click", () => {
   seedMockScan();
 });
 
-function setBookView(category = "All", author = "") {
+function setBookView(category = "All") {
   state.category = category;
-  state.authorFilter = author;
   document.querySelectorAll(".category-tab").forEach((item) => {
     item.classList.toggle("active", item.textContent.trim() === category);
   });
@@ -967,11 +963,6 @@ document.querySelectorAll(".category-tab").forEach((tab) => {
   tab.addEventListener("click", () => {
     setBookView(tab.textContent.trim());
   });
-});
-
-authorQuickLink.addEventListener("click", () => {
-  setBookView("All", "Matt Haig");
-  showToast("Showing Matt Haig in your library");
 });
 
 savedBooksBtn.addEventListener("click", () => {
