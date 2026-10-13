@@ -64,8 +64,20 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .book-cover-card { min-width: 0; cursor: pointer; }
 .book-cover-art { position: relative; display: grid; place-items: center; width: 100%; aspect-ratio: 0.72; overflow: hidden; border-radius: 0.55rem; background: linear-gradient(145deg, #684630, #291a14); color: #fff3e8; box-shadow: 0 5px 14px rgba(0,0,0,.2); }
 .book-cover-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.book-cover-initials {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  color: rgba(255, 245, 232, 0.24);
+  font-family: Georgia, serif;
+  font-size: clamp(2rem, 7vw, 4.5rem);
+  font-weight: 700;
+  letter-spacing: -0.08em;
+  transform: translate(-50%, -50%);
+}
 .book-cover-placeholder { max-width: 85%; padding: 0.6rem; font: 600 clamp(0.75rem, 2vw, 1rem)/1.2 Georgia, serif; text-align: center; }
-.book-cover-art.has-cover .book-cover-placeholder { display: none; }
+.book-cover-art.has-cover .book-cover-placeholder,
+.book-cover-art.has-cover .book-cover-initials { display: none; }
 .book-cover-title { display: block; margin-top: 0.45rem; color: #fff8ef; font-size: 0.9rem; line-height: 1.2; }
 .book-cover-author { display: block; margin-top: 0.2rem; color: var(--muted); font-size: 0.8rem; line-height: 1.25; }
 .featured-cover .book-cover-art { height: 100%; }
@@ -205,4 +217,1356 @@ h1, h2, h3, h4, p { margin-top: 0; }
   .shelf-item { padding: 0.85rem; border-radius: 0.7rem; background: #39241d; color: #f5e3d8; }
   .shelf-item span { color: #bca69b; }
   .now-reading, .mobile-nav { display: none; }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 0.45rem;
+}
+
+.sidebar {
+  display: none;
+}
+
+.main-stage {
+  width: 100%;
+  min-height: calc(100vh - 0.9rem);
+  margin: 0;
+  padding: 0 clamp(0.75rem, 3vw, 2rem);
+}
+
+.spotify-topbar {
+  position: sticky;
+  z-index: 6;
+  top: 0;
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  padding: max(0.75rem, env(safe-area-inset-top)) 0 0.85rem;
+  background: rgba(22, 13, 10, 0.96);
+  backdrop-filter: blur(14px);
+}
+
+.spotify-topbar::before {
+  content: none;
+}
+
+.home-button {
+  width: 2.7rem;
+  height: 2.7rem;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 50%;
+  background: #34231d;
+  color: #fff7f0;
+  font-size: 1.5rem;
+}
+
+.global-search {
+  display: flex;
+  min-width: 0;
+  width: min(100%, 38rem);
+  min-height: 2.8rem;
+  flex: 1 1 20rem;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0 auto;
+  padding: 0.35rem 0.9rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: #352420;
+  color: var(--muted);
+}
+
+.row-empty-action {
+  grid-column: 1 / -1;
+  justify-self: start;
+  margin: 0 1rem 1rem;
+}
+
+.sidebar-empty {
+  margin: 0;
+  padding: 0.75rem 0.5rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.skeleton-section {
+  overflow: hidden;
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.65rem;
+  background: rgba(245, 221, 201, 0.09);
+}
+
+.skeleton::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.09), transparent);
+  content: "";
+  animation: skeleton-shimmer 1.5s infinite;
+}
+
+.skeleton-heading {
+  width: min(14rem, 45%);
+  height: 1.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.skeleton-card {
+  aspect-ratio: 0.85;
+}
+
+@keyframes skeleton-shimmer {
+  to { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.global-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(201, 123, 77, 0.2);
+}
+
+.global-search > span {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.global-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #fff8ef;
+}
+
+.global-search input::placeholder {
+  color: #c1b3ac;
+}
+
+.global-search button,
+.create-shelf-btn {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.55rem 0.9rem;
+  background: var(--accent);
+  color: #24130d;
+  font-weight: 700;
+}
+
+.add-book-btn {
+  flex: 0 0 auto;
+  border: 1px solid rgba(245, 221, 201, 0.18);
+  border-radius: 999px;
+  padding: 0.6rem 0.9rem;
+  background: transparent;
+  color: #f7e8de;
+}
+
+.account-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.account-menu summary {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.account-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.account-avatar {
+  display: grid;
+  width: 2.55rem;
+  height: 2.55rem;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #24130d;
+  font-weight: 800;
+}
+
+.account-menu-label {
+  color: #f7e8de;
+  font-size: 0.9rem;
+}
+
+.account-menu-panel {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  right: 0;
+  z-index: 8;
+  width: min(18rem, calc(100vw - 2rem));
+  padding: 1rem;
+  border: 1px solid rgba(245, 221, 201, 0.14);
+  border-radius: 0.8rem;
+  background: #281a16;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+}
+
+.account-menu-panel p {
+  margin-bottom: 0.75rem;
+  color: #e0d0c7;
+  line-height: 1.4;
+}
+
+.account-menu-panel .action-btn {
+  width: 100%;
+}
+
+.spotify-home {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+  padding-bottom: 6rem;
+}
+
+.now-reading[hidden] {
+  display: none !important;
+}
+
+.now-reading:not([hidden]) {
+  position: fixed;
+  z-index: 5;
+  right: 0.75rem;
+  bottom: 4.75rem;
+  left: 0.75rem;
+  display: grid;
+  grid-template-columns: 2.7rem minmax(0, 1fr) minmax(3rem, 10rem) auto auto;
+}
+
+.reading-progress {
+  height: 0.2rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #edab74 0 28%, rgba(255, 255, 255, 0.22) 28% 100%);
+}
+
+.mobile-nav {
+  display: grid;
+}
+
+.sidebar-library,
+.library-heading,
+.shelf-item-copy {
+  min-width: 0;
+}
+
+.library-toggle-btn,
+.mobile-sidebar-close {
+  display: none;
+}
+
+.sidebar-backdrop[hidden] {
+  display: none;
+}
+
+.library-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.library-heading h2 {
+  margin: 0;
+  color: #f8ede6;
+  font-size: 1rem;
+}
+
+.create-shelf-btn {
+  padding: 0.45rem 0.65rem;
+  background: #3c2a23;
+  color: #f7e8de;
+  font-size: 0.82rem;
+}
+
+.sidebar-filters {
+  flex-wrap: nowrap;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding: 0.85rem 0;
+  scrollbar-width: none;
+}
+
+.sidebar-filters::-webkit-scrollbar {
+  display: none;
+}
+
+.sidebar-filters .category-tab {
+  padding: 0.45rem 0.7rem;
+  background: #3a2722;
+  font-size: 0.78rem;
+}
+
+.sidebar-filters .category-tab.active {
+  background: var(--accent);
+  color: #24130d;
+}
+
+.shelf-list {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.shelf-item {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.5rem;
+  border: 0;
+  border-radius: 0.55rem;
+  background: transparent;
+  color: #fff8ef;
+  text-align: left;
+}
+
+.shelf-item:hover,
+.shelf-item:focus-visible {
+  background: rgba(245, 221, 201, 0.09);
+}
+
+.shelf-thumbnail {
+  display: grid;
+  width: 2.9rem;
+  height: 2.9rem;
+  flex: 0 0 2.9rem;
+  overflow: hidden;
+  place-items: center;
+  border-radius: 0.35rem;
+  background: linear-gradient(145deg, #8b5e3c, #39241d);
+  color: #fff4e9;
+  font-family: Georgia, serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.liked-thumbnail {
+  background: linear-gradient(135deg, #5b2636, #d18c5b);
+  font-family: sans-serif;
+}
+
+.shelf-thumb-art {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.shelf-thumb-art .book-cover-placeholder {
+  padding: 0.15rem;
+  font-size: 0.55rem;
+}
+
+.shelf-thumb-art .book-cover-initials {
+  font-size: 1.1rem;
+}
+
+.shelf-item-copy {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.shelf-item-copy strong,
+.shelf-item-copy > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shelf-item-copy strong {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.shelf-item-copy > span {
+  color: var(--muted);
+  font-size: 0.73rem;
+}
+
+.legacy-panel {
+  display: none !important;
+}
+
+@media (max-width: 480px) {
+  .app-shell {
+    padding: 0;
+  }
+
+  .main-stage {
+    min-height: 100vh;
+    padding: 0 0.75rem;
+  }
+
+  .spotify-topbar {
+    gap: 0.45rem;
+  }
+
+  .global-search {
+    gap: 0.4rem;
+    padding: 0.3rem 0.65rem;
+  }
+
+  .global-search button {
+    padding: 0.45rem 0.6rem;
+    font-size: 0.8rem;
+  }
+
+  .add-book-btn,
+  .account-menu-label {
+    display: none;
+  }
+
+  .account-avatar,
+  .home-button {
+    width: 2.35rem;
+    height: 2.35rem;
+  }
+}
+
+@media (min-width: 900px) {
+  .app-shell {
+    display: grid;
+    grid-template-columns: minmax(245px, 19vw) minmax(0, 1fr);
+    gap: 0.45rem;
+    padding: 0.45rem;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 0.45rem;
+    display: flex;
+    height: calc(100vh - 0.9rem);
+    min-height: 0;
+    flex-direction: column;
+    gap: 1rem;
+    overflow: hidden;
+    padding: 1rem;
+    border: 1px solid rgba(245, 221, 201, 0.12);
+    border-radius: 0.75rem;
+    background: rgba(31, 17, 13, 0.88);
+  }
+
+  .sidebar .brand {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(245, 221, 201, 0.1);
+  }
+
+  .sidebar .brand-mark {
+    width: 2.9rem;
+    height: 2.9rem;
+    font-size: 1.6rem;
+  }
+
+  .sidebar .eyebrow {
+    margin: 0 0 0.15rem;
+    color: #c29b82;
+    font-size: 0.65rem;
+    letter-spacing: 0.16em;
+  }
+
+  .sidebar h2 {
+    margin-bottom: 0;
+    font-size: 1.2rem;
+  }
+
+  .sidebar-nav {
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  .nav-pill {
+    padding: 0.65rem 0.75rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: #bca9a0;
+    text-align: left;
+  }
+
+  .nav-pill:hover,
+  .nav-pill.active {
+    background: #43271e;
+    color: #fff;
+  }
+
+  .sidebar-library {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+  }
+
+  .sidebar-library .shelf-list {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-color: #684536 transparent;
+    scrollbar-width: thin;
+  }
+
+  .main-stage {
+    min-height: calc(100vh - 0.9rem);
+    padding: 0 clamp(1.25rem, 4vw, 3.5rem);
+  }
+
+  .spotify-topbar {
+    padding: 0.85rem 0 1rem;
+  }
+
+  .spotify-home {
+    gap: 1.8rem;
+    padding-bottom: 2rem;
+  }
+
+  .mobile-nav {
+    display: none;
+  }
+
+  .now-reading:not([hidden]) {
+    right: 0.45rem;
+    bottom: 0.45rem;
+    left: calc(max(245px, min(19vw, 340px)) + 0.9rem);
+  }
+}
+
+@media (max-width: 899px) {
+  .library-toggle-btn {
+    display: grid;
+    width: 2.4rem;
+    height: 2.4rem;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 0;
+    border-radius: 50%;
+    background: #34231d;
+    color: #fff7f0;
+    font-size: 1.15rem;
+  }
+
+  .sidebar {
+    position: fixed;
+    z-index: 12;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    display: none;
+    width: min(21rem, 88vw);
+    min-height: 0;
+    height: 100dvh;
+    padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
+    border: 0;
+    border-radius: 0 0.85rem 0.85rem 0;
+    background: #1f110d;
+    box-shadow: 0.75rem 0 2rem rgba(0, 0, 0, 0.45);
+  }
+
+  .sidebar.is-open {
+    display: flex;
+  }
+
+  .sidebar .brand {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(245, 221, 201, 0.1);
+  }
+
+  .sidebar .brand-mark {
+    width: 2.9rem;
+    height: 2.9rem;
+    font-size: 1.6rem;
+  }
+
+  .sidebar .eyebrow {
+    margin: 0 0 0.15rem;
+    color: #c29b82;
+    font-size: 0.65rem;
+    letter-spacing: 0.16em;
+  }
+
+  .sidebar h2 {
+    margin-bottom: 0;
+    font-size: 1.2rem;
+  }
+
+  .sidebar-nav {
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  .sidebar .nav-pill {
+    padding: 0.65rem 0.75rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: #bca9a0;
+    text-align: left;
+  }
+
+  .sidebar .nav-pill:hover,
+  .sidebar .nav-pill.active {
+    background: #43271e;
+    color: #fff;
+  }
+
+  .sidebar-library {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+  }
+
+  .sidebar-library .shelf-list {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .mobile-sidebar-close {
+    display: grid;
+    width: 2.2rem;
+    height: 2.2rem;
+    margin-left: auto;
+    place-items: center;
+    border: 0;
+    border-radius: 50%;
+    background: #3c2a23;
+    color: #fff8ef;
+    font-size: 1.4rem;
+  }
+
+  .sidebar-backdrop:not([hidden]) {
+    position: fixed;
+    z-index: 11;
+    inset: 0;
+    display: block;
+    border: 0;
+    background: rgba(10, 5, 3, 0.68);
+  }
+
+  .library-drawer-open {
+    overflow: hidden;
+  }
+}
+
+:where(button, input, summary, a):focus-visible {
+  outline: 2px solid #f2b47f;
+  outline-offset: 3px;
+}
+
+.home-rows {
+  display: grid;
+  gap: clamp(1.75rem, 4vw, 2.75rem);
+  min-width: 0;
+}
+
+.card-row-section {
+  min-width: 0;
+}
+
+.card-row-section .section-heading-row {
+  margin-bottom: 0.9rem;
+}
+
+.card-row-section .section-heading-row h2 {
+  margin: 0;
+  font-size: clamp(1.2rem, 2.2vw, 1.55rem);
+  letter-spacing: -0.025em;
+}
+
+.show-all-btn {
+  flex: 0 0 auto;
+  padding: 0.35rem 0;
+  font-size: 0.82rem;
+}
+
+.show-all-btn:hover {
+  color: #fff8ef;
+  text-decoration: underline;
+}
+
+.card-row {
+  display: grid;
+  grid-auto-columns: minmax(8.5rem, 10.5rem);
+  grid-auto-flow: column;
+  grid-template-rows: auto;
+  gap: 0.9rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding: 0.15rem 0.1rem 0.8rem;
+  scrollbar-color: rgba(198, 146, 112, 0.45) transparent;
+  scrollbar-width: thin;
+}
+
+.card-row.expanded {
+  grid-auto-flow: row;
+  grid-auto-columns: initial;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  overflow: visible;
+}
+
+.media-card {
+  position: relative;
+  min-width: 0;
+  border-radius: 0.65rem;
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.media-card:hover {
+  transform: translateY(-3px);
+  background: rgba(245, 221, 201, 0.07);
+}
+
+.card-open-button {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 0.45rem;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.card-open-button .book-cover-art,
+.shelf-card-art,
+.genre-tile {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 0.45rem;
+}
+
+.card-open-button .book-cover-art {
+  background: linear-gradient(145deg, #765139, #34211a);
+}
+
+.card-open-button .book-cover-placeholder {
+  font-size: 0.92rem;
+}
+
+.card-open-button .book-cover-initials {
+  font-size: 2.8rem;
+}
+
+.card-open-button .book-cover-title {
+  overflow: hidden;
+  margin-top: 0.65rem;
+  font-size: 0.9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-open-button .book-cover-author {
+  display: -webkit-box;
+  min-height: 2.1em;
+  overflow: hidden;
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.card-action {
+  position: absolute;
+  right: 0.8rem;
+  bottom: 3.6rem;
+  display: grid;
+  width: 2.45rem;
+  height: 2.45rem;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #e9b389;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.45);
+  color: #25150f;
+  font-size: 1.45rem;
+  opacity: 0;
+  transform: translateY(0.4rem);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.card-menu {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  z-index: 2;
+}
+
+.card-menu summary {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(24, 14, 10, 0.84);
+  color: #fff8ef;
+  cursor: pointer;
+  font-size: 1.2rem;
+  line-height: 1;
+  list-style: none;
+}
+
+.card-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.card-menu-actions {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  display: grid;
+  width: 11rem;
+  overflow: hidden;
+  padding: 0.25rem;
+  border: 1px solid rgba(245, 221, 201, 0.12);
+  border-radius: 0.55rem;
+  background: #2b1c17;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+}
+
+.card-menu-actions button {
+  padding: 0.55rem 0.65rem;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: #f4e4da;
+  text-align: left;
+}
+
+.card-menu-actions button:hover {
+  background: rgba(245, 221, 201, 0.1);
+}
+
+.card-like {
+  position: absolute;
+  bottom: 0.8rem;
+  left: 0.8rem;
+  display: grid;
+  width: 2.3rem;
+  height: 2.3rem;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(24, 14, 10, 0.84);
+  color: #fff8ef;
+  font-size: 1.3rem;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.card-like.is-liked {
+  color: #f39a87;
+  opacity: 1;
+}
+
+.media-card:hover .card-like,
+.card-like:focus-visible {
+  opacity: 1;
+}
+
+.media-card:hover .card-action,
+.card-action:focus-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.shelf-card-art {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  place-items: center;
+  background: linear-gradient(145deg, var(--shelf-color), #281a16);
+  color: #fff3e8;
+  font-family: Georgia, serif;
+  font-size: 3rem;
+  font-weight: 700;
+}
+
+.shelf-card-art .book-cover-art {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1;
+  border-radius: 0;
+}
+
+.suggested-shelf-card .shelf-card-art::after {
+  position: absolute;
+  right: 0.6rem;
+  top: 0.45rem;
+  color: rgba(255, 255, 255, 0.84);
+  content: "LIBRITO";
+  font-family: "Trebuchet MS", sans-serif;
+  font-size: 0.48rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.genre-tile {
+  display: flex;
+  align-items: flex-end;
+  padding: 0.9rem;
+  border: 0;
+  background: linear-gradient(145deg, var(--genre-color), color-mix(in srgb, var(--genre-color), #190e0b 42%));
+  box-shadow: inset 0 -4rem 3rem -3rem rgba(0, 0, 0, 0.28);
+  color: #fff;
+  font-size: 1.2rem;
+  font-weight: 750;
+  text-align: left;
+}
+
+.genre-tile:hover {
+  filter: brightness(1.12);
+}
+
+.row-empty-state {
+  grid-column: 1 / -1;
+  align-self: center;
+  margin: 0;
+  padding: 1rem;
+  border: 1px dashed rgba(245, 221, 201, 0.2);
+  border-radius: 0.7rem;
+  color: var(--muted);
+}
+
+.compact-card-row:not(.expanded) {
+  grid-auto-columns: minmax(15rem, 1fr);
+  grid-template-rows: repeat(2, minmax(4.6rem, auto));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(15rem, 1fr);
+}
+
+.compact-book-card .card-open-button {
+  display: grid;
+  grid-template-columns: 4.2rem minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  gap: 0 0.75rem;
+  height: 100%;
+  align-items: center;
+}
+
+.compact-shelf-card .card-open-button {
+  display: grid;
+  grid-template-columns: 4.2rem minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  gap: 0 0.75rem;
+  height: 100%;
+  align-items: center;
+}
+
+.compact-shelf-card .shelf-card-art {
+  grid-row: 1 / span 2;
+  height: 4.2rem;
+  aspect-ratio: 1;
+  font-size: 1.8rem;
+}
+
+.compact-shelf-card .card-open-button .book-cover-title {
+  align-self: end;
+  margin: 0;
+}
+
+.compact-shelf-card .card-open-button .book-cover-author {
+  align-self: start;
+  min-height: 0;
+}
+
+.compact-book-card .card-open-button .book-cover-art {
+  grid-row: 1 / span 2;
+  height: 4.2rem;
+  aspect-ratio: 1;
+}
+
+.compact-book-card .card-open-button .book-cover-title {
+  align-self: end;
+  margin: 0;
+}
+
+.compact-book-card .card-open-button .book-cover-author {
+  align-self: start;
+  min-height: 0;
+}
+
+.compact-book-card .card-action {
+  right: 0.65rem;
+  bottom: 0.65rem;
+  width: 2rem;
+  height: 2rem;
+  font-size: 1.15rem;
+}
+
+.compact-book-card .card-like {
+  bottom: 0.6rem;
+  left: 0.6rem;
+  width: 1.8rem;
+  height: 1.8rem;
+  font-size: 1rem;
+}
+
+.page-view {
+  display: grid;
+  gap: clamp(1.5rem, 4vw, 2.5rem);
+  min-width: 0;
+  padding-bottom: 2rem;
+}
+
+.page-view.hidden {
+  display: none;
+}
+
+.page-header {
+  position: relative;
+  min-width: 0;
+  padding: 0.75rem 0 1rem;
+}
+
+.page-header .eyebrow {
+  margin: 1.1rem 0 0.35rem;
+  color: #d49c79;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.6rem);
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+}
+
+.page-back {
+  padding: 0.25rem 0;
+  color: #e9b389;
+}
+
+.page-description {
+  margin: 0.7rem 0 0;
+  color: var(--muted);
+}
+
+.shelf-hero {
+  display: flex;
+  min-height: 11rem;
+  align-items: end;
+  gap: 1.25rem;
+  padding: 1.2rem;
+  border-radius: 0.9rem;
+  background: linear-gradient(145deg, #69412e, #2b1a14 78%);
+}
+
+.shelf-hero-cover {
+  width: clamp(7.5rem, 18vw, 12rem);
+  aspect-ratio: 1;
+  background: linear-gradient(145deg, var(--cover-tint, #8b5e3c), #261712);
+}
+
+.shelf-hero-cover .book-cover-placeholder {
+  font-size: clamp(1rem, 2vw, 1.5rem);
+}
+
+.shelf-hero-meta {
+  display: grid;
+  gap: 0.4rem;
+  padding-bottom: 0.15rem;
+  color: #e4d2c8;
+}
+
+.shelf-hero-meta strong {
+  color: white;
+  font-size: clamp(1.4rem, 3vw, 2rem);
+}
+
+.page-toolbar,
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.book-table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+  border-radius: 0.75rem;
+  background: rgba(40, 26, 22, 0.72);
+}
+
+.book-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.book-table th,
+.book-table td {
+  padding: 0.85rem 0.75rem;
+  border-bottom: 1px solid rgba(245, 221, 201, 0.08);
+  color: #e8dbd4;
+  white-space: nowrap;
+}
+
+.book-table th:first-child,
+.book-table td:first-child {
+  width: 3.2rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.book-table th {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.book-table tbody tr:hover {
+  background: rgba(245, 221, 201, 0.07);
+}
+
+.table-sort,
+.table-book-title {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-weight: inherit;
+  text-align: left;
+}
+
+.table-sort:hover,
+.table-book-title:hover {
+  color: #f1b78d;
+  text-decoration: underline;
+}
+
+.table-book-title {
+  color: #fff8ef;
+  font-weight: 700;
+}
+
+.book-detail-layout {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.75fr) minmax(0, 1fr);
+  gap: clamp(1.5rem, 5vw, 3.5rem);
+  align-items: start;
+  padding: clamp(1rem, 4vw, 2.5rem);
+  border-radius: 1rem;
+  background: linear-gradient(145deg, rgba(71, 42, 30, 0.85), rgba(34, 21, 17, 0.88));
+}
+
+.book-detail-cover {
+  width: min(100%, 20rem);
+  justify-self: center;
+  box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.35);
+}
+
+.book-detail-content {
+  display: grid;
+  gap: 0.2rem;
+  align-content: center;
+  min-height: 100%;
+}
+
+.book-detail-content p {
+  margin: 0;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid rgba(245, 221, 201, 0.1);
+  color: #e0d0c7;
+}
+
+.book-detail-content p strong {
+  display: inline-block;
+  min-width: 6rem;
+  color: #fff8ef;
+}
+
+.page-actions {
+  margin-top: 1.1rem;
+}
+
+.page-shelf-select {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(245, 221, 201, 0.18);
+  border-radius: 0.5rem;
+  background: #281a16;
+  color: #fff8ef;
+}
+
+.reading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+  margin-top: 0.8rem;
+}
+
+.reading-actions input {
+  width: 7rem;
+  min-height: 2.5rem;
+  padding: 0.45rem;
+  border: 1px solid rgba(245, 221, 201, 0.18);
+  border-radius: 0.5rem;
+  background: #281a16;
+  color: #fff8ef;
+}
+
+.reading-progress-wrap {
+  display: grid;
+  min-width: 4rem;
+  gap: 0.25rem;
+}
+
+.reading-progress {
+  height: 0.22rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f0b384 var(--reading-progress, 0%), rgba(255, 255, 255, 0.24) var(--reading-progress, 0%));
+}
+
+.reading-progress-text {
+  color: #f1d4c2;
+  font-size: 0.66rem;
+  white-space: nowrap;
+}
+
+.search-result-group {
+  min-width: 0;
+}
+
+.search-result-group > h2 {
+  margin-bottom: 0.8rem;
+  font-size: 1.25rem;
+}
+
+.author-result-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.author-result {
+  padding: 0.65rem 0.9rem;
+  border: 1px solid rgba(245, 221, 201, 0.15);
+  border-radius: 999px;
+  background: #30201c;
+  color: #f5e6dd;
+}
+
+.author-result:hover {
+  background: #493025;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 0.9rem;
+}
+
+.stat-card {
+  display: grid;
+  min-height: 8rem;
+  align-content: space-between;
+  padding: 1rem;
+  border: 1px solid rgba(245, 221, 201, 0.1);
+  border-radius: 0.8rem;
+  background: linear-gradient(145deg, rgba(69, 40, 29, 0.8), rgba(40, 26, 22, 0.8));
+}
+
+.stat-card span {
+  color: var(--muted);
+}
+
+.stat-card strong {
+  color: #fff5ed;
+  font-size: clamp(1.4rem, 3vw, 2rem);
+}
+
+@media (max-width: 600px) {
+  .card-row {
+    grid-auto-columns: minmax(8.25rem, 42vw);
+    gap: 0.55rem;
+  }
+
+  .card-row.expanded {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .compact-card-row:not(.expanded) {
+    grid-auto-columns: minmax(14.5rem, 80vw);
+  }
+
+  .book-detail-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .book-detail-cover {
+    width: min(65vw, 18rem);
+  }
+
+  .shelf-hero {
+    min-height: 9rem;
+    padding: 0.9rem;
+  }
+
+  .book-table th,
+  .book-table td {
+    padding: 0.7rem 0.55rem;
+  }
+
+  .card-action {
+    width: 2.2rem;
+    height: 2.2rem;
+    opacity: 1;
+    transform: none;
+  }
+
+  .card-like {
+    opacity: 1;
+  }
+}
+
+@media (hover: none) {
+  .card-action {
+    opacity: 1;
+    transform: none;
+  }
+
+  .card-like {
+    opacity: 1;
+  }
 }

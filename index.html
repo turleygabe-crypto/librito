@@ -12,13 +12,14 @@
   </head>
   <body>
     <div class="app-shell">
-      <aside class="sidebar">
+      <aside id="sidebar" class="sidebar" aria-label="Library and navigation">
         <div class="brand">
           <div class="brand-mark">L</div>
           <div>
             <p class="eyebrow">cozy catalog</p>
             <h2>Librito</h2>
           </div>
+          <button id="closeLibraryBtn" class="mobile-sidebar-close" type="button" aria-label="Close library">×</button>
         </div>
         <nav class="sidebar-nav" aria-label="Primary navigation">
           <button class="nav-pill active" type="button">Home</button>
@@ -26,88 +27,62 @@
           <button class="nav-pill" type="button">Discover</button>
           <button class="nav-pill" type="button">Stats</button>
         </nav>
-        <div class="sidebar-card">
-          <p id="sidebarAuthCopy">Sign in to build your own shelves.</p>
-          <button id="authButton" class="action-btn">Sign in</button>
-        </div>
+        <section class="sidebar-library" aria-labelledby="libraryHeading">
+          <div class="library-heading">
+            <h2 id="libraryHeading">Your Library</h2>
+            <button id="createShelfBtn" class="create-shelf-btn" type="button">＋ Create</button>
+          </div>
+          <nav class="category-tabs sidebar-filters" aria-label="Filter shelves">
+            <button class="category-tab active" type="button" aria-pressed="true">All</button>
+            <button class="category-tab" type="button" aria-pressed="false">Fiction</button>
+            <button class="category-tab" type="button" aria-pressed="false">Nonfiction</button>
+            <button class="category-tab" type="button" aria-pressed="false">Genres</button>
+          </nav>
+          <div id="shelfList" class="shelf-list" aria-label="Your shelves"></div>
+        </section>
       </aside>
+      <button id="sidebarBackdrop" class="sidebar-backdrop" type="button" aria-label="Close library" hidden></button>
 
       <div class="main-stage">
         <header class="topbar spotify-topbar">
-          <div class="brand-mark compact-mark">L</div>
+          <button id="libraryToggleBtn" class="library-toggle-btn" type="button" aria-label="Open library" aria-controls="sidebar" aria-expanded="false">☰</button>
+          <button id="topHomeBtn" class="home-button" type="button" aria-label="Home">⌂</button>
+          <form id="globalSearchForm" class="global-search" role="search">
+            <label class="visually-hidden" for="globalSearchInput">Find a book</label>
+            <span aria-hidden="true">⌕</span>
+            <input id="globalSearchInput" type="search" placeholder="Find a book for your shelves" autocomplete="off" />
+            <button id="previewBtn" type="submit">Search</button>
+          </form>
+          <button id="openModalBtn" class="add-book-btn" type="button">＋ Add book</button>
+          <details class="account-menu">
+            <summary aria-label="Open account menu">
+              <span class="account-avatar" aria-hidden="true">L</span>
+              <span class="account-menu-label">Account</span>
+            </summary>
+            <div class="account-menu-panel">
+              <p id="sidebarAuthCopy">Sign in to build your own shelves.</p>
+              <button id="authButton" class="action-btn">Sign in</button>
+            </div>
+          </details>
         </header>
 
         <main class="spotify-home">
-          <nav class="category-tabs" aria-label="Book categories">
-            <button class="category-tab active" type="button">All</button>
-            <button class="category-tab" type="button">Fiction</button>
-            <button class="category-tab" type="button">Nonfiction</button>
-            <button class="category-tab" type="button">Genres</button>
-          </nav>
-
-          <section class="quick-links" aria-label="Shortcuts">
-            <button id="openModalBtn" class="quick-link liked-link" type="button">
-              <span class="quick-art heart-art">♥</span>
-              <strong>Liked Books</strong>
-            </button>
-          </section>
-
-          <button id="previewBtn" class="ask-bar" type="button">
-            <span class="ask-orb">◔</span>
-            <span>Find a book for your shelves</span>
-            <b>Beta</b>
-            <span class="mic-icon">♩</span>
-          </button>
-
-          <section class="home-section buzz-section">
-            <h1>Picked for your library</h1>
-            <p class="section-kicker">Based on the books you own <span aria-hidden="true">ⓘ</span></p>
-            <article class="featured-book">
-              <div id="featuredBookCover" class="featured-cover"></div>
-              <div class="featured-copy">
-                <h2>The Midnight Library</h2>
-                <p>Book · Matt Haig</p>
-                <button id="featuredAddBtn" class="add-circle" type="button" aria-label="Add featured book">＋</button>
-              </div>
-              <button id="featuredPlayBtn" class="play-circle" type="button" aria-label="Save featured book">＋</button>
-              <button class="more-btn" type="button" aria-label="More options">⋮</button>
-            </article>
-          </section>
-
-          <section class="home-section recommendation-section">
-            <div class="section-heading-row">
-              <h2>Shelves for your taste</h2>
-              <button id="createShelfBtn" class="text-btn" type="button">New shelf</button>
-            </div>
-            <div class="recommended-shelves">
-              <button class="recommendation-card lavender-card" type="button">
-                <span class="recommendation-label">LIBRITO</span>
-                <span class="recommendation-orbit">✦</span>
-                <strong>Late Night<br />Reading</strong>
-              </button>
-              <button class="recommendation-card coral-card" type="button">
-                <span class="recommendation-label">LIBRITO</span>
-                <span class="recommendation-orbit">◉</span>
-                <strong>New<br />Perspectives</strong>
-              </button>
-            </div>
-            <div id="bookList" class="book-list"></div>
-          </section>
-
-          <section class="panel legacy-panel" data-panel="shelves">
-            <div class="panel-heading"><h3>Shelves</h3><span id="recentBook">Newly added</span></div>
-            <div id="shelfList" class="shelf-list"></div>
-          </section>
+          <div id="homeRows" class="home-rows"></div>
+          <section id="pageView" class="page-view hidden" aria-live="polite"></section>
           <div class="overview-stats" aria-hidden="true">
             <span id="totalBooks">0</span><span id="totalSpent">$0</span><span id="shelvesCount">0</span>
           </div>
         </main>
 
-        <div class="now-reading">
+        <div id="nowReadingBar" class="now-reading" hidden>
           <div id="nowReadingCover" class="mini-cover"></div>
-          <div><strong>Recently added</strong><span id="nowReadingBook">Your library is waiting for its first book</span></div>
-          <button type="button" aria-label="Open current book">↗</button>
-          <button type="button" aria-label="Add a book">＋</button>
+          <div><strong>Currently reading</strong><span id="nowReadingBook"></span></div>
+          <div class="reading-progress-wrap">
+            <div id="readingProgress" class="reading-progress" role="progressbar" aria-label="Reading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+            <span id="readingProgressText" class="reading-progress-text"></span>
+          </div>
+          <button id="nowReadingLikeBtn" type="button" aria-label="Like current book">♡</button>
+          <button id="nowReadingFinishedBtn" type="button" aria-label="Mark current book finished">✓</button>
         </div>
         <nav class="mobile-nav" aria-label="Mobile navigation">
           <button class="mobile-nav-item active" type="button"><span>⌂</span>Home</button>
@@ -243,6 +218,8 @@
             Title
             <input name="title" placeholder="The House of Doors" required />
           </label>
+          <input name="genre" type="hidden" />
+          <input name="page_count" type="hidden" />
           <label>
             Author
             <input name="author" placeholder="Tan Twan Eng" required />
@@ -286,7 +263,7 @@
       </div>
     </div>
 
-    <div id="toast" class="toast hidden">Book added</div>
+    <div id="toast" class="toast hidden" role="status" aria-live="polite">Book added</div>
     <script type="module" src="/app.js"></script>
   </body>
 </html>

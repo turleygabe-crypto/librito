@@ -23,7 +23,7 @@ Then open http://127.0.0.1:3000/.
 
 ## Supabase setup
 1. Create a new Supabase project.
-2. Open SQL Editor and run [supabase/schema.sql](supabase/schema.sql), then [supabase/auth-setup.sql](supabase/auth-setup.sql). The second script creates a profile for each newly registered Supabase user.
+2. Open SQL Editor and run [supabase/schema.sql](supabase/schema.sql), then [supabase/auth-setup.sql](supabase/auth-setup.sql). The schema script is safe to re-run on an existing project: it adds genre and reading-progress fields, plus shelf-membership and liked-book tables while keeping existing book and shelf rows. Re-run it on existing projects before using shelf membership, likes, or reading progress. The second script creates a profile for each newly registered Supabase user.
 3. Set the project's URL and anon key in `config.js`. Users can choose Google or email/password to register or sign in; these are alternative methods, so Google users do not need to provide a separate email/password in Librito. If email confirmation is enabled, email/password users must confirm their email before signing in. Signed-in books and shelves are loaded from Supabase.
 4. To enable Google sign-in, create a Google OAuth client and add the callback URL shown under Supabase Authentication > Providers > Google as an authorized redirect URI in Google Cloud. Add the client ID and secret to that Google provider in Supabase, then enable it.
 5. In Supabase Authentication > URL Configuration, set the site URL to the deployed app URL and add the deployed URL and local preview URL (for example, `http://localhost:3000/`) to the allowed redirect URLs. The Google button uses the current app URL as its post-login redirect.
