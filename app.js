@@ -1062,7 +1062,7 @@ function showHomePage() {
   document.getElementById("homeRows").classList.remove("hidden");
   document.getElementById("pageView").classList.add("hidden");
   updateActiveNavigation("Home");
-  renderBooks();
+  render();
 }
 
 function showPage(view) {
@@ -2731,7 +2731,7 @@ bookForm.addEventListener("submit", async (event) => {
 
 initializeBookLanguageOptions();
 updateAuthButton();
-render();
+showHomePage();
 initializeSupabase();
 
 if ("serviceWorker" in navigator) {
