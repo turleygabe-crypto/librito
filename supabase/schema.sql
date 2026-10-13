@@ -19,6 +19,7 @@ create table if not exists public.books (
   reading_status text,
   disposition text,
   current_page integer not null default 0,
+  bookmarked_at timestamptz,
   page_count integer,
   cost numeric(10,2) default 0,
   added_on date not null default current_date,
@@ -31,6 +32,7 @@ alter table public.books add column if not exists genre text;
 alter table public.books add column if not exists reading_status text;
 alter table public.books add column if not exists disposition text;
 alter table public.books add column if not exists current_page integer not null default 0;
+alter table public.books add column if not exists bookmarked_at timestamptz;
 alter table public.books add column if not exists page_count integer;
 
 create table if not exists public.shelves (

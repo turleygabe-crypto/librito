@@ -491,18 +491,21 @@ async function setBookDisposition(book, disposition) {
 
 async function saveCurrentPage(book, currentPage) {
   if (!Number.isInteger(currentPage) || currentPage < 0) {
-    showToast("Enter a valid current page (0 or greater).");
+    showToast("Enter a valid bookmarked page (0 or greater).");
     return;
   }
   const pageCount = Number(book.page_count || book.pages);
   if (Number.isInteger(pageCount) && pageCount > 0 && currentPage > pageCount) {
-    showToast(`Current page cannot exceed ${pageCount}.`);
+    showToast(`Bookmarked page cannot exceed ${pageCount}.`);
     return;
   }
-  const updated = await updateBookFields(book, { current_page: currentPage });
+  const updated = await updateBookFields(book, {
+    current_page: currentPage,
+    bookmarked_at: new Date().toISOString(),
+  });
   if (!updated) return;
   render();
-  showToast("Current page saved");
+  showToast("Page bookmarked");
 }
 
 async function addBookToShelf(book, shelf) {
@@ -662,6 +665,16 @@ function formatCurrency(value) {
 function formatDate(value) {
   if (!value) return "—";
   return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatBookmarkTimestamp(value) {
+  if (!value) return "Not bookmarked yet";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Bookmark time unavailable";
+  return `Last bookmarked ${new Intl.DateTimeFormat(navigator.language, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date)}`;
 }
 
 function createBookCover(book, className = "") {
@@ -1925,43 +1938,61 @@ function createCurrentlyReadingList(books) {
     const progress = document.createElement("span");
     progress.className = "currently-reading-progress";
     progress.textContent = Number.isInteger(pageCount) && pageCount > 0
-      ? `Page ${book.current_page || 0} of ${pageCount}`
-      : `Page ${book.current_page || 0}`;
-    details.append(title, author, progress);
+      ? `Bookmarked page ${book.current_page || 0} of ${pageCount}`
+      : `Bookmarked page ${book.current_page || 0}`;
+    const bookmarkedAt = document.createElement("span");
+    bookmarkedAt.className = "currently-reading-bookmark-time";
+    bookmarkedAt.textContent = formatBookmarkTimestamp(book.bookmarked_at);
+    details.append(title, author, progress, bookmarkedAt);
 
-    const controls = document.createElement("div");
-    controls.className = "currently-reading-controls";
-    const pageInput = document.createElement("input");
-    pageInput.type = "number";
-    pageInput.min = "0";
-    if (Number.isInteger(pageCount) && pageCount > 0) pageInput.max = String(pageCount);
-    pageInput.step = "1";
-    pageInput.value = String(book.current_page || 0);
-    pageInput.setAttribute("aria-label", `Current page for ${book.title}`);
-    const bookmarkPage = document.createElement("button");
-    bookmarkPage.type = "button";
-    bookmarkPage.className = "secondary-btn";
-    bookmarkPage.textContent = "Bookmark page";
-    bookmarkPage.addEventListener("click", () => saveCurrentPage(
-      book,
-      pageInput.value.trim() ? Number(pageInput.value) : Number.NaN
-    ));
-    const complete = document.createElement("button");
-    complete.type = "button";
-    complete.className = "action-btn";
-    complete.textContent = "Finished reading";
-    complete.addEventListener("click", () => markBookAsRead(book));
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.className = "secondary-btn";
-    remove.textContent = "Remove";
-    remove.setAttribute("aria-label", `Remove ${book.title} from Currently Reading`);
-    remove.addEventListener("click", () => setReadingStatus(book, ""));
-    controls.append(pageInput, bookmarkPage, complete, remove);
+    const controls = createCurrentlyReadingControls(book);
     row.append(coverButton, details, controls);
     list.append(row);
   });
   return list;
+}
+
+function createCurrentlyReadingControls(book) {
+  const controls = document.createElement("div");
+  controls.className = "currently-reading-controls";
+  const pageCount = Number(book.page_count || book.pages);
+  const pageInput = document.createElement("input");
+  pageInput.type = "number";
+  pageInput.min = "0";
+  if (Number.isInteger(pageCount) && pageCount > 0) pageInput.max = String(pageCount);
+  pageInput.step = "1";
+  pageInput.value = String(book.current_page || 0);
+  pageInput.className = "current-page-input";
+  pageInput.setAttribute("aria-label", `Bookmarked page for ${book.title}`);
+  const pageLabel = document.createElement("label");
+  pageLabel.className = "bookmarked-page-field";
+  const pageLabelText = document.createElement("span");
+  pageLabelText.textContent = "Bookmarked page";
+  pageLabel.append(pageLabelText, pageInput);
+  const bookmarkPage = document.createElement("button");
+  bookmarkPage.type = "button";
+  bookmarkPage.className = "secondary-btn";
+  bookmarkPage.textContent = "Bookmark page";
+  bookmarkPage.addEventListener("click", () => saveCurrentPage(
+    book,
+    pageInput.value.trim() ? Number(pageInput.value) : Number.NaN
+  ));
+  const finishedReading = document.createElement("button");
+  finishedReading.type = "button";
+  finishedReading.className = "action-btn";
+  finishedReading.textContent = "Finished reading";
+  finishedReading.addEventListener("click", () => markBookAsRead(book));
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "secondary-btn";
+  remove.textContent = "Remove";
+  remove.setAttribute("aria-label", `Remove ${book.title} from Currently Reading`);
+  remove.addEventListener("click", () => setReadingStatus(book, ""));
+  const bookmarkedAt = document.createElement("span");
+  bookmarkedAt.className = "currently-reading-bookmark-time";
+  bookmarkedAt.textContent = formatBookmarkTimestamp(book.bookmarked_at);
+  controls.append(pageLabel, bookmarkedAt, bookmarkPage, finishedReading, remove);
+  return controls;
 }
 
 function showShelvesPage() {
@@ -2203,37 +2234,32 @@ function renderBookPage(book) {
   if (ownedBook && !ownedBook.disposition) {
     const readingActions = document.createElement("div");
     readingActions.className = "reading-actions";
-    const currentlyReadingLabel = document.createElement("label");
-    currentlyReadingLabel.className = "currently-reading-toggle";
-    const currentlyReading = document.createElement("input");
-    currentlyReading.type = "checkbox";
-    currentlyReading.checked = ownedBook.reading_status === "reading";
-    currentlyReading.addEventListener("change", () => setReadingStatus(
-      ownedBook,
-      currentlyReading.checked ? "reading" : ""
-    ));
-    const toggleTrack = document.createElement("span");
-    toggleTrack.className = "toggle-track";
-    toggleTrack.setAttribute("aria-hidden", "true");
+    const isCurrentlyReading = ownedBook.reading_status === "reading";
+    const currentlyReading = document.createElement("button");
+    currentlyReading.type = "button";
+    currentlyReading.className = `currently-reading-button${isCurrentlyReading ? " is-reading" : ""}`;
+    currentlyReading.setAttribute("aria-pressed", String(isCurrentlyReading));
+    const readingIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    readingIcon.setAttribute("viewBox", "0 0 24 24");
+    readingIcon.setAttribute("aria-hidden", "true");
+    readingIcon.classList.add("currently-reading-icon");
+    const iconPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    iconPath.setAttribute("d", "M12 6.2C9.6 4.8 6.7 4.5 3.5 5.4v13.1c3.2-.9 6.1-.6 8.5.8m0-13.1c2.4-1.4 5.3-1.7 8.5-.8v13.1c-3.2-.9-6.1-.6-8.5.8m0-13.1v13.1");
+    iconPath.setAttribute("fill", "none");
+    iconPath.setAttribute("stroke", "currentColor");
+    iconPath.setAttribute("stroke-linecap", "round");
+    iconPath.setAttribute("stroke-linejoin", "round");
+    iconPath.setAttribute("stroke-width", "1.7");
+    readingIcon.append(iconPath);
     const toggleText = document.createElement("span");
-    toggleText.textContent = "Currently Reading";
-    currentlyReadingLabel.append(currentlyReading, toggleTrack, toggleText);
-
-    const currentPage = document.createElement("input");
-    currentPage.type = "number";
-    currentPage.min = "0";
-    currentPage.step = "1";
-    currentPage.value = String(ownedBook.current_page || 0);
-    currentPage.className = "current-page-input";
-    currentPage.setAttribute("aria-label", "Current page");
-    const currentPageField = document.createElement("label");
-    currentPageField.className = "current-page-field";
-    currentPageField.append(document.createTextNode("Current Page"), currentPage);
-    currentPage.addEventListener("change", () => {
-      if (currentPage.value.trim()) saveCurrentPage(ownedBook, Number(currentPage.value));
-      else showToast("Enter a valid current page (0 or greater).");
-    });
-    readingActions.append(currentlyReadingLabel, currentPageField);
+    toggleText.textContent = isCurrentlyReading ? "Currently reading" : "Start reading";
+    currentlyReading.append(readingIcon, toggleText);
+    currentlyReading.addEventListener("click", () => setReadingStatus(
+      ownedBook,
+      isCurrentlyReading ? "" : "reading"
+    ));
+    readingActions.append(currentlyReading);
+    if (isCurrentlyReading) readingActions.append(createCurrentlyReadingControls(ownedBook));
     content.append(readingActions);
   }
   layout.append(cover, content);
@@ -3457,6 +3483,7 @@ async function loadFromSupabase() {
     reading_status: book.reading_status || "",
     disposition: book.disposition || "",
     current_page: Number(book.current_page || 0),
+    bookmarked_at: book.bookmarked_at || null,
     page_count: book.page_count ? Number(book.page_count) : null,
     cost: Number(book.cost || 0),
     added: book.added_on || book.created_at,
@@ -3519,6 +3546,7 @@ async function saveBookToSupabase(book) {
     reading_status: book.reading_status || null,
     disposition: book.disposition || null,
     current_page: Number(book.current_page || 0),
+    bookmarked_at: book.bookmarked_at || null,
     page_count: book.page_count || null,
     cost: Number(book.cost || 0),
     added_on: book.added,
