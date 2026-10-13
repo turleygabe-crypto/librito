@@ -391,15 +391,44 @@ async function toggleBookLike(book) {
   render();
 }
 
+function getMissingBooksColumn(error) {
+  const message = error && typeof error.message === "string" ? error.message : "";
+  const match = message.match(/'([^']+)' column of 'books'/i);
+  return match ? match[1] : null;
+}
+
+function getSchemaUpgradeMessage(error) {
+  if (!error) return "";
+  return getMissingBooksColumn(error)
+    ? "Your Supabase schema is out of date. Run the latest migration before updating books."
+    : "";
+}
+
+async function runBookSchemaRetry(operation, payload) {
+  let currentPayload = { ...payload };
+  while (true) {
+    const result = await operation(currentPayload);
+    if (!result.error) return result;
+    const missingColumn = getMissingBooksColumn(result.error);
+    if (!missingColumn || !(missingColumn in currentPayload)) return result;
+    delete currentPayload[missingColumn];
+    if (!Object.keys(currentPayload).length) return result;
+  }
+}
+
 async function updateBookFields(book, fields) {
   if (state.supabase && state.session) {
-    const { error } = await state.supabase.from("books")
-      .update(fields)
-      .eq("id", book.id)
-      .eq("user_id", state.session.user.id);
-    if (error) {
-      console.error(error);
-      showToast("Could not update this book. Run the latest Supabase schema first.");
+    const result = await runBookSchemaRetry(async (candidate) => {
+      const { error } = await state.supabase.from("books")
+        .update(candidate)
+        .eq("id", book.id)
+        .eq("user_id", state.session.user.id);
+      return { error };
+    }, fields);
+
+    if (result.error) {
+      console.error(result.error);
+      showToast(getSchemaUpgradeMessage(result.error) || "Could not update this book. Run the latest Supabase schema first.");
       return false;
     }
   }
@@ -2843,14 +2872,17 @@ async function saveBookToSupabase(book) {
     user_id: state.session.user.id,
   };
 
-  const { data: savedBook, error } = await state.supabase
-    .from("books")
-    .insert(payload)
-    .select("id")
-    .single();
+  const { data: savedBook, error } = await runBookSchemaRetry(async (candidate) => {
+    const { data, error: insertError } = await state.supabase
+      .from("books")
+      .insert(candidate)
+      .select("id")
+      .single();
+    return { data, error: insertError };
+  }, payload);
   if (error || !savedBook) {
     console.error(error || new Error("Supabase did not confirm the inserted book."));
-    showToast(error?.message || "Could not save your book. Check your connection and try again.");
+    showToast(getSchemaUpgradeMessage(error) || error?.message || "Could not save your book. Check your connection and try again.");
     return false;
   }
 
