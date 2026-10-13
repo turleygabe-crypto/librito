@@ -265,6 +265,12 @@ let authPrompted = sessionStorage.getItem(oauthRedirectKey) === "true";
 let authMode = "signin";
 let supabaseInitialization = null;
 
+function getAuthRedirectUrl() {
+  const { hostname, origin, pathname } = window.location;
+  const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
+  return `${isLocalhost ? origin : "https://librito.casa"}${pathname}`;
+}
+
 function loadBooks() {
   try {
     const saved = localStorage.getItem(storageKey);
@@ -2898,7 +2904,7 @@ googleAuthBtn.addEventListener("click", async () => {
     const { error } = await state.supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}${window.location.pathname}`,
+        redirectTo: getAuthRedirectUrl(),
       },
     });
     if (error) throw error;
@@ -2954,6 +2960,7 @@ authForm.addEventListener("submit", async (event) => {
         password,
         options: {
           data: { full_name: displayName },
+          emailRedirectTo: getAuthRedirectUrl(),
         },
       });
       if (error) throw error;
@@ -2971,7 +2978,7 @@ authForm.addEventListener("submit", async (event) => {
       showToast("Account created");
     } else if (authMode === "reset") {
       const { error } = await state.supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}${window.location.pathname}`,
+        redirectTo: getAuthRedirectUrl(),
       });
       if (error) throw error;
       closeAuthModal();
