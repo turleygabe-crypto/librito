@@ -794,13 +794,18 @@ h1, h2, h3, h4, p { margin-top: 0; }
     bottom: 0;
     left: 0;
     display: none;
-    width: min(21rem, 88vw);
+    width: min(20rem, 86vw);
     min-height: 0;
     height: 100dvh;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 1rem;
+    overflow-y: auto;
     padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
     border: 0;
     border-radius: 0 0.85rem 0.85rem 0;
-    background: #1f110d;
+    background: #121212;
     box-shadow: 0.75rem 0 2rem rgba(0, 0, 0, 0.45);
   }
 
@@ -810,6 +815,7 @@ h1, h2, h3, h4, p { margin-top: 0; }
 
   .sidebar .brand {
     display: flex;
+    flex: 0 0 auto;
     align-items: center;
     gap: 0.8rem;
     padding-bottom: 0.75rem;
@@ -836,6 +842,9 @@ h1, h2, h3, h4, p { margin-top: 0; }
 
   .sidebar-nav {
     display: grid;
+    flex: 0 0 auto;
+    grid-auto-rows: auto;
+    align-content: start;
     gap: 0.2rem;
   }
 
@@ -857,7 +866,7 @@ h1, h2, h3, h4, p { margin-top: 0; }
   .sidebar-library {
     display: flex;
     min-height: 0;
-    flex: 1;
+    flex: 1 1 0%;
     flex-direction: column;
   }
 
