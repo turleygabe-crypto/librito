@@ -761,32 +761,50 @@ function renderBooks() {
       color: ["#8050a8", "#bf613f", "#3f7772", "#536c9e"][index % 4],
     }));
 
-  container.append(
-    createCardRow("Jump back in", shelfTiles.length
+  const homeSections = [
+    ["Jump back in", () => createCardRow("Jump back in", shelfTiles.length
       ? shelfTiles.slice(0, 6).map((shelf) => ({ type: "shelf", ...shelf }))
       : orderedBooks.slice(0, 6).map((book) => ({ type: "compact-book", book })), {
         compact: true,
         emptyMessage: state.loading ? "Loading your shelves and books…" : "",
-      }),
-    createCardRow("Picked for your library", recommendations.slice(0, 8)
-      .map(({ book, reason }) => ({ type: "book", book, subtitle: reason, recommendation: true }))),
-    createCardRow("Shelves for your taste", buildSuggestedShelves(genres)),
-    createCardRow("Recently added", orderedBooks.slice(0, 10)
+      })],
+    ["Picked for your library", () => createCardRow("Picked for your library", recommendations.slice(0, 8)
+      .map(({ book, reason }) => ({ type: "book", book, subtitle: reason, recommendation: true })))],
+    ["Shelves for your taste", () => createCardRow("Shelves for your taste", buildSuggestedShelves(genres))],
+    ["Recently added", () => createCardRow("Recently added", orderedBooks.slice(0, 10)
       .map((book) => ({ type: "book", book })), {
         emptyMessage: state.loading
           ? "Loading your library…"
           : state.loadError || "Add your first book to start building your library.",
         emptyActionLabel: state.loading ? "" : "＋ Add your first book",
         emptyAction: state.loading ? null : openDialog,
-      }),
-    createCardRow("More by authors you own", moreByOwnedAuthors.slice(0, 8)
+      })],
+    ["More by authors you own", () => createCardRow("More by authors you own", moreByOwnedAuthors.slice(0, 8)
       .map(({ book }) => ({ type: "book", book })), {
         emptyMessage: state.loading
           ? "Loading your library…"
           : "Add books by an author you love to find more of their work.",
-      }),
-    createCardRow("Browse by genre", genreTiles.map((genre) => ({ type: "genre", ...genre })))
-  );
+      })],
+    ["Browse by genre", () => createCardRow("Browse by genre", genreTiles.map((genre) => ({ type: "genre", ...genre })))],
+  ];
+
+  let hadSectionError = false;
+  homeSections.forEach(([title, createSection]) => {
+    try {
+      container.append(createSection());
+    } catch (error) {
+      console.error(`Could not render home section "${title}"`, error);
+      const section = document.createElement("section");
+      section.className = "home-section card-row-section";
+      const message = document.createElement("p");
+      message.className = "row-empty-state";
+      message.textContent = "This section could not be displayed. Please refresh the page.";
+      section.append(message);
+      container.append(section);
+      hadSectionError = true;
+    }
+  });
+  if (hadSectionError) showToast("Some home sections could not be displayed.");
 }
 
 function scoreRecommendations(candidates) {
@@ -1652,7 +1670,21 @@ function render() {
   renderShelfOptions();
   renderStats();
   renderShelves();
-  if (state.view === "home") renderBooks();
+  if (state.view === "home") {
+    try {
+      renderBooks();
+    } catch (error) {
+      console.error("Could not render the home page", error);
+      const section = document.createElement("section");
+      section.className = "home-section card-row-section";
+      const message = document.createElement("p");
+      message.className = "row-empty-state";
+      message.textContent = "The home page could not be loaded. Please refresh and try again.";
+      section.append(message);
+      document.getElementById("homeRows").replaceChildren(section);
+      showToast("Could not load the home page.");
+    }
+  }
   else if (state.view === "shelf") showShelfPage(state.currentShelf);
   else if (state.view === "shelves") showShelvesPage();
   else if (state.view === "search") showSearchPage(state.searchQuery);
