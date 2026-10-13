@@ -131,6 +131,7 @@ const lookupTitleInput = document.getElementById("lookupTitleInput");
 const lookupAuthorInput = document.getElementById("lookupAuthorInput");
 const lookupTitleBtn = document.getElementById("lookupTitleBtn");
 const titleLookupResults = document.getElementById("titleLookupResults");
+const selectedBookConfirmation = document.getElementById("selectedBookConfirmation");
 const scanIsbnBtn = document.getElementById("scanIsbnBtn");
 const lookupIsbnBtn = document.getElementById("lookupIsbnBtn");
 const isbnInput = document.getElementById("isbnInput");
@@ -165,6 +166,8 @@ const settingsBtn = document.getElementById("settingsBtn");
 let cameraStream = null;
 let barcodeLoopTimer = null;
 let selectedBook = null;
+let titleSearchResults = [];
+let selectedTitleResult = null;
 const oauthRedirectKey = "librito-oauth-redirect";
 let authPrompted = sessionStorage.getItem(oauthRedirectKey) === "true";
 let authMode = "signin";
@@ -383,7 +386,10 @@ function closeDialog() {
   bookForm.reset();
   lookupTitleInput.value = "";
   lookupAuthorInput.value = "";
+  titleSearchResults = [];
+  selectedTitleResult = null;
   titleLookupResults.replaceChildren();
+  renderSelectedBookConfirmation();
   lookupMethod.value = "title";
   titleLookupPanel.classList.remove("hidden");
   isbnLookupPanel.classList.add("hidden");
@@ -469,6 +475,114 @@ function fillBookDetails({ title, authors = [], isbn = "", publishDate = "" }) {
   bookForm.elements.added.value = new Date().toISOString().slice(0, 10);
 }
 
+function getBookDescription(result) {
+  const sentence = Array.isArray(result.first_sentence) ? result.first_sentence[0] : result.first_sentence;
+  if (sentence) return sentence;
+  if (Array.isArray(result.subject) && result.subject.length) return result.subject.slice(0, 3).join(" · ");
+  const metadata = [result.first_publish_year, result.isbn?.[0] ? `ISBN ${result.isbn[0]}` : ""].filter(Boolean);
+  return metadata.join(" · ") || "No description available.";
+}
+
+function createLookupCover(result) {
+  const cover = document.createElement("div");
+  cover.className = "lookup-cover";
+  const isbn = Array.isArray(result.isbn) ? result.isbn[0] : "";
+  const coverUrl = result.cover_i
+    ? `https://covers.openlibrary.org/b/id/${result.cover_i}-M.jpg`
+    : isbn
+      ? `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(isbn)}-M.jpg`
+      : "";
+  if (!coverUrl) {
+    cover.textContent = "Cover unavailable";
+    return cover;
+  }
+
+  const image = document.createElement("img");
+  image.src = coverUrl;
+  image.alt = "";
+  image.loading = "lazy";
+  image.addEventListener("error", () => {
+    cover.replaceChildren();
+    cover.textContent = "Cover unavailable";
+  }, { once: true });
+  cover.append(image);
+  return cover;
+}
+
+function renderTitleSearchResults() {
+  titleLookupResults.replaceChildren();
+  titleSearchResults.forEach((result, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "lookup-result";
+    button.setAttribute("aria-pressed", String(selectedTitleResult === result));
+    button.append(createLookupCover(result));
+
+    const copy = document.createElement("span");
+    copy.className = "lookup-result-copy";
+    const title = document.createElement("strong");
+    title.textContent = result.title || "Untitled";
+    const authors = Array.isArray(result.author_name) ? result.author_name : [];
+    const authorLine = document.createElement("span");
+    authorLine.textContent = authors.join(", ") || "Unknown author";
+    const description = document.createElement("span");
+    description.textContent = getBookDescription(result);
+    copy.append(title, authorLine, description);
+    button.append(copy);
+    button.addEventListener("click", () => {
+      selectedTitleResult = titleSearchResults[index];
+      renderTitleSearchResults();
+      renderSelectedBookConfirmation();
+      scanStatus.textContent = `Selected ${result.title || "Untitled"}. Confirm to use this book.`;
+      selectedBookConfirmation.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+    titleLookupResults.append(button);
+  });
+}
+
+function renderSelectedBookConfirmation() {
+  selectedBookConfirmation.replaceChildren();
+  selectedBookConfirmation.classList.toggle("hidden", !selectedTitleResult);
+  if (!selectedTitleResult) return;
+
+  const result = selectedTitleResult;
+  selectedBookConfirmation.append(createLookupCover(result));
+  const message = document.createElement("p");
+  const authors = Array.isArray(result.author_name) ? result.author_name : [];
+  message.textContent = `Use “${result.title || "Untitled"}” by ${authors.join(", ") || "Unknown author"}?`;
+  const actions = document.createElement("div");
+  actions.className = "selected-book-actions";
+  const confirmButton = document.createElement("button");
+  confirmButton.type = "button";
+  confirmButton.className = "action-btn";
+  confirmButton.textContent = "Use this book";
+  confirmButton.addEventListener("click", () => {
+    fillBookDetails({
+      title: result.title,
+      authors,
+      isbn: Array.isArray(result.isbn) ? result.isbn[0] || "" : "",
+      publishDate: result.first_publish_year ? String(result.first_publish_year) : "",
+    });
+    selectedTitleResult = null;
+    titleSearchResults = [];
+    titleLookupResults.replaceChildren();
+    renderSelectedBookConfirmation();
+    scanStatus.textContent = "Book details filled. Review them below and save to your library.";
+  });
+  const cancelButton = document.createElement("button");
+  cancelButton.type = "button";
+  cancelButton.className = "secondary-btn";
+  cancelButton.textContent = "Choose another";
+  cancelButton.addEventListener("click", () => {
+    selectedTitleResult = null;
+    renderTitleSearchResults();
+    renderSelectedBookConfirmation();
+    scanStatus.textContent = "Select the book you want to add.";
+  });
+  actions.append(confirmButton, cancelButton);
+  selectedBookConfirmation.append(message, actions);
+}
+
 async function lookupBooksByTitleOrAuthor() {
   const title = lookupTitleInput.value.trim();
   const author = lookupAuthorInput.value.trim();
@@ -480,49 +594,26 @@ async function lookupBooksByTitleOrAuthor() {
   const params = new URLSearchParams({
     q: [title, author].filter(Boolean).join(" "),
     limit: "10",
-    fields: "key,title,author_name,isbn,first_publish_year",
+    fields: "key,title,author_name,isbn,first_publish_year,cover_i,first_sentence,subject",
   });
   scanStatus.textContent = "Searching books…";
+  titleSearchResults = [];
+  selectedTitleResult = null;
   titleLookupResults.replaceChildren();
+  renderSelectedBookConfirmation();
 
   try {
     const response = await fetch(`https://openlibrary.org/search.json?${params}`);
     if (!response.ok) throw new Error(`Open Library responded with ${response.status}`);
     const payload = await response.json();
-    const results = Array.isArray(payload.docs) ? payload.docs : [];
-    if (!results.length) {
+    titleSearchResults = Array.isArray(payload.docs) ? payload.docs : [];
+    if (!titleSearchResults.length) {
       scanStatus.textContent = "No matching books found. You can enter the details manually.";
       return;
     }
 
-    results.forEach((result) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "lookup-result";
-      const resultTitle = document.createElement("strong");
-      resultTitle.textContent = result.title || "Untitled";
-      const details = document.createElement("span");
-      const authors = Array.isArray(result.author_name) ? result.author_name : [];
-      details.textContent = [
-        authors.join(", ") || "Unknown author",
-        result.first_publish_year,
-        Array.isArray(result.isbn) && result.isbn[0] ? `ISBN ${result.isbn[0]}` : "",
-      ].filter(Boolean).join(" · ");
-      button.append(resultTitle, details);
-      button.addEventListener("click", () => {
-        fillBookDetails({
-          title: result.title,
-          authors,
-          isbn: Array.isArray(result.isbn) ? result.isbn[0] || "" : "",
-          publishDate: result.first_publish_year ? String(result.first_publish_year) : "",
-        });
-        scanStatus.textContent = `Selected ${result.title}`;
-        titleLookupResults.replaceChildren();
-        showToast("Book details filled from search");
-      });
-      titleLookupResults.append(button);
-    });
-    scanStatus.textContent = `${results.length} matching books. Select one to fill in its details.`;
+    renderTitleSearchResults();
+    scanStatus.textContent = `${titleSearchResults.length} matching books. Select a cover to review and confirm.`;
   } catch (error) {
     console.error(error);
     scanStatus.textContent = "Book search failed. Try again or enter the details manually.";
@@ -925,6 +1016,9 @@ lookupMethod.addEventListener("change", () => {
   titleLookupPanel.classList.toggle("hidden", useIsbn);
   isbnLookupPanel.classList.toggle("hidden", !useIsbn);
   titleLookupResults.replaceChildren();
+  titleSearchResults = [];
+  selectedTitleResult = null;
+  renderSelectedBookConfirmation();
   scanStatus.textContent = useIsbn
     ? "Enter an ISBN manually or scan the book's barcode with your camera."
     : "Search by title, author, or both.";
