@@ -1399,6 +1399,10 @@ h1, h2, h3, h4, p { margin-top: 0; }
   box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.35);
 }
 
+.book-detail-cover img {
+  object-fit: contain;
+}
+
 .book-detail-content {
   display: grid;
   gap: 0.2rem;
