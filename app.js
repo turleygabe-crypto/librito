@@ -321,30 +321,21 @@ async function updateBookFields(book, fields) {
 }
 
 async function setReadingStatus(book, status) {
-  if (status === "reading") {
-    const previous = state.books.find((item) => item !== book && item.reading_status === "reading");
-    if (previous) {
-      const paused = await updateBookFields(previous, { reading_status: "paused" });
-      if (!paused) return;
-    }
-  }
   const updated = await updateBookFields(book, { reading_status: status });
   if (!updated) return;
   render();
-  showToast(status === "reading" ? "Added to Currently reading" : status === "finished" ? "Marked as finished" : "Reading paused");
+  showToast(status === "reading" ? "Added to Currently Reading" : "Removed from Currently Reading");
 }
 
-async function saveReadingProgress(book, currentPage, pageCount) {
-  if (!Number.isInteger(currentPage) || currentPage < 0
-    || !Number.isInteger(pageCount) || pageCount <= 0
-    || currentPage > pageCount) {
-    showToast("Enter valid pages, with current page no greater than the book's page count.");
+async function saveCurrentPage(book, currentPage) {
+  if (!Number.isInteger(currentPage) || currentPage < 0) {
+    showToast("Enter a valid current page (0 or greater).");
     return;
   }
-  const updated = await updateBookFields(book, { current_page: currentPage, page_count: pageCount });
+  const updated = await updateBookFields(book, { current_page: currentPage });
   if (!updated) return;
   render();
-  showToast("Reading progress saved");
+  showToast("Current page saved");
 }
 
 async function addBookToShelf(book, shelf) {
@@ -442,7 +433,9 @@ async function removeBookFromLibrary(book) {
 }
 
 async function renameShelf(shelf, name) {
-  if (!name || state.shelves.some((item) => item.id !== shelf.id && item.name.toLowerCase() === name.toLowerCase())) {
+  if (!name
+    || name.toLowerCase() === "currently reading"
+    || state.shelves.some((item) => item.id !== shelf.id && item.name.toLowerCase() === name.toLowerCase())) {
     showToast("Choose a unique shelf name.");
     return;
   }
@@ -523,18 +516,27 @@ function createBookCover(book, className = "") {
   const isbn = Array.isArray(book.isbn)
     ? book.isbn[0]
     : book.isbn || (Array.isArray(book.isbnList) ? book.isbnList[0] : "");
+  const coverSize = className.includes("book-detail-cover") ? "L" : "M";
   const coverUrl = book.cover_i
-    ? `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg?default=false`
+    ? `https://covers.openlibrary.org/b/id/${book.cover_i}-${coverSize}.jpg?default=false`
     : isbn
-      ? `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(isbn)}-M.jpg?default=false`
+      ? `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(isbn)}-${coverSize}.jpg?default=false`
       : "";
   if (coverUrl) {
     const image = document.createElement("img");
+    let currentCoverSize = coverSize;
     image.src = coverUrl;
     image.alt = `${book.title || "Book"} cover`;
     image.loading = "lazy";
     image.addEventListener("load", () => cover.classList.add("has-cover"), { once: true });
-    image.addEventListener("error", () => image.remove(), { once: true });
+    image.addEventListener("error", () => {
+      if (currentCoverSize === "L") {
+        currentCoverSize = "M";
+        image.src = coverUrl.replace("-L.jpg", "-M.jpg");
+      } else {
+        image.remove();
+      }
+    });
     cover.prepend(image);
   }
   return cover;
@@ -597,7 +599,14 @@ function renderShelves() {
 
   shelfList.replaceChildren();
   const likedBooks = state.books.filter((book) => book.liked);
+  const currentlyReadingBooks = state.books.filter((book) => book.reading_status === "reading");
   shelfList.append(createShelfNavigationItem("Liked Books", String(likedBooks.length), "liked", likedBooks[0]));
+  shelfList.append(createShelfNavigationItem(
+    "Currently Reading",
+    String(currentlyReadingBooks.length),
+    "#496c5d",
+    currentlyReadingBooks[0]
+  ));
   const visibleShelves = shelvesToRender.filter(({ books }) => matchesShelfFilter(books));
   visibleShelves.forEach((shelf) => {
     shelfList.append(createShelfNavigationItem(shelf.name, String(shelf.books.length), shelf.color, shelf.books[0]));
@@ -657,8 +666,8 @@ function createShelfNavigationItem(name, count, color, book = null) {
   item.type = "button";
   item.addEventListener("click", () => {
     if (window.matchMedia("(max-width: 899px)").matches) setLibraryDrawerOpen(false);
-    if (name === "Liked Books") {
-      showShelfPage("Liked Books");
+    if (name === "Liked Books" || name === "Currently Reading") {
+      showShelfPage(name);
       return;
     }
     showShelfPage(name);
@@ -1131,9 +1140,11 @@ function showShelfPage(shelfName) {
   const shelf = state.shelves.find((item) => item.name === shelfName);
   const books = state.books.filter((book) => shelfName === "Liked Books"
     ? book.liked
-    : shelfName === "Library"
-      ? getBookShelfNames(book).length === 0
-      : getBookShelfNames(book).includes(shelfName));
+    : shelfName === "Currently Reading"
+      ? book.reading_status === "reading"
+      : shelfName === "Library"
+        ? getBookShelfNames(book).length === 0
+        : getBookShelfNames(book).includes(shelfName));
   const coverBook = books[0] || { title: shelfName, author: "", isbn: "" };
   const totalValue = books.reduce((total, book) => total + Number(book.cost || 0), 0);
   const header = createPageHeader("Shelf · Your library", shelfName, `${books.length} books · ${formatCurrency(totalValue)} total value`);
@@ -1191,6 +1202,13 @@ function showShelvesPage() {
       count: state.books.filter((book) => book.liked).length,
       color: "#704052",
       book: state.books.find((book) => book.liked),
+    },
+    {
+      type: "shelf",
+      name: "Currently Reading",
+      count: state.books.filter((book) => book.reading_status === "reading").length,
+      color: "#496c5d",
+      book: state.books.find((book) => book.reading_status === "reading"),
     },
     {
       type: "shelf",
@@ -1303,10 +1321,13 @@ function createBookTable(books) {
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "table-sort";
-    remove.textContent = state.currentShelf === "Liked Books" ? "Unlike" : "Remove";
-    remove.setAttribute("aria-label", `${state.currentShelf === "Liked Books" ? "Unlike" : "Remove"} ${book.title}`);
+    const isLikedShelf = state.currentShelf === "Liked Books";
+    const isCurrentlyReadingShelf = state.currentShelf === "Currently Reading";
+    remove.textContent = isLikedShelf ? "Unlike" : "Remove";
+    remove.setAttribute("aria-label", `${isLikedShelf ? "Unlike" : "Remove"} ${book.title}`);
     remove.addEventListener("click", () => {
-      if (state.currentShelf === "Liked Books") toggleBookLike(book);
+      if (isLikedShelf) toggleBookLike(book);
+      else if (isCurrentlyReadingShelf) setReadingStatus(book, "");
       else removeBookFromShelf(book, state.currentShelf);
     });
     actions.append(remove);
@@ -1335,7 +1356,6 @@ function renderBookPage(book) {
     ["Date added", formatDate(book.added || book.added_on)],
     ["Pages", book.page_count || book.pages || "—"],
     ["Value", formatCurrency(book.cost)],
-    ["Reading status", book.reading_status || "Not started"],
   ];
   details.forEach(([label, value]) => {
     const field = document.createElement("p");
@@ -1393,46 +1413,38 @@ function renderBookPage(book) {
   if (ownedBook) {
     const readingActions = document.createElement("div");
     readingActions.className = "reading-actions";
-    const readingButton = document.createElement("button");
-    readingButton.type = "button";
-    readingButton.className = "secondary-btn";
-    readingButton.textContent = ownedBook.reading_status === "reading" ? "Pause reading" : "Start reading";
-    readingButton.addEventListener("click", () => setReadingStatus(
+    const currentlyReadingLabel = document.createElement("label");
+    currentlyReadingLabel.className = "currently-reading-toggle";
+    const currentlyReading = document.createElement("input");
+    currentlyReading.type = "checkbox";
+    currentlyReading.checked = ownedBook.reading_status === "reading";
+    currentlyReading.addEventListener("change", () => setReadingStatus(
       ownedBook,
-      ownedBook.reading_status === "reading" ? "paused" : "reading"
+      currentlyReading.checked ? "reading" : ""
     ));
+    const toggleTrack = document.createElement("span");
+    toggleTrack.className = "toggle-track";
+    toggleTrack.setAttribute("aria-hidden", "true");
+    const toggleText = document.createElement("span");
+    toggleText.textContent = "Currently Reading";
+    currentlyReadingLabel.append(currentlyReading, toggleTrack, toggleText);
+
     const currentPage = document.createElement("input");
     currentPage.type = "number";
     currentPage.min = "0";
-    currentPage.max = String(ownedBook.page_count || "");
+    currentPage.step = "1";
     currentPage.value = String(ownedBook.current_page || 0);
-    currentPage.placeholder = "Current page";
+    currentPage.className = "current-page-input";
     currentPage.setAttribute("aria-label", "Current page");
-    const pageCount = document.createElement("input");
-    pageCount.type = "number";
-    pageCount.min = "1";
-    pageCount.value = String(ownedBook.page_count || "");
-    pageCount.placeholder = "Total pages";
-    pageCount.setAttribute("aria-label", "Total pages");
-    const saveProgress = document.createElement("button");
-    saveProgress.type = "button";
-    saveProgress.className = "secondary-btn";
-    saveProgress.textContent = "Save progress";
-    saveProgress.addEventListener("click", () => saveReadingProgress(
-      ownedBook,
-      Number(currentPage.value),
-      Number(pageCount.value)
-    ));
-    readingActions.append(readingButton, currentPage, pageCount, saveProgress);
+    const currentPageField = document.createElement("label");
+    currentPageField.className = "current-page-field";
+    currentPageField.append(document.createTextNode("Current Page"), currentPage);
+    currentPage.addEventListener("change", () => {
+      if (currentPage.value.trim()) saveCurrentPage(ownedBook, Number(currentPage.value));
+      else showToast("Enter a valid current page (0 or greater).");
+    });
+    readingActions.append(currentlyReadingLabel, currentPageField);
     content.append(readingActions);
-    if (ownedBook.reading_status === "reading") {
-      const finished = document.createElement("button");
-      finished.type = "button";
-      finished.className = "text-btn";
-      finished.textContent = "Mark finished";
-      finished.addEventListener("click", () => setReadingStatus(ownedBook, "finished"));
-      readingActions.append(finished);
-    }
   }
   layout.append(cover, content);
   page.append(header, layout);
@@ -1700,15 +1712,7 @@ function renderNowReadingBook() {
   }
   nowReadingCover.replaceChildren(createBookCover(book));
   nowReadingBook.textContent = `${book.title} · ${book.author || "Unknown author"}`;
-  const progress = book.page_count
-    ? Math.min(100, Math.round((Number(book.current_page || 0) / Number(book.page_count)) * 100))
-    : 0;
-  const progressBar = document.getElementById("readingProgress");
-  progressBar.style.setProperty("--reading-progress", `${progress}%`);
-  progressBar.setAttribute("aria-valuenow", String(progress));
-  document.getElementById("readingProgressText").textContent = book.page_count
-    ? `Page ${book.current_page || 0} of ${book.page_count}`
-    : "Progress not set";
+  document.getElementById("nowReadingPage").textContent = `Current page: ${book.current_page || 0}`;
   document.getElementById("nowReadingLikeBtn").textContent = book.liked ? "♥" : "♡";
 }
 
@@ -2240,6 +2244,10 @@ async function createShelfInSupabase() {
     showToast("Name your shelf first.");
     return;
   }
+  if (name.toLowerCase() === "currently reading") {
+    showToast("Currently Reading is a generated shelf. Choose another name.");
+    return;
+  }
   let session;
   try {
     session = await refreshAuthSession();
@@ -2414,11 +2422,6 @@ sidebarBackdrop.addEventListener("click", () => setLibraryDrawerOpen(false));
 document.getElementById("nowReadingLikeBtn").addEventListener("click", () => {
   const book = state.books.find((item) => item.reading_status === "reading");
   if (book) toggleBookLike(book);
-});
-
-document.getElementById("nowReadingFinishedBtn").addEventListener("click", () => {
-  const book = state.books.find((item) => item.reading_status === "reading");
-  if (book) setReadingStatus(book, "finished");
 });
 
 document.querySelectorAll(".mobile-nav-item").forEach((item) => {
