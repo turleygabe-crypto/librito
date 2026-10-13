@@ -205,6 +205,15 @@ const bookForm = document.getElementById("bookForm");
 const dialogOverlay = document.getElementById("dialogOverlay");
 const openModalBtn = document.getElementById("openModalBtn");
 const closeDialogBtn = document.getElementById("closeDialogBtn");
+const bookEntryChoice = document.getElementById("bookEntryChoice");
+const lookupBookOptionBtn = document.getElementById("lookupBookOptionBtn");
+const manualBookOptionBtn = document.getElementById("manualBookOptionBtn");
+const bookLookupFlow = document.getElementById("bookLookupFlow");
+const lookupBackBtn = document.getElementById("lookupBackBtn");
+const manualEntryFromLookupBtn = document.getElementById("manualEntryFromLookupBtn");
+const bookDetailsPanel = document.getElementById("bookDetailsPanel");
+const bookDetailsBackBtn = document.getElementById("bookDetailsBackBtn");
+const saveBookBtn = document.getElementById("saveBookBtn");
 const toast = document.getElementById("toast");
 const lookupMethod = document.getElementById("lookupMethod");
 const titleLookupPanel = document.getElementById("titleLookupPanel");
@@ -256,6 +265,7 @@ let readingCoverCycleKey = "";
 let selectedBook = null;
 let titleSearchResults = [];
 let selectedTitleResult = null;
+let bookEntryMode = "";
 let dialogReturnFocus = null;
 let shelfReturnFocus = null;
 let authReturnFocus = null;
@@ -1135,6 +1145,7 @@ function createBookCard(book, { compact = false, subtitle = "", recommendation =
 function markBookAsOwned(book) {
   openDialog();
   if (!state.session) return;
+  startManualEntry();
   bookForm.elements.title.value = book.title || "";
   bookForm.elements.author.value = Array.isArray(book.author_name)
     ? book.author_name.join(", ")
@@ -2111,7 +2122,40 @@ function openDialog() {
   }
   dialogReturnFocus = document.activeElement;
   dialogOverlay.classList.remove("hidden");
+  showEntryChoice();
+  lookupBookOptionBtn.focus();
+}
+
+function showEntryChoice() {
+  bookEntryMode = "";
+  bookEntryChoice.classList.remove("hidden");
+  bookLookupFlow.classList.add("hidden");
+  bookDetailsPanel.classList.add("hidden");
+}
+
+function startBookLookup() {
+  bookEntryMode = "lookup";
+  bookEntryChoice.classList.add("hidden");
+  bookLookupFlow.classList.remove("hidden");
+  bookDetailsPanel.classList.add("hidden");
   lookupTitleInput.focus();
+}
+
+function startManualEntry() {
+  bookEntryMode = "manual";
+  bookEntryChoice.classList.add("hidden");
+  bookLookupFlow.classList.add("hidden");
+  bookDetailsPanel.classList.remove("hidden");
+  bookDetailsBackBtn.textContent = "Choose another method";
+  bookForm.elements.title.focus();
+}
+
+function showBookDetails() {
+  bookEntryChoice.classList.add("hidden");
+  bookLookupFlow.classList.add("hidden");
+  bookDetailsPanel.classList.remove("hidden");
+  bookDetailsBackBtn.textContent = bookEntryMode === "lookup" ? "Back to book lookup" : "Choose another method";
+  bookForm.elements.title.focus();
 }
 
 function closeDialog() {
@@ -2128,6 +2172,7 @@ function closeDialog() {
   titleLookupPanel.classList.remove("hidden");
   isbnLookupPanel.classList.add("hidden");
   scanStatus.textContent = "Search by title or author, or switch to ISBN to enter or scan a barcode.";
+  showEntryChoice();
   if (dialogReturnFocus instanceof HTMLElement && dialogReturnFocus.isConnected) dialogReturnFocus.focus();
   dialogReturnFocus = null;
 }
@@ -2219,6 +2264,7 @@ function fillBookDetails({ title, authors = [], isbn = "", publishDate = "", gen
   if (isbn) isbnInput.value = isbn;
   bookForm.elements.notes.value = publishDate ? `Published ${publishDate}` : "";
   bookForm.elements.added.value = new Date().toISOString().slice(0, 10);
+  showBookDetails();
 }
 
 function getBookDescription(result) {
@@ -2670,7 +2716,7 @@ async function createShelfInSupabase() {
 }
 
 async function loadFromSupabase() {
-  if (!state.supabase || !state.session) return;
+  if (!state.supabase || !state.session) return false;
   await ensureProfile();
   await loadShelvesFromSupabase();
   const { data, error } = await state.supabase.from("books").select("*").order("created_at", { ascending: false });
@@ -2680,7 +2726,7 @@ async function loadFromSupabase() {
     state.loadError = "Your library could not be loaded. Check your connection and try again.";
     render();
     showToast("Could not load your books.");
-    return;
+    return false;
   }
   const books = (data || []).map((book) => ({
     id: book.id,
@@ -2734,13 +2780,13 @@ async function loadFromSupabase() {
   state.loading = false;
   state.loadError = "";
   render();
+  return true;
 }
 
 async function saveBookToSupabase(book) {
   if (!state.supabase || !state.session) {
-    state.books = [book, ...state.books];
-    saveBooks();
-    return;
+    showToast("Your account connection is unavailable. The book was not saved; try again.");
+    return false;
   }
 
   const payload = {
@@ -2760,31 +2806,51 @@ async function saveBookToSupabase(book) {
     user_id: state.session.user.id,
   };
 
-  const { error } = await state.supabase.from("books").insert(payload);
-  if (error) {
-    console.error(error);
-    state.books = state.books.filter((item) => item.id !== book.id);
-    render();
-    showToast("Could not save to Supabase. Check the schema and try again.");
-    return;
+  const { data: savedBook, error } = await state.supabase
+    .from("books")
+    .insert(payload)
+    .select("id")
+    .single();
+  if (error || !savedBook) {
+    console.error(error || new Error("Supabase did not confirm the inserted book."));
+    showToast(error?.message || "Could not save your book. Check your connection and try again.");
+    return false;
   }
 
+  let shelfMembershipSaved = true;
   const shelf = state.shelves.find((item) => item.name === book.shelf);
   if (shelf) {
-    const { error: shelfError } = await state.supabase.from("book_shelves").insert({
-      book_id: book.id,
-      shelf_id: shelf.id,
-      user_id: state.session.user.id,
-    });
-    if (shelfError) {
+    try {
+      const { error: shelfError } = await state.supabase.from("book_shelves").insert({
+        book_id: book.id,
+        shelf_id: shelf.id,
+        user_id: state.session.user.id,
+      });
+      if (shelfError) {
+        console.error(shelfError);
+        shelfMembershipSaved = false;
+      }
+    } catch (shelfError) {
       console.error(shelfError);
-      showToast("Book saved, but shelf membership could not be saved. Run the latest Supabase schema.");
-      await loadFromSupabase();
-      return;
+      shelfMembershipSaved = false;
     }
   }
-  showToast("Book saved to Supabase");
-  await loadFromSupabase();
+  let libraryLoaded = false;
+  try {
+    libraryLoaded = await loadFromSupabase();
+  } catch (error) {
+    console.error(error);
+  }
+  if (!shelfMembershipSaved) {
+    showToast("Book saved, but shelf membership could not be saved. Run the latest Supabase schema.");
+    return true;
+  }
+  if (!libraryLoaded || !state.books.some((item) => item.id === savedBook.id)) {
+    showToast("Book saved, but it could not be confirmed in your library. Refresh the page to check.");
+    return true;
+  }
+  showToast("Book saved to your library");
+  return true;
 }
 
 document.querySelectorAll(".sidebar-filters .category-tab").forEach((tab) => {
@@ -2863,6 +2929,36 @@ document.addEventListener("keydown", (event) => {
 
 openModalBtn.addEventListener("click", () => {
   openDialog();
+});
+
+lookupBookOptionBtn.addEventListener("click", () => {
+  startBookLookup();
+});
+
+manualBookOptionBtn.addEventListener("click", () => {
+  startManualEntry();
+});
+
+lookupBackBtn.addEventListener("click", () => {
+  stopCameraScan();
+  showEntryChoice();
+  lookupBookOptionBtn.focus();
+});
+
+manualEntryFromLookupBtn.addEventListener("click", () => {
+  stopCameraScan();
+  startManualEntry();
+});
+
+bookDetailsBackBtn.addEventListener("click", () => {
+  if (bookEntryMode === "lookup") {
+    bookDetailsPanel.classList.add("hidden");
+    bookLookupFlow.classList.remove("hidden");
+    lookupMethod.focus();
+  } else {
+    showEntryChoice();
+    manualBookOptionBtn.focus();
+  }
 });
 
 scanIsbnBtn.addEventListener("click", () => {
@@ -3141,10 +3237,17 @@ bookForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  state.books = [book, ...state.books];
-  saveBooks();
-  closeDialog();
-  await saveBookToSupabase(book);
+  saveBookBtn.disabled = true;
+  saveBookBtn.textContent = "Saving...";
+  try {
+    if (await saveBookToSupabase(book)) closeDialog();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || "Could not save your book. Try again.");
+  } finally {
+    saveBookBtn.disabled = false;
+    saveBookBtn.textContent = "Save to Library";
+  }
 });
 
 initializeBookLanguageOptions();

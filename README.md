@@ -8,7 +8,7 @@ Librito is a cozy, mobile-first library platform concept for scanning books, org
 - Books are added to the library by default and can optionally be assigned to user-created shelves
 - Currently Reading and Completed Books are dedicated shelves; completed books can be restarted or managed for selling or donating
 - Welcome prompt for visitors to sign in or create an account, with the option to continue browsing
-- Book lookup by title and/or author defaults to the browser language and lets users choose another language or any language; results use edition-specific covers. ISBN lookup uses Open Library metadata.
+- Adding a book starts with a choice to look it up or enter it manually. Lookup supports title and/or author searches, ISBN entry, and camera scanning; title searches default to the browser language and use edition-specific covers.
 - Camera-based barcode scan attempt on supported mobile browsers
 - Supabase-ready SQL schema for books, shelves, and profiles
 - Vercel-friendly static deployment structure
