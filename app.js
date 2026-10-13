@@ -1267,6 +1267,7 @@ function createBookCardMenu(book, ownedBook, recommendation) {
 }
 
 function wireCardPopover(menu, summary, panel) {
+  panel.hidden = true;
   const positionPanel = () => {
     const summaryRect = summary.getBoundingClientRect();
     const panelRect = panel.getBoundingClientRect();
@@ -1289,10 +1290,17 @@ function wireCardPopover(menu, summary, panel) {
   menu.addEventListener("toggle", () => {
     menu.closest(".media-card")?.classList.toggle("card-menu-open", menu.open);
     if (menu.open) {
+      document.querySelectorAll(".card-add-menu[open], .card-menu[open]").forEach((otherMenu) => {
+        if (otherMenu !== menu) otherMenu.open = false;
+      });
+      panel.hidden = false;
+      document.body.append(panel);
       positionPanel();
       window.addEventListener("resize", repositionPanel);
       window.addEventListener("scroll", repositionPanel, true);
     } else {
+      panel.hidden = true;
+      menu.append(panel);
       window.removeEventListener("resize", repositionPanel);
       window.removeEventListener("scroll", repositionPanel, true);
     }
@@ -3264,6 +3272,16 @@ document.getElementById("topHomeBtn").addEventListener("click", () => {
 
 window.addEventListener("popstate", restoreRouteFromLocation);
 
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  const activeMenu = target instanceof Element
+    ? target.closest(".card-add-menu, .card-menu")
+    : null;
+  document.querySelectorAll(".card-add-menu[open], .card-menu[open]").forEach((menu) => {
+    if (menu !== activeMenu) menu.open = false;
+  });
+});
+
 libraryToggleBtn.addEventListener("click", () => {
   setLibraryDrawerOpen(!sidebar.classList.contains("is-open"));
 });
@@ -3287,7 +3305,7 @@ document.addEventListener("keydown", (event) => {
     else if (!dialogOverlay.classList.contains("hidden")) closeDialog();
     else if (!bookProfileOverlay.classList.contains("hidden")) closeBookProfile();
     else if (document.body.classList.contains("library-drawer-open")) setLibraryDrawerOpen(false);
-    else document.querySelectorAll(".card-menu[open], .account-menu[open]").forEach((menu) => { menu.open = false; });
+    else document.querySelectorAll(".card-add-menu[open], .card-menu[open], .account-menu[open]").forEach((menu) => { menu.open = false; });
     return;
   }
 
