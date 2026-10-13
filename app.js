@@ -271,6 +271,72 @@ function getAuthRedirectUrl() {
   return `${isLocalhost ? origin : "https://librito.casa"}${pathname}`;
 }
 
+function createRouteHash(view, values = {}) {
+  const params = new URLSearchParams();
+  Object.entries(values).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+  });
+  const query = params.toString();
+  return `#/${view}${query ? `?${query}` : ""}`;
+}
+
+function navigateTo(view, values = {}) {
+  const hash = createRouteHash(view, values);
+  if (window.location.hash !== hash) {
+    window.history.pushState(null, "", hash);
+  }
+  restoreRouteFromLocation();
+}
+
+function findBookForRoute(params) {
+  const id = params.get("id");
+  const title = params.get("title");
+  const author = params.get("author");
+  const books = [
+    ...state.books,
+    ...(state.searchResults || []),
+    ...discoveryBooks,
+  ];
+  return books.find((book) => id
+    ? book.id === id
+    : book.title === title && book.author === author);
+}
+
+function renderBookRoute(params = new URLSearchParams(window.location.hash.split("?")[1] || "")) {
+  state.currentBook = findBookForRoute(params) || null;
+  if (state.currentBook) {
+    renderBookPage(state.currentBook);
+    return;
+  }
+  const page = showPage("book");
+  page.append(createPageHeader("Book · Your library", state.loading ? "Loading book…" : "Book not found"));
+}
+
+function restoreRouteFromLocation() {
+  const [path, query = ""] = window.location.hash.slice(1).split("?");
+  const params = new URLSearchParams(query);
+  switch (path) {
+    case "/shelves":
+      showShelvesPage();
+      break;
+    case "/shelf":
+      showShelfPage(params.get("name") || "");
+      break;
+    case "/search":
+      runNaturalSearch(params.get("q") || "", { updateHistory: false });
+      break;
+    case "/stats":
+      showStatsPage();
+      break;
+    case "/book":
+      state.view = "book";
+      renderBookRoute(params);
+      break;
+    default:
+      showHomePage();
+  }
+}
+
 function loadBooks() {
   try {
     const saved = localStorage.getItem(storageKey);
@@ -476,7 +542,7 @@ async function removeBookFromLibrary(book) {
     }
   }
   state.books = state.books.filter((item) => item.id !== book.id);
-  if (state.currentBook && getBookKey(state.currentBook) === getBookKey(book)) showHomePage();
+  if (state.currentBook && getBookKey(state.currentBook) === getBookKey(book)) navigateTo("home");
   if (!state.session) localStorage.setItem(storageKey, JSON.stringify(state.books));
   render();
   showToast("Removed from your library");
@@ -504,7 +570,7 @@ async function renameShelf(shelf, name) {
     if (book.shelf === oldName) book.shelf = name;
     book.shelves = getBookShelfNames(book).map((item) => item === oldName ? name : item);
   });
-  showShelfPage(name);
+  navigateTo("shelf", { name });
   renderShelves();
   showToast("Shelf renamed");
 }
@@ -533,7 +599,7 @@ async function deleteShelf(shelf) {
     book.shelves = getBookShelfNames(book).filter((name) => name !== shelf.name);
     if (book.shelf === shelf.name) book.shelf = book.shelves[0] || "";
   });
-  if (state.view === "shelf") showHomePage();
+  if (state.view === "shelf") navigateTo("home");
   render();
   showToast("Shelf deleted");
 }
@@ -726,11 +792,7 @@ function createShelfNavigationItem(name, count, color, book = null) {
   item.type = "button";
   item.addEventListener("click", () => {
     if (window.matchMedia("(max-width: 899px)").matches) setLibraryDrawerOpen(false);
-    if (name === "Liked Books" || name === "Currently Reading" || name === "Completed Books") {
-      showShelfPage(name);
-      return;
-    }
-    showShelfPage(name);
+    navigateTo("shelf", { name });
   });
 
   const thumbnail = document.createElement("span");
@@ -819,12 +881,17 @@ function renderShelfOptions() {
 function openBookProfile(book) {
   bookProfileReturnFocus = document.activeElement;
   selectedBook = book;
-  renderBookPage(book);
+  navigateTo("book", {
+    id: book.id || "",
+    title: book.title || "",
+    author: book.author || "",
+  });
 }
 
 function closeBookProfile() {
   selectedBook = null;
-  showHomePage();
+  window.history.replaceState(null, "", createRouteHash("home"));
+  restoreRouteFromLocation();
   if (bookProfileReturnFocus instanceof HTMLElement && bookProfileReturnFocus.isConnected) bookProfileReturnFocus.focus();
   bookProfileReturnFocus = null;
 }
@@ -1161,7 +1228,7 @@ function createShelfCard(shelf, { compact = false } = {}) {
       openShelfDrawer();
       if (state.session) newShelfInput.value = name;
     } else {
-      showShelfPage(name);
+      navigateTo("shelf", { name });
     }
   });
   card.append(open);
@@ -1210,7 +1277,9 @@ function updateActiveNavigation(label) {
     else item.removeAttribute("aria-current");
   });
   document.querySelectorAll(".mobile-nav-item").forEach((item) => {
-    item.classList.toggle("active", item.textContent.trim().toLowerCase().includes(label.toLowerCase()));
+    const mobileLabel = label === "Discover" ? "Search" : label;
+    item.classList.toggle("active", Boolean(mobileLabel)
+      && item.textContent.trim().toLowerCase().includes(mobileLabel.toLowerCase()));
   });
 }
 
@@ -1221,7 +1290,7 @@ function createPageHeader(kicker, title, description = "") {
   back.type = "button";
   back.className = "text-btn page-back";
   back.textContent = "‹ Home";
-  back.addEventListener("click", showHomePage);
+  back.addEventListener("click", () => navigateTo("home"));
   const eyebrow = document.createElement("p");
   eyebrow.className = "eyebrow";
   eyebrow.textContent = kicker;
@@ -1906,7 +1975,11 @@ function findLocalSearchMatches(query) {
   });
 }
 
-async function runNaturalSearch(query) {
+async function runNaturalSearch(query, { updateHistory = true } = {}) {
+  if (updateHistory) {
+    navigateTo("search", { q: query.trim() });
+    return;
+  }
   state.searchQuery = query.trim();
   state.searchMessage = "";
   state.searchLoading = false;
@@ -2027,7 +2100,7 @@ function render() {
   else if (state.view === "shelves") showShelvesPage();
   else if (state.view === "search") showSearchPage(state.searchQuery);
   else if (state.view === "stats") showStatsPage();
-  else if (state.view === "book" && state.currentBook) renderBookPage(state.currentBook);
+  else if (state.view === "book") renderBookRoute();
 }
 
 function openDialog() {
@@ -2725,9 +2798,11 @@ globalSearchForm.addEventListener("submit", async (event) => {
 });
 
 document.getElementById("topHomeBtn").addEventListener("click", () => {
-  showHomePage();
+  navigateTo("home");
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
+
+window.addEventListener("popstate", restoreRouteFromLocation);
 
 libraryToggleBtn.addEventListener("click", () => {
   setLibraryDrawerOpen(!sidebar.classList.contains("is-open"));
@@ -2739,9 +2814,9 @@ document.querySelectorAll(".mobile-nav-item").forEach((item) => {
   item.addEventListener("click", () => {
     document.querySelectorAll(".mobile-nav-item").forEach((navItem) => navItem.classList.remove("active"));
     item.classList.add("active");
-    if (item.textContent.includes("Home")) showHomePage();
+    if (item.textContent.includes("Home")) navigateTo("home");
     if (item.textContent.includes("Search")) runNaturalSearch("");
-    if (item.textContent.includes("Shelves")) showShelvesPage();
+    if (item.textContent.includes("Shelves")) navigateTo("shelves");
     if (item.textContent.includes("Create")) openDialog();
   });
 });
@@ -2749,10 +2824,10 @@ document.querySelectorAll(".mobile-nav-item").forEach((item) => {
 document.querySelectorAll(".nav-pill").forEach((item) => {
   item.addEventListener("click", () => {
     if (window.matchMedia("(max-width: 899px)").matches) setLibraryDrawerOpen(false);
-    if (item.textContent.includes("Home")) showHomePage();
-    if (item.textContent.includes("Your shelves")) showShelvesPage();
+    if (item.textContent.includes("Home")) navigateTo("home");
+    if (item.textContent.includes("Your shelves")) navigateTo("shelves");
     if (item.textContent.includes("Discover")) runNaturalSearch("");
-    if (item.textContent.includes("Stats")) showStatsPage();
+    if (item.textContent.includes("Stats")) navigateTo("stats");
   });
 });
 
@@ -3076,7 +3151,7 @@ initializeBookLanguageOptions();
 state.books = loadBooks();
 state.loading = false;
 updateAuthButton();
-showHomePage();
+restoreRouteFromLocation();
 initializeSupabase();
 
 if ("serviceWorker" in navigator) {
