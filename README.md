@@ -21,8 +21,12 @@ Then open http://127.0.0.1:3000/.
 
 ## Supabase setup
 1. Create a new Supabase project.
-2. Open SQL Editor and run the script in [supabase/schema.sql](supabase/schema.sql).
-3. In the app, replace the placeholder local storage logic with Supabase calls later.
+2. Open SQL Editor and run [supabase/schema.sql](supabase/schema.sql), then [supabase/auth-setup.sql](supabase/auth-setup.sql). The second script creates a profile for each newly registered Supabase user.
+3. Set the project's URL and anon key in `config.js`. Email/password registration and sign-in use Supabase Auth; if email confirmation is enabled, new users must confirm their email before signing in. Signed-in books and shelves are loaded from Supabase.
+4. To enable Google sign-in, create a Google OAuth client and add the callback URL shown under Supabase Authentication > Providers > Google as an authorized redirect URI in Google Cloud. Add the client ID and secret to that Google provider in Supabase, then enable it.
+5. In Supabase Authentication > URL Configuration, set the site URL to the deployed app URL and add the deployed URL and local preview URL (for example, `http://localhost:3000/`) to the allowed redirect URLs. The Google button uses the current app URL as its post-login redirect.
+
+The Google button supports both registration and sign-in. Supabase returns users to the app after authorization, and the profile trigger uses Google's name metadata when creating their Librito profile. Keep the Google client secret in Supabase; it does not belong in `config.js`.
 
 ## Vercel deployment
 1. Push this repository to GitHub.

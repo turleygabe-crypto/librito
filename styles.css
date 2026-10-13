@@ -96,6 +96,11 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .action-btn, .secondary-btn { padding: 0.75rem 1rem; border: 0; border-radius: 999px; }
 .action-btn { background: #7a4a2d; color: #fff; }
 .secondary-btn { background: #eadcc8; color: var(--ink); }
+.google-auth-options { display: grid; gap: 0.65rem; margin: 0.75rem 0; }
+.google-auth-btn { width: 100%; padding: 0.75rem 1rem; border: 1px solid rgba(63,46,35,.2); border-radius: 0.65rem; background: #fff; color: var(--ink); font: inherit; font-weight: 600; }
+.google-auth-btn:disabled { opacity: 0.65; }
+.auth-divider { display: flex; align-items: center; gap: 0.65rem; margin: 0; color: var(--muted); font-size: 0.8rem; }
+.auth-divider::before, .auth-divider::after { flex: 1; height: 1px; background: rgba(63,46,35,.16); content: ""; }
 .scan-zone { padding: 0.8rem; border: 1px solid rgba(139,94,60,.16); border-radius: 1rem; }
 .scan-actions { display: flex; gap: 0.6rem; margin-top: 0.6rem; }
 #scannerVideo { width: 100%; margin-top: 0.75rem; border-radius: 0.75rem; background: #1f130d; }

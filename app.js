@@ -134,6 +134,8 @@ const authOverlay = document.getElementById("authOverlay");
 const closeAuthBtn = document.getElementById("closeAuthBtn");
 const authForm = document.getElementById("authForm");
 const authSubmitBtn = document.getElementById("authSubmitBtn");
+const googleAuthOptions = document.getElementById("googleAuthOptions");
+const googleAuthBtn = document.getElementById("googleAuthBtn");
 const toggleAuthModeBtn = document.getElementById("toggleAuthModeBtn");
 const forgotPasswordBtn = document.getElementById("forgotPasswordBtn");
 const authTitle = document.getElementById("authTitle");
@@ -156,7 +158,8 @@ const settingsBtn = document.getElementById("settingsBtn");
 let cameraStream = null;
 let barcodeLoopTimer = null;
 let selectedBook = null;
-let authPrompted = false;
+const oauthRedirectKey = "librito-oauth-redirect";
+let authPrompted = sessionStorage.getItem(oauthRedirectKey) === "true";
 let authMode = "signin";
 
 function loadBooks() {
@@ -401,6 +404,7 @@ function promptForProfile() {
 
 function setAuthMode(nextMode) {
   authMode = nextMode;
+  googleAuthOptions.classList.toggle("hidden", nextMode === "reset");
   authForm.elements.password.required = nextMode !== "reset";
   if (nextMode === "reset") {
     authTitle.textContent = "Reset your password";
@@ -586,6 +590,10 @@ async function initializeSupabase() {
       state.session = session;
       updateAuthButton();
       if (session) {
+        if (sessionStorage.getItem(oauthRedirectKey) === "true") {
+          authPrompted = true;
+          sessionStorage.removeItem(oauthRedirectKey);
+        }
         state.books = [];
         state.shelves = [];
         render();
@@ -870,6 +878,35 @@ authButton.addEventListener("click", async () => {
 
 toggleAuthModeBtn.addEventListener("click", () => {
   setAuthMode(authMode === "reset" ? "signin" : authMode === "signup" ? "signin" : "signup");
+});
+
+googleAuthBtn.addEventListener("click", async () => {
+  if (!state.supabase) {
+    await initializeSupabase();
+  }
+  if (!state.supabase) {
+    showToast("Authentication is not configured. Check the Supabase settings.");
+    return;
+  }
+
+  googleAuthBtn.disabled = true;
+  googleAuthBtn.textContent = "Connecting to Google…";
+  sessionStorage.setItem(oauthRedirectKey, "true");
+  try {
+    const { error } = await state.supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}${window.location.pathname}`,
+      },
+    });
+    if (error) throw error;
+  } catch (error) {
+    console.error(error);
+    sessionStorage.removeItem(oauthRedirectKey);
+    googleAuthBtn.disabled = false;
+    googleAuthBtn.textContent = "Continue with Google";
+    showToast(error.message || "Could not connect to Google.");
+  }
 });
 
 forgotPasswordBtn.addEventListener("click", () => {
