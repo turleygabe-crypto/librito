@@ -7,7 +7,7 @@ Librito is a cozy, mobile-first library platform concept for scanning books, org
 - Local demo library with mock data
 - Books are added to the library by default and can optionally be assigned to user-created shelves
 - Welcome prompt for visitors to sign in or create an account, with the option to continue browsing
-- ISBN lookup using Open Library metadata
+- Book lookup by title and/or author, or by ISBN using Open Library metadata
 - Camera-based barcode scan attempt on supported mobile browsers
 - Supabase-ready SQL schema for books, shelves, and profiles
 - Vercel-friendly static deployment structure

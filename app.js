@@ -124,6 +124,13 @@ const scanButton = document.getElementById("scanButton");
 const openModalBtn = document.getElementById("openModalBtn");
 const closeDialogBtn = document.getElementById("closeDialogBtn");
 const toast = document.getElementById("toast");
+const lookupMethod = document.getElementById("lookupMethod");
+const titleLookupPanel = document.getElementById("titleLookupPanel");
+const isbnLookupPanel = document.getElementById("isbnLookupPanel");
+const lookupTitleInput = document.getElementById("lookupTitleInput");
+const lookupAuthorInput = document.getElementById("lookupAuthorInput");
+const lookupTitleBtn = document.getElementById("lookupTitleBtn");
+const titleLookupResults = document.getElementById("titleLookupResults");
 const scanIsbnBtn = document.getElementById("scanIsbnBtn");
 const lookupIsbnBtn = document.getElementById("lookupIsbnBtn");
 const isbnInput = document.getElementById("isbnInput");
@@ -367,12 +374,20 @@ function openDialog() {
     return;
   }
   dialogOverlay.classList.remove("hidden");
-  bookForm.elements.title.focus();
+  lookupTitleInput.focus();
 }
 
 function closeDialog() {
   dialogOverlay.classList.add("hidden");
+  stopCameraScan();
   bookForm.reset();
+  lookupTitleInput.value = "";
+  lookupAuthorInput.value = "";
+  titleLookupResults.replaceChildren();
+  lookupMethod.value = "title";
+  titleLookupPanel.classList.remove("hidden");
+  isbnLookupPanel.classList.add("hidden");
+  scanStatus.textContent = "Search by title or author, or switch to ISBN to enter or scan a barcode.";
 }
 
 function openShelfDrawer() {
@@ -446,6 +461,75 @@ function showToast(message) {
   }, 1800);
 }
 
+function fillBookDetails({ title, authors = [], isbn = "", publishDate = "" }) {
+  bookForm.elements.title.value = title || "";
+  bookForm.elements.author.value = authors.join(", ");
+  if (isbn) isbnInput.value = isbn;
+  bookForm.elements.notes.value = publishDate ? `Published ${publishDate}` : "";
+  bookForm.elements.added.value = new Date().toISOString().slice(0, 10);
+}
+
+async function lookupBooksByTitleOrAuthor() {
+  const title = lookupTitleInput.value.trim();
+  const author = lookupAuthorInput.value.trim();
+  if (!title && !author) {
+    scanStatus.textContent = "Enter a title, an author, or both to search.";
+    return;
+  }
+
+  const params = new URLSearchParams({
+    q: [title, author].filter(Boolean).join(" "),
+    limit: "10",
+    fields: "key,title,author_name,isbn,first_publish_year",
+  });
+  scanStatus.textContent = "Searching books…";
+  titleLookupResults.replaceChildren();
+
+  try {
+    const response = await fetch(`https://openlibrary.org/search.json?${params}`);
+    if (!response.ok) throw new Error(`Open Library responded with ${response.status}`);
+    const payload = await response.json();
+    const results = Array.isArray(payload.docs) ? payload.docs : [];
+    if (!results.length) {
+      scanStatus.textContent = "No matching books found. You can enter the details manually.";
+      return;
+    }
+
+    results.forEach((result) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "lookup-result";
+      const resultTitle = document.createElement("strong");
+      resultTitle.textContent = result.title || "Untitled";
+      const details = document.createElement("span");
+      const authors = Array.isArray(result.author_name) ? result.author_name : [];
+      details.textContent = [
+        authors.join(", ") || "Unknown author",
+        result.first_publish_year,
+        Array.isArray(result.isbn) && result.isbn[0] ? `ISBN ${result.isbn[0]}` : "",
+      ].filter(Boolean).join(" · ");
+      button.append(resultTitle, details);
+      button.addEventListener("click", () => {
+        fillBookDetails({
+          title: result.title,
+          authors,
+          isbn: Array.isArray(result.isbn) ? result.isbn[0] || "" : "",
+          publishDate: result.first_publish_year ? String(result.first_publish_year) : "",
+        });
+        scanStatus.textContent = `Selected ${result.title}`;
+        titleLookupResults.replaceChildren();
+        showToast("Book details filled from search");
+      });
+      titleLookupResults.append(button);
+    });
+    scanStatus.textContent = `${results.length} matching books. Select one to fill in its details.`;
+  } catch (error) {
+    console.error(error);
+    scanStatus.textContent = "Book search failed. Try again or enter the details manually.";
+    showToast("Book search failed");
+  }
+}
+
 async function lookupBookByIsbn(isbn) {
   const normalized = (isbn || "").replace(/[^0-9Xx]/g, "").trim();
   if (!normalized) {
@@ -483,10 +567,7 @@ async function lookupBookByIsbn(isbn) {
       ? bookData.authors.map((author) => author.name).filter(Boolean)
       : [];
 
-    bookForm.elements.title.value = bookData.title || "";
-    bookForm.elements.author.value = authors.join(", ") || "";
-    bookForm.elements.notes.value = bookData.publish_date ? `Published ${bookData.publish_date}` : "";
-    bookForm.elements.added.value = new Date().toISOString().slice(0, 10);
+    fillBookDetails({ title: bookData.title, authors, isbn: normalized, publishDate: bookData.publish_date || "" });
     scanStatus.textContent = `Loaded ${bookData.title}`;
     showToast("Book profile filled from ISBN lookup");
   } catch (error) {
@@ -836,6 +917,42 @@ openModalBtn.addEventListener("click", () => {
 
 scanIsbnBtn.addEventListener("click", () => {
   startCameraScan();
+});
+
+lookupMethod.addEventListener("change", () => {
+  const useIsbn = lookupMethod.value === "isbn";
+  if (!useIsbn) stopCameraScan();
+  titleLookupPanel.classList.toggle("hidden", useIsbn);
+  isbnLookupPanel.classList.toggle("hidden", !useIsbn);
+  titleLookupResults.replaceChildren();
+  scanStatus.textContent = useIsbn
+    ? "Enter an ISBN manually or scan the book's barcode with your camera."
+    : "Search by title, author, or both.";
+});
+
+lookupTitleBtn.addEventListener("click", () => {
+  lookupBooksByTitleOrAuthor();
+});
+
+lookupTitleInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    lookupBooksByTitleOrAuthor();
+  }
+});
+
+lookupAuthorInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    lookupBooksByTitleOrAuthor();
+  }
+});
+
+isbnInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    lookupBookByIsbn(isbnInput.value);
+  }
 });
 
 lookupIsbnBtn.addEventListener("click", () => {

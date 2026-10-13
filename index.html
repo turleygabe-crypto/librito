@@ -205,15 +205,38 @@
         <form id="bookForm" class="book-form">
           <div class="scan-zone">
             <label>
-              ISBN / barcode
-              <input id="isbnInput" name="isbn" placeholder="9780141036144" />
+              Find a book by
+              <select id="lookupMethod">
+                <option value="title">Title and/or author</option>
+                <option value="isbn">ISBN</option>
+              </select>
             </label>
-            <div class="scan-actions">
-              <button id="scanIsbnBtn" type="button" class="secondary-btn">Scan ISBN</button>
-              <button id="lookupIsbnBtn" type="button" class="secondary-btn">Lookup</button>
+            <div id="titleLookupPanel" class="lookup-panel">
+              <label>
+                Title
+                <input id="lookupTitleInput" placeholder="Book title" />
+              </label>
+              <label>
+                Author (optional)
+                <input id="lookupAuthorInput" placeholder="Author name" />
+              </label>
+              <div class="scan-actions">
+                <button id="lookupTitleBtn" type="button" class="secondary-btn">Search books</button>
+              </div>
+              <div id="titleLookupResults" class="lookup-results" aria-live="polite"></div>
             </div>
-            <video id="scannerVideo" autoplay playsinline muted></video>
-            <p id="scanStatus" class="scan-status">Use your phone camera or enter the ISBN manually.</p>
+            <div id="isbnLookupPanel" class="lookup-panel hidden">
+              <label>
+                ISBN
+                <input id="isbnInput" name="isbn" placeholder="Enter ISBN" />
+              </label>
+              <div class="scan-actions">
+                <button id="scanIsbnBtn" type="button" class="secondary-btn">Scan with camera</button>
+                <button id="lookupIsbnBtn" type="button" class="secondary-btn">Look up ISBN</button>
+              </div>
+              <video id="scannerVideo" autoplay playsinline muted></video>
+            </div>
+            <p id="scanStatus" class="scan-status">Search by title or author, or switch to ISBN to enter or scan a barcode.</p>
           </div>
 
           <label>
