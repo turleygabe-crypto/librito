@@ -2002,31 +2002,52 @@ async function runNaturalSearch(query, { updateHistory = true } = {}) {
   const searchTerms = [...new Set(parsed.queryTerms)];
   try {
     const params = new URLSearchParams({
-      q: searchTerms.join(" ") || state.searchQuery,
-      fields: "title,author_name,isbn,cover_i,subject,number_of_pages_median",
+      q: `${searchTerms.join(" ") || state.searchQuery} language:${getDefaultBookLanguage()}`,
+      fields: "key,title,author_name,isbn,cover_i,subject,number_of_pages_median",
       limit: "24",
     });
     const response = await fetch(`https://openlibrary.org/search.json?${params}`);
     if (!response.ok) throw new Error(`Open Library search failed with ${response.status}`);
     const data = await response.json();
-    const externalBooks = (data.docs || [])
-      .map((result) => ({
-        title: result.title || "Untitled",
-        author: result.author_name?.[0] || "Unknown author",
-        author_name: result.author_name || [],
-        isbn: result.isbn?.[0] || "",
-        isbnList: result.isbn || [],
-        cover_i: result.cover_i,
-        subjects: result.subject || [],
-        genre: parsed.genre || result.subject?.[0] || "",
-        pages: result.number_of_pages_median,
-        page_count: result.number_of_pages_median,
-      }))
-      .filter((book) => !parsed.pageLimit || (book.pages && book.pages <= parsed.pageLimit));
+    const works = Array.isArray(data.docs) ? data.docs : [];
+    const editionResults = await Promise.allSettled(works.map(async (work) => {
+      if (!work.key) return null;
+      const edition = await getMatchingOpenLibraryEdition(work.key, getDefaultBookLanguage());
+      if (!edition) return null;
+      const isbnList = [...(edition.isbn_13 || []), ...(edition.isbn_10 || [])];
+      return {
+        title: edition.title || work.title || "Untitled",
+        author: work.author_name?.[0] || "Unknown author",
+        author_name: work.author_name || [],
+        isbn: isbnList[0] || "",
+        isbnList,
+        cover_i: edition.covers?.[0],
+        subjects: work.subject || [],
+        genre: parsed.genre || work.subject?.[0] || "",
+        pages: work.number_of_pages_median,
+        page_count: work.number_of_pages_median,
+      };
+    }));
+    let editionLookupFailures = 0;
+    const externalBooks = editionResults.flatMap((result) => {
+      if (result.status === "rejected") {
+        editionLookupFailures += 1;
+        console.error(result.reason);
+        return [];
+      }
+      const book = result.value;
+      return book && (!parsed.pageLimit || (book.pages && book.pages <= parsed.pageLimit)) ? [book] : [];
+    });
     state.searchResults = [...state.searchResults, ...externalBooks]
       .filter((book, index, all) => all.findIndex((candidate) => getBookKey(candidate) === getBookKey(book)) === index);
+    if (editionLookupFailures) {
+      const languageName = getOpenLibraryLanguageName(getDefaultBookLanguage());
+      state.searchMessage = `Some matching ${languageName} editions could not be checked; showing verified editions only.`;
+    }
     if (!state.searchResults.length && parsed.pageLimit) {
       state.searchMessage = `No results with a verified page count under ${parsed.pageLimit} pages.`;
+    } else if (!state.searchResults.length && works.length && !externalBooks.length && !editionLookupFailures) {
+      state.searchMessage = `No matching editions found in ${getOpenLibraryLanguageName(getDefaultBookLanguage())}.`;
     }
   } catch (error) {
     console.warn("Natural-language search used local results because Open Library was unavailable.", error);
@@ -2289,6 +2310,25 @@ function getOpenLibraryLanguageName(code) {
   return openLibraryLanguages.find(([languageCode]) => languageCode === code)?.[1] || code;
 }
 
+async function getMatchingOpenLibraryEdition(workKey, selectedLanguage) {
+  const response = await fetch(`https://openlibrary.org${workKey}/editions.json?limit=100`);
+  if (!response.ok) throw new Error(`Open Library editions responded with ${response.status}`);
+  const payload = await response.json();
+  const editions = Array.isArray(payload.entries) ? payload.entries : [];
+  const matchingEditions = editions.filter((edition) => {
+    const editionLanguages = (edition.languages || []).map((language) => language.key.split("/").pop());
+    return !selectedLanguage || editionLanguages.includes(selectedLanguage);
+  });
+  matchingEditions.sort((first, second) => {
+    const editionScore = (edition) => Number(Boolean(edition.covers?.length)) * 2 + Number(Boolean(edition.isbn_13?.length));
+    return editionScore(second) - editionScore(first);
+  });
+  const edition = matchingEditions[0];
+  if (!edition) return null;
+  const editionLanguages = (edition.languages || []).map((language) => language.key.split("/").pop());
+  return { ...edition, language: editionLanguages };
+}
+
 function renderTitleSearchResults() {
   titleLookupResults.replaceChildren();
   titleSearchResults.forEach((result, index) => {
@@ -2397,27 +2437,14 @@ async function lookupBooksByTitleOrAuthor() {
     const works = Array.isArray(payload.docs) ? payload.docs : [];
     const editionResults = await Promise.allSettled(works.map(async (work) => {
       if (!work.key) return null;
-      const editionsResponse = await fetch(`https://openlibrary.org${work.key}/editions.json?limit=100`);
-      if (!editionsResponse.ok) throw new Error(`Open Library editions responded with ${editionsResponse.status}`);
-      const editionPayload = await editionsResponse.json();
-      const editions = Array.isArray(editionPayload.entries) ? editionPayload.entries : [];
-      const matchingEditions = editions.filter((edition) => {
-        const editionLanguages = (edition.languages || []).map((language) => language.key.split("/").pop());
-        return !selectedLanguage || editionLanguages.includes(selectedLanguage);
-      });
-      matchingEditions.sort((first, second) => {
-        const editionScore = (edition) => Number(Boolean(edition.covers?.length)) * 2 + Number(Boolean(edition.isbn_13?.length));
-        return editionScore(second) - editionScore(first);
-      });
-      const edition = matchingEditions[0];
+      const edition = await getMatchingOpenLibraryEdition(work.key, selectedLanguage);
       if (!edition) return null;
-      const editionLanguages = (edition.languages || []).map((language) => language.key.split("/").pop());
       return {
         ...work,
         title: edition.title || work.title,
         isbn: [...(edition.isbn_13 || []), ...(edition.isbn_10 || [])],
         cover_i: edition.covers?.[0],
-        language: editionLanguages,
+        language: edition.language,
         first_publish_year: edition.publish_date || work.first_publish_year,
       };
     }));
