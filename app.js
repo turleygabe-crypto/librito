@@ -2730,6 +2730,8 @@ bookForm.addEventListener("submit", async (event) => {
 });
 
 initializeBookLanguageOptions();
+state.books = loadBooks();
+state.loading = false;
 updateAuthButton();
 showHomePage();
 initializeSupabase();
