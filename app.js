@@ -982,7 +982,7 @@ function renderBooks() {
     }));
 
   const homeSections = [
-    ["Currently reading", () => createCurrentlyReadingHomeSection(currentlyReadingBooks)],
+    ["Currently reading", () => createCurrentlyReadingHomeSection(currentlyReadingBooks, libraryBooks)],
     ["Picked for your library", () => createCardRow("Picked for your library", pickedRecommendations
       .map(({ book, reason }) => ({ type: "book", book, subtitle: reason, recommendation: true })), {
         emptyMessage: state.catalogLoading
@@ -1161,31 +1161,82 @@ function getBookRecommendations(libraryBooks = getLibraryBooks()) {
       && !state.dismissedRecommendations.has(getBookKey(book))));
 }
 
-function createCurrentlyReadingHomeSection(books) {
+function createCurrentlyReadingHomeSection(books, libraryBooks) {
   const section = document.createElement("section");
   section.className = "home-section card-row-section";
   const heading = document.createElement("div");
   heading.className = "section-heading-row";
   const title = document.createElement("h2");
   title.textContent = "Currently reading";
-  const showAll = document.createElement("button");
-  showAll.type = "button";
-  showAll.className = "text-btn show-all-btn";
-  showAll.textContent = "View list";
-  showAll.setAttribute("aria-label", "View all currently reading books");
-  showAll.addEventListener("click", () => navigateTo("shelf", { name: "Currently Reading" }));
-  heading.append(title, showAll);
-
-  const booksList = state.loading
-    ? document.createElement("p")
-    : createCurrentlyReadingList(books);
-  if (state.loading) {
-    booksList.className = "row-empty-state";
-    booksList.textContent = "Loading your reading list…";
-    booksList.setAttribute("role", "status");
+  heading.append(title);
+  if (books.length) {
+    const row = document.createElement("div");
+    row.className = "card-row";
+    row.setAttribute("role", "region");
+    row.setAttribute("aria-label", "Currently reading books");
+    row.tabIndex = 0;
+    row.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+        event.preventDefault();
+        row.scrollBy({ left: event.key === "ArrowRight" ? 240 : -240, behavior: "smooth" });
+      }
+    });
+    books.forEach((book) => row.append(createReadingBookCard(book)));
+    section.append(heading, row);
+    return section;
   }
-  section.append(heading, booksList);
+
+  const empty = document.createElement("p");
+  empty.className = "row-empty-state";
+  empty.textContent = state.loading
+    ? "Loading your reading list…"
+    : "Ready to start a book? Choose one from your library to add to Currently Reading.";
+  section.append(heading, empty);
+
+  const booksToStart = libraryBooks.filter((book) => book.reading_status !== "reading");
+  if (booksToStart.length) {
+    const row = document.createElement("div");
+    row.className = "card-row";
+    row.setAttribute("role", "region");
+    row.setAttribute("aria-label", "Choose a book to start reading");
+    row.tabIndex = 0;
+    row.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+        event.preventDefault();
+        row.scrollBy({ left: event.key === "ArrowRight" ? 240 : -240, behavior: "smooth" });
+      }
+    });
+    booksToStart.slice(0, 6).forEach((book) => row.append(createReadingBookCard(book)));
+    section.append(row);
+  } else if (!state.loading && !libraryBooks.length) {
+    const addBook = document.createElement("button");
+    addBook.type = "button";
+    addBook.className = "secondary-btn row-empty-action";
+    addBook.textContent = "＋ Add a book";
+    addBook.addEventListener("click", openDialog);
+    section.append(addBook);
+  }
   return section;
+}
+
+function createReadingBookCard(book) {
+  const card = document.createElement("article");
+  card.className = "media-card book-card";
+  const open = document.createElement("button");
+  open.type = "button";
+  open.className = "card-open-button";
+  open.setAttribute("aria-label", `Open ${book.title} by ${book.author || "Unknown author"}`);
+  open.append(createBookCover(book));
+  const title = document.createElement("strong");
+  title.className = "book-cover-title";
+  title.textContent = book.title || "Untitled";
+  const author = document.createElement("span");
+  author.className = "book-cover-author";
+  author.textContent = book.author || "Unknown author";
+  open.append(title, author);
+  open.addEventListener("click", () => openBookProfile(book));
+  card.append(open);
+  return card;
 }
 
 function scoreRecommendations(candidates) {
@@ -1887,18 +1938,18 @@ function createCurrentlyReadingList(books) {
     pageInput.step = "1";
     pageInput.value = String(book.current_page || 0);
     pageInput.setAttribute("aria-label", `Current page for ${book.title}`);
-    const savePage = document.createElement("button");
-    savePage.type = "button";
-    savePage.className = "secondary-btn";
-    savePage.textContent = "Save page";
-    savePage.addEventListener("click", () => saveCurrentPage(
+    const bookmarkPage = document.createElement("button");
+    bookmarkPage.type = "button";
+    bookmarkPage.className = "secondary-btn";
+    bookmarkPage.textContent = "Bookmark page";
+    bookmarkPage.addEventListener("click", () => saveCurrentPage(
       book,
       pageInput.value.trim() ? Number(pageInput.value) : Number.NaN
     ));
     const complete = document.createElement("button");
     complete.type = "button";
     complete.className = "action-btn";
-    complete.textContent = "Mark complete";
+    complete.textContent = "Finished reading";
     complete.addEventListener("click", () => markBookAsRead(book));
     const remove = document.createElement("button");
     remove.type = "button";
@@ -1906,7 +1957,7 @@ function createCurrentlyReadingList(books) {
     remove.textContent = "Remove";
     remove.setAttribute("aria-label", `Remove ${book.title} from Currently Reading`);
     remove.addEventListener("click", () => setReadingStatus(book, ""));
-    controls.append(pageInput, savePage, complete, remove);
+    controls.append(pageInput, bookmarkPage, complete, remove);
     row.append(coverButton, details, controls);
     list.append(row);
   });
