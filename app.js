@@ -396,12 +396,6 @@ function closeAuthModal() {
   setAuthMode("signin");
 }
 
-function promptForProfile() {
-  authPrompted = true;
-  openAuthModal();
-  showToast("Signed in. Create your username to finish setup.");
-}
-
 function setAuthMode(nextMode) {
   authMode = nextMode;
   googleAuthOptions.classList.toggle("hidden", nextMode === "reset");
@@ -414,27 +408,24 @@ function setAuthMode(nextMode) {
     toggleAuthModeBtn.style.display = "inline-flex";
     forgotPasswordBtn.style.display = "none";
     displayNameInput.closest("label").style.display = "none";
-    authForm.elements.favoriteShelf.closest("label").style.display = "none";
     authForm.elements.password.closest("label").style.display = "none";
   } else if (nextMode === "signin") {
     authTitle.textContent = "Sign in to Librito";
-    authCopy.textContent = "Sign in with email and password to keep your shelves and books synced.";
+    authCopy.textContent = "Choose one way to sign in: continue with Google, or use your email and password.";
     authSubmitBtn.textContent = "Sign in";
     toggleAuthModeBtn.textContent = "Need an account?";
     toggleAuthModeBtn.style.display = "inline-flex";
     forgotPasswordBtn.style.display = "inline-flex";
     displayNameInput.closest("label").style.display = "none";
-    authForm.elements.favoriteShelf.closest("label").style.display = "none";
     authForm.elements.password.closest("label").style.display = "grid";
   } else {
     authTitle.textContent = "Create your Librito profile";
-    authCopy.textContent = "Create an account with email and password to keep your shelves and books synced.";
+    authCopy.textContent = "Choose one way to create your account: continue with Google, or use email and password. You do not need both.";
     authSubmitBtn.textContent = "Create account";
     toggleAuthModeBtn.textContent = "Already have an account?";
     toggleAuthModeBtn.style.display = "inline-flex";
     forgotPasswordBtn.style.display = "none";
     displayNameInput.closest("label").style.display = "grid";
-    authForm.elements.favoriteShelf.closest("label").style.display = "grid";
     authForm.elements.password.closest("label").style.display = "grid";
   }
 }
@@ -597,9 +588,6 @@ async function initializeSupabase() {
         state.books = [];
         state.shelves = [];
         render();
-        if (!authPrompted) {
-          promptForProfile();
-        }
         loadFromSupabase();
       } else {
         authPrompted = false;
@@ -633,7 +621,7 @@ async function initializeSupabase() {
   }
 }
 
-async function ensureProfile(displayName = "", favoriteShelf = "") {
+async function ensureProfile(displayName = "") {
   if (!state.supabase || !state.session) return;
   const user = state.session.user;
   const { data, error } = await state.supabase
@@ -643,7 +631,6 @@ async function ensureProfile(displayName = "", favoriteShelf = "") {
         id: user.id,
         email: user.email,
         full_name: displayName || user.user_metadata?.full_name || user.email,
-        favorite_shelf: favoriteShelf || null,
       },
       { onConflict: "id" }
     )
@@ -934,8 +921,6 @@ authForm.addEventListener("submit", async (event) => {
   const displayName = formData.get("displayName").toString().trim();
   const email = formData.get("email").toString().trim();
   const password = formData.get("password").toString();
-  const favoriteShelf = formData.get("favoriteShelf").toString().trim();
-
   if (!email) {
     showToast("Email is required.");
     return;
@@ -974,7 +959,7 @@ authForm.addEventListener("submit", async (event) => {
 
       state.session = data.session;
       updateAuthButton();
-      await ensureProfile(displayName, favoriteShelf);
+      await ensureProfile(displayName);
       closeAuthModal();
       showToast("Account created");
     } else if (authMode === "reset") {
@@ -989,7 +974,7 @@ authForm.addEventListener("submit", async (event) => {
       if (error) throw error;
       state.session = data.session;
       updateAuthButton();
-      await ensureProfile(displayName || data.user?.user_metadata?.full_name || "", favoriteShelf);
+      await ensureProfile(displayName || data.user?.user_metadata?.full_name || "");
       closeAuthModal();
       showToast("Signed in");
     }
