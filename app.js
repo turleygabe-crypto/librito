@@ -342,6 +342,9 @@ function restoreRouteFromLocation() {
       state.view = "book";
       renderBookRoute(params);
       break;
+    case "/purchase":
+      showPurchasePage(params);
+      break;
     default:
       showHomePage();
   }
@@ -1145,19 +1148,38 @@ function createBookCard(book, { compact = false, subtitle = "", recommendation =
   card.append(open);
   const ownedBook = getLibraryBooks().find((owned) => getBookKey(owned) === getBookKey(book));
   if (!ownedBook) {
-    const action = document.createElement("button");
-    action.type = "button";
+    const addMenu = document.createElement("details");
+    addMenu.className = "card-add-menu";
+    const action = document.createElement("summary");
     action.className = "card-action";
     action.textContent = "＋";
-    action.setAttribute("aria-label", recommendation ? `Mark ${book.title} as owned` : `Open ${book.title} details`);
-    action.addEventListener("click", () => {
-      if (recommendation) {
-        markBookAsOwned(book);
-      } else {
-        openBookProfile(book);
-      }
+    action.setAttribute("aria-label", `Add or purchase ${book.title}`);
+    const choices = document.createElement("div");
+    choices.className = "card-add-actions";
+    const addToLibrary = document.createElement("button");
+    addToLibrary.type = "button";
+    addToLibrary.textContent = "Add to Library";
+    addToLibrary.addEventListener("click", () => {
+      addMenu.open = false;
+      markBookAsOwned(book);
     });
-    card.append(action);
+    const purchase = document.createElement("button");
+    purchase.type = "button";
+    purchase.textContent = "Purchase";
+    purchase.addEventListener("click", () => {
+      addMenu.open = false;
+      navigateTo("purchase", {
+        title: book.title || "",
+        author: book.author || "",
+        isbn: Array.isArray(book.isbn) ? book.isbn[0] || "" : book.isbn || "",
+        cover: book.cover_url
+          || (book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-L.jpg?default=false` : ""),
+      });
+    });
+    choices.append(addToLibrary, purchase);
+    addMenu.append(action, choices);
+    wireCardPopover(addMenu, action, choices);
+    card.append(addMenu);
   }
   if (ownedBook) {
     const like = document.createElement("button");
@@ -1200,37 +1222,7 @@ function createBookCardMenu(book, ownedBook, recommendation) {
   summary.setAttribute("aria-label", `More actions for ${book.title}`);
   const actions = document.createElement("div");
   actions.className = "card-menu-actions";
-  const positionActions = () => {
-    const summaryRect = summary.getBoundingClientRect();
-    const actionsRect = actions.getBoundingClientRect();
-    const margin = 8;
-    const gap = 6;
-    const left = Math.max(margin, Math.min(
-      summaryRect.right - actionsRect.width,
-      window.innerWidth - actionsRect.width - margin
-    ));
-    const below = summaryRect.bottom + gap;
-    const top = below + actionsRect.height <= window.innerHeight - margin
-      ? below
-      : Math.max(margin, summaryRect.top - actionsRect.height - gap);
-    actions.style.left = `${left}px`;
-    actions.style.top = `${top}px`;
-  };
-  const repositionOnViewportChange = () => {
-    if (menu.open) positionActions();
-  };
-  menu.addEventListener("toggle", () => {
-    menu.classList.toggle("is-open", menu.open);
-    menu.closest(".media-card")?.classList.toggle("card-menu-open", menu.open);
-    if (menu.open) {
-      positionActions();
-      window.addEventListener("resize", repositionOnViewportChange);
-      window.addEventListener("scroll", repositionOnViewportChange, true);
-    } else {
-      window.removeEventListener("resize", repositionOnViewportChange);
-      window.removeEventListener("scroll", repositionOnViewportChange, true);
-    }
-  });
+  wireCardPopover(menu, summary, actions);
   const addToShelf = document.createElement("button");
   addToShelf.type = "button";
   addToShelf.textContent = "Add to shelf";
@@ -1272,6 +1264,39 @@ function createBookCardMenu(book, ownedBook, recommendation) {
   actions.append(addToShelf, markOwned, like, remove);
   menu.append(summary, actions);
   return menu;
+}
+
+function wireCardPopover(menu, summary, panel) {
+  const positionPanel = () => {
+    const summaryRect = summary.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    const margin = 8;
+    const gap = 6;
+    const left = Math.max(margin, Math.min(
+      summaryRect.right - panelRect.width,
+      window.innerWidth - panelRect.width - margin
+    ));
+    const below = summaryRect.bottom + gap;
+    const top = below + panelRect.height <= window.innerHeight - margin
+      ? below
+      : Math.max(margin, summaryRect.top - panelRect.height - gap);
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+  };
+  const repositionPanel = () => {
+    if (menu.open) positionPanel();
+  };
+  menu.addEventListener("toggle", () => {
+    menu.closest(".media-card")?.classList.toggle("card-menu-open", menu.open);
+    if (menu.open) {
+      positionPanel();
+      window.addEventListener("resize", repositionPanel);
+      window.addEventListener("scroll", repositionPanel, true);
+    } else {
+      window.removeEventListener("resize", repositionPanel);
+      window.removeEventListener("scroll", repositionPanel, true);
+    }
+  });
 }
 
 function createShelfCard(shelf, { compact = false } = {}) {
@@ -2329,6 +2354,82 @@ function showStatsPage() {
   page.append(stats);
 }
 
+function showPurchasePage(params = new URLSearchParams(window.location.hash.split("?")[1] || "")) {
+  updateActiveNavigation("");
+  const title = params.get("title") || "";
+  const author = params.get("author") || "";
+  const isbn = params.get("isbn") || "";
+  const cover = params.get("cover") || "";
+  const page = showPage("purchase");
+  page.append(createPageHeader("Purchase", title || "Book not found", author));
+  if (!title) {
+    const message = document.createElement("p");
+    message.className = "row-empty-state";
+    message.textContent = "This purchase page is missing book details. Return home and choose a book to purchase.";
+    page.append(message);
+    return;
+  }
+
+  const book = { title, author, isbn, cover_url: cover };
+  const summary = document.createElement("section");
+  summary.className = "purchase-book-summary";
+  summary.append(createBookCover(book));
+  const details = document.createElement("div");
+  const heading = document.createElement("h2");
+  heading.textContent = title;
+  const byline = document.createElement("p");
+  byline.className = "page-description";
+  byline.textContent = author || "Unknown author";
+  details.append(heading, byline);
+  if (isbn) {
+    const identifier = document.createElement("p");
+    identifier.className = "purchase-isbn";
+    identifier.textContent = `ISBN: ${isbn}`;
+    details.append(identifier);
+  }
+  summary.append(details);
+
+  const section = document.createElement("section");
+  section.className = "purchase-options";
+  const sectionHeading = document.createElement("h2");
+  sectionHeading.textContent = "Choose a retailer";
+  const retailerList = document.createElement("div");
+  retailerList.className = "purchase-retailer-list";
+  const searchTerm = isbn || `${title} ${author}`.trim();
+  const encodedSearch = encodeURIComponent(searchTerm);
+  const retailers = [
+    ["Amazon", "Shop new and used editions", `https://www.amazon.com/s?k=${encodedSearch}&i=stripbooks`],
+    ["Bookshop.org", "Support independent bookstores", `https://bookshop.org/search?keywords=${encodedSearch}`],
+    ["Barnes & Noble", "Browse books and editions", `https://www.barnesandnoble.com/s/${encodedSearch}`],
+    ["ThriftBooks", "Find pre-owned copies", `https://www.thriftbooks.com/browse/?b.search=${encodedSearch}`],
+    ["Better World Books", "Shop new and used books", `https://www.betterworldbooks.com/search/results?q=${encodedSearch}`],
+  ];
+  retailers.forEach(([name, description, url]) => {
+    const link = document.createElement("a");
+    link.className = "purchase-retailer";
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    const copy = document.createElement("span");
+    const retailer = document.createElement("strong");
+    retailer.textContent = name;
+    const note = document.createElement("span");
+    note.textContent = description;
+    copy.append(retailer, note);
+    const arrow = document.createElement("span");
+    arrow.className = "purchase-retailer-arrow";
+    arrow.setAttribute("aria-hidden", "true");
+    arrow.textContent = "↗";
+    link.append(copy, arrow);
+    retailerList.append(link);
+  });
+  const disclosure = document.createElement("p");
+  disclosure.className = "purchase-disclosure";
+  disclosure.textContent = "Retailer pages show their own prices, formats, shipping, and availability.";
+  section.append(sectionHeading, retailerList, disclosure);
+  page.append(summary, section);
+}
+
 function countBy(items, getKey) {
   return items.reduce((counts, item) => {
     const key = getKey(item);
@@ -2365,6 +2466,7 @@ function render() {
   else if (state.view === "search") showSearchPage(state.searchQuery);
   else if (state.view === "stats") showStatsPage();
   else if (state.view === "book") renderBookRoute();
+  else if (state.view === "purchase") showPurchasePage();
 }
 
 function openDialog() {

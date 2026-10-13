@@ -1085,7 +1085,23 @@ h1, h2, h3, h4, p { margin-top: 0; }
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
 }
 
-.card-menu-actions button {
+.card-add-actions {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  display: grid;
+  width: 12rem;
+  overflow: hidden;
+  padding: 0.25rem;
+  border: 1px solid rgba(245, 221, 201, 0.12);
+  border-radius: 0.55rem;
+  background: #2b1c17;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+}
+
+.card-menu-actions button,
+.card-add-actions button {
   padding: 0.55rem 0.65rem;
   border: 0;
   border-radius: 0.35rem;
@@ -1094,8 +1110,17 @@ h1, h2, h3, h4, p { margin-top: 0; }
   text-align: left;
 }
 
-.card-menu-actions button:hover {
+.card-menu-actions button:hover,
+.card-add-actions button:hover {
   background: rgba(245, 221, 201, 0.1);
+}
+
+.card-add-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.card-add-menu > summary {
+  list-style: none;
 }
 
 .card-like {
@@ -1310,6 +1335,91 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .page-description {
   margin: 0.7rem 0 0;
   color: var(--muted);
+}
+
+.purchase-book-summary {
+  display: grid;
+  grid-template-columns: minmax(6rem, 8rem) minmax(0, 1fr);
+  align-items: center;
+  gap: 1.1rem;
+  padding: 1rem;
+  border: 1px solid rgba(245, 221, 201, 0.1);
+  border-radius: 0.85rem;
+  background: linear-gradient(145deg, rgba(69, 40, 29, 0.8), rgba(40, 26, 22, 0.8));
+}
+
+.purchase-book-summary .book-cover-art {
+  width: 100%;
+  aspect-ratio: 0.72;
+}
+
+.purchase-book-summary h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: clamp(1.2rem, 4vw, 1.7rem);
+}
+
+.purchase-isbn {
+  margin: 0.65rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.purchase-options {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.purchase-options h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.purchase-retailer-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.purchase-retailer {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(245, 221, 201, 0.12);
+  border-radius: 0.75rem;
+  background: #281a16;
+  color: #fff8ef;
+  text-decoration: none;
+}
+
+.purchase-retailer:hover {
+  border-color: rgba(233, 179, 137, 0.55);
+  background: #35231c;
+}
+
+.purchase-retailer > span:first-child {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.purchase-retailer > span:first-child > span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.purchase-retailer-arrow {
+  flex: 0 0 auto;
+  color: #e9b389;
+  font-size: 1.2rem;
+}
+
+.purchase-disclosure {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .shelf-hero {
