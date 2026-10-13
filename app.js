@@ -268,6 +268,10 @@ let readingCoverCycleTimer = null;
 let readingCoverCycleBooks = [];
 let readingCoverCycleIndex = 0;
 let readingCoverCycleKey = "";
+let recommendationRotationTimer = null;
+let lastRecommendationScrollAt = 0;
+const recommendationRotationInterval = 3 * 60 * 1000;
+const recommendationScrollPause = 2000;
 let selectedBook = null;
 let titleSearchResults = [];
 let selectedTitleResult = null;
@@ -1013,12 +1017,16 @@ function renderBooks() {
 
   const homeSections = [
     ["Currently reading", () => createCurrentlyReadingHomeSection(currentlyReadingBooks, libraryBooks)],
-    ["Picked for your library", () => createCardRow("Picked for your library", pickedRecommendations
-      .map(({ book, reason }) => ({ type: "book", book, subtitle: reason, recommendation: true })), {
-        emptyMessage: state.catalogLoading
-          ? "Finding books for your library…"
-          : state.catalogError || "No new books to suggest right now.",
-      })],
+    ["Picked for your library", () => {
+      const section = createCardRow("Picked for your library", pickedRecommendations
+        .map(({ book, reason }) => ({ type: "book", book, subtitle: reason, recommendation: true })), {
+          emptyMessage: state.catalogLoading
+            ? "Finding books for your library…"
+            : state.catalogError || "No new books to suggest right now.",
+        });
+      section.dataset.recommendationSection = "true";
+      return section;
+    }],
     ["Shelves for your taste", () => createCardRow("Shelves for your taste",
       buildSuggestedShelves(genres, shelfRecommendations, moreByOwnedAuthors), {
         emptyMessage: state.loading || state.catalogLoading
@@ -1078,6 +1086,35 @@ function rotateRecommendationPool() {
   const uniqueBooks = new Map([...discoveryBooks, ...state.catalogBooks]
     .map((book) => [getRecommendationKey(book), book]));
   state.recommendationPool = shuffleBooks([...uniqueBooks.values()]);
+}
+
+function scheduleRecommendationRotation(delay = recommendationRotationInterval) {
+  window.clearTimeout(recommendationRotationTimer);
+  recommendationRotationTimer = window.setTimeout(() => {
+    if (state.view === "home" && Date.now() - lastRecommendationScrollAt < recommendationScrollPause) {
+      scheduleRecommendationRotation(1000);
+      return;
+    }
+    rotateRecommendationPool();
+    if (state.view === "home") renderBooks();
+    scheduleRecommendationRotation();
+  }, delay);
+}
+
+function trackRecommendationScroll(event) {
+  const section = document.querySelector("[data-recommendation-section]");
+  if (!section) return;
+  const target = event.target;
+  if (target instanceof Element && section.contains(target)) {
+    lastRecommendationScrollAt = Date.now();
+    return;
+  }
+  if (target === document || target === document.documentElement || target === document.body) {
+    const bounds = section.getBoundingClientRect();
+    if (bounds.bottom > 0 && bounds.top < window.innerHeight) {
+      lastRecommendationScrollAt = Date.now();
+    }
+  }
 }
 
 function getRecommendationKey(book) {
@@ -1676,7 +1713,6 @@ function showHomePage() {
   state.view = "home";
   state.currentShelf = "";
   state.currentBook = null;
-  rotateRecommendationPool();
   document.getElementById("homeRows").classList.remove("hidden");
   document.getElementById("pageView").classList.add("hidden");
   updateActiveNavigation("Home");
@@ -3637,6 +3673,7 @@ document.getElementById("topHomeBtn").addEventListener("click", () => {
 });
 
 window.addEventListener("popstate", restoreRouteFromLocation);
+window.addEventListener("scroll", trackRecommendationScroll, { capture: true, passive: true });
 
 document.addEventListener("click", (event) => {
   const target = event.target;
@@ -4028,6 +4065,7 @@ bookForm.addEventListener("submit", async (event) => {
 });
 
 initializeBookLanguageOptions();
+scheduleRecommendationRotation();
 state.books = loadBooks();
 state.loading = false;
 updateAuthButton();
