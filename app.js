@@ -332,6 +332,9 @@ function restoreRouteFromLocation() {
     case "/shelf":
       showShelfPage(params.get("name") || "");
       break;
+    case "/suggested-shelf":
+      showSuggestedShelfPage(params.get("key") || "");
+      break;
     case "/search":
       runNaturalSearch(params.get("q") || "", { updateHistory: false });
       break;
@@ -956,9 +959,7 @@ function renderBooks() {
   const libraryBooks = getLibraryBooks();
   const orderedBooks = libraryBooks.slice().sort((a, b) =>
     new Date(b.added || b.added_on || 0) - new Date(a.added || a.added_on || 0));
-  const ownedKeys = new Set(libraryBooks.map(getBookKey));
-  const recommendations = scoreRecommendations(discoveryBooks.filter((book) =>
-    !ownedKeys.has(getBookKey(book)) && !state.dismissedRecommendations.has(getBookKey(book))));
+  const recommendations = getBookRecommendations(libraryBooks);
   const moreByOwnedAuthors = recommendations.filter(({ book }) =>
     libraryBooks.some((owned) => owned.author && owned.author.toLowerCase() === book.author.toLowerCase()));
   const shelfTiles = state.shelves.map((shelf) => ({
@@ -984,7 +985,14 @@ function renderBooks() {
       })],
     ["Picked for your library", () => createCardRow("Picked for your library", recommendations.slice(0, 8)
       .map(({ book, reason }) => ({ type: "book", book, subtitle: reason, recommendation: true })))],
-    ["Shelves for your taste", () => createCardRow("Shelves for your taste", buildSuggestedShelves(genres))],
+    ["Shelves for your taste", () => createCardRow("Shelves for your taste",
+      buildSuggestedShelves(genres, recommendations, moreByOwnedAuthors), {
+        emptyMessage: state.loading
+          ? "Finding books for your shelves…"
+          : libraryBooks.length
+            ? "No suggested shelves for your library just yet."
+            : "Add books to your library to get personalized suggestions.",
+      })],
     ["Recently added", () => createCardRow("Recently added", orderedBooks.slice(0, 10)
       .map((book) => ({ type: "book", book })), {
         emptyMessage: state.loading
@@ -1021,6 +1029,12 @@ function renderBooks() {
   if (hadSectionError) showToast("Some home sections could not be displayed.");
 }
 
+function getBookRecommendations(libraryBooks = getLibraryBooks()) {
+  const ownedKeys = new Set(libraryBooks.map(getBookKey));
+  return scoreRecommendations(discoveryBooks.filter((book) =>
+    !ownedKeys.has(getBookKey(book)) && !state.dismissedRecommendations.has(getBookKey(book))));
+}
+
 function scoreRecommendations(candidates) {
   const libraryBooks = getLibraryBooks();
   const ownedGenres = new Set(libraryBooks.map((book) => (book.genre || "").toLowerCase()).filter(Boolean));
@@ -1050,16 +1064,37 @@ function getBookKey(book) {
   return (book.isbn || `${book.title}|${book.author}`).toString().toLowerCase();
 }
 
-function buildSuggestedShelves(genres) {
-  const suggestions = [
-    { title: "Late Night Reading", subtitle: "Stories for after hours", color: "#74508a" },
-    { title: "New Perspectives", subtitle: "Ideas that stay with you", color: "#bd6749" },
-    { title: "Slow Sunday Reads", subtitle: "A softer kind of afternoon", color: "#496c5d" },
-  ];
-  if (genres.includes("Nonfiction")) {
-    suggestions[1] = { title: "Curious Minds", subtitle: "Thoughtful nonfiction", color: "#4c7083" };
+function buildSuggestedShelves(genres, recommendations, authorRecommendations = []) {
+  const suggestions = [];
+  if (authorRecommendations.length) {
+    suggestions.push({
+      key: "authors",
+      name: "More by authors you love",
+      subtitle: "More books by authors in your library",
+      color: "#74508a",
+      books: authorRecommendations.map(({ book }) => book),
+    });
   }
-  return suggestions.map((shelf) => ({ type: "suggested-shelf", ...shelf }));
+  [...new Map(genres.map((genre) => [genre.toLowerCase(), genre])).values()].forEach((genre, index) => {
+    const books = recommendations
+      .filter(({ book }) => (book.genre || "").toLowerCase() === genre.toLowerCase())
+      .map(({ book }) => book);
+    if (books.length) {
+      suggestions.push({
+        key: `genre:${genre.toLowerCase()}`,
+        name: `More ${genre} to explore`,
+        subtitle: `Because you enjoy ${genre}`,
+        color: ["#bd6749", "#496c5d", "#4c7083", "#536c9e"][index % 4],
+        books,
+      });
+    }
+  });
+  return suggestions.map((shelf) => ({
+    type: "suggested-shelf",
+    ...shelf,
+    count: shelf.books.length,
+    book: shelf.books[0],
+  }));
 }
 
 function createCardRow(title, cards, {
@@ -1337,15 +1372,43 @@ function createShelfCard(shelf, { compact = false } = {}) {
   title.textContent = name;
   const subtitle = document.createElement("span");
   subtitle.className = "book-cover-author";
-  subtitle.textContent = isSuggestion ? shelf.subtitle : `${shelf.count} books`;
+  subtitle.textContent = isSuggestion
+    ? `${shelf.count} suggested ${shelf.count === 1 ? "book" : "books"}`
+    : `${shelf.count} books`;
   open.append(cover, title, subtitle);
   open.addEventListener("click", () => {
-    if (isSuggestion) navigateTo("shelves");
+    if (isSuggestion) navigateTo("suggested-shelf", { key: shelf.key });
     else navigateTo("shelf", { name });
   });
   card.append(open);
   if (cover.hasAttribute("data-reading-shelf-card-cover")) updateReadingShelfCovers();
   return card;
+}
+
+function showSuggestedShelfPage(key) {
+  const libraryBooks = getLibraryBooks();
+  const recommendations = getBookRecommendations(libraryBooks);
+  const genres = [...new Set(libraryBooks.map((book) => book.genre).filter(Boolean))];
+  const authorRecommendations = recommendations.filter(({ book }) =>
+    libraryBooks.some((owned) => owned.author && owned.author.toLowerCase() === book.author.toLowerCase()));
+  const shelf = buildSuggestedShelves(genres, recommendations, authorRecommendations)
+    .find((suggestion) => suggestion.key === key);
+  const page = showPage("suggested-shelf");
+  updateActiveNavigation("Home");
+  if (!shelf) {
+    page.append(createPageHeader("Suggestions · For your library", "Suggested shelf not found"));
+    return;
+  }
+  page.append(
+    createPageHeader("Suggestions · For your library", shelf.name, shelf.subtitle),
+    createCardRow(shelf.name, shelf.books.map((book) => ({
+      type: "book",
+      book,
+      recommendation: true,
+    })), {
+      emptyMessage: "No suggestions in this shelf right now.",
+    })
+  );
 }
 
 function createGenreCard(genre) {
@@ -2480,6 +2543,7 @@ function render() {
   }
   else if (state.view === "shelf") showShelfPage(state.currentShelf);
   else if (state.view === "shelves") showShelvesPage();
+  else if (state.view === "suggested-shelf") restoreRouteFromLocation();
   else if (state.view === "search") showSearchPage(state.searchQuery);
   else if (state.view === "stats") showStatsPage();
   else if (state.view === "book") renderBookRoute();
