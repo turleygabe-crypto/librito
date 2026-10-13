@@ -36,6 +36,6 @@ The Google button supports both registration and sign-in. Supabase returns users
 4. Vercel will serve the static files automatically.
 
 ## Scanner notes
-- On many phones, the camera scanner works best in Chrome or Edge.
-- The browser must allow camera access.
-- If the browser does not support BarcodeDetector, the flow falls back to manual ISBN entry.
+- ISBN lookup uses Open Library metadata. The app first tries its `/api/scan` endpoint, then falls back to Open Library directly.
+- Camera scanning requires a secure context (HTTPS when deployed; localhost is allowed for local development) and camera permission.
+- The scanner uses the browser's `BarcodeDetector` when available and otherwise loads ZXing from jsDelivr. Manual ISBN entry and Lookup remain available if camera scanning is unsupported or unavailable.

@@ -537,7 +537,10 @@ async function startCameraScan() {
     }
   } catch (error) {
     console.error(error);
-    scanStatus.textContent = "Camera permission was denied. Enter the ISBN manually instead.";
+    stopCameraScan();
+    scanStatus.textContent = error?.name === "NotAllowedError" || error?.name === "SecurityError"
+      ? "Camera access was denied or blocked. Allow camera access on a secure page, or enter the ISBN manually."
+      : "Could not start the barcode scanner. Check camera availability and your connection, or enter the ISBN manually.";
   }
 }
 
