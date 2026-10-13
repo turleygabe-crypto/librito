@@ -970,6 +970,11 @@ h1, h2, h3, h4, p { margin-top: 0; }
   background: rgba(245, 221, 201, 0.07);
 }
 
+.media-card.card-menu-open {
+  z-index: 5;
+  transform: none;
+}
+
 .card-open-button {
   display: block;
   width: 100%;
@@ -1066,9 +1071,10 @@ h1, h2, h3, h4, p { margin-top: 0; }
 }
 
 .card-menu-actions {
-  position: absolute;
-  top: calc(100% + 0.35rem);
-  right: 0;
+  position: fixed;
+  top: 0;
+  right: auto;
+  z-index: 20;
   display: grid;
   width: 11rem;
   overflow: hidden;
@@ -1123,6 +1129,13 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .card-action:focus-visible {
   opacity: 1;
   transform: translateY(0);
+}
+
+@media (hover: none) {
+  .media-card .card-action {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .shelf-card-art {

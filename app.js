@@ -1143,19 +1143,22 @@ function createBookCard(book, { compact = false, subtitle = "", recommendation =
   open.append(title, author);
   open.addEventListener("click", () => openBookProfile(book));
   card.append(open);
-  const action = document.createElement("button");
-  action.type = "button";
-  action.className = "card-action";
-  action.textContent = "＋";
-  action.setAttribute("aria-label", recommendation ? `Mark ${book.title} as owned` : `Open ${book.title} details`);
-  action.addEventListener("click", () => {
-    if (recommendation) {
-      markBookAsOwned(book);
-    } else {
-      openBookProfile(book);
-    }
-  });
   const ownedBook = getLibraryBooks().find((owned) => getBookKey(owned) === getBookKey(book));
+  if (!ownedBook) {
+    const action = document.createElement("button");
+    action.type = "button";
+    action.className = "card-action";
+    action.textContent = "＋";
+    action.setAttribute("aria-label", recommendation ? `Mark ${book.title} as owned` : `Open ${book.title} details`);
+    action.addEventListener("click", () => {
+      if (recommendation) {
+        markBookAsOwned(book);
+      } else {
+        openBookProfile(book);
+      }
+    });
+    card.append(action);
+  }
   if (ownedBook) {
     const like = document.createElement("button");
     like.type = "button";
@@ -1167,7 +1170,6 @@ function createBookCard(book, { compact = false, subtitle = "", recommendation =
     card.append(like);
   }
   card.append(createBookCardMenu(book, ownedBook, recommendation));
-  card.append(action);
   return card;
 }
 
@@ -1198,6 +1200,37 @@ function createBookCardMenu(book, ownedBook, recommendation) {
   summary.setAttribute("aria-label", `More actions for ${book.title}`);
   const actions = document.createElement("div");
   actions.className = "card-menu-actions";
+  const positionActions = () => {
+    const summaryRect = summary.getBoundingClientRect();
+    const actionsRect = actions.getBoundingClientRect();
+    const margin = 8;
+    const gap = 6;
+    const left = Math.max(margin, Math.min(
+      summaryRect.right - actionsRect.width,
+      window.innerWidth - actionsRect.width - margin
+    ));
+    const below = summaryRect.bottom + gap;
+    const top = below + actionsRect.height <= window.innerHeight - margin
+      ? below
+      : Math.max(margin, summaryRect.top - actionsRect.height - gap);
+    actions.style.left = `${left}px`;
+    actions.style.top = `${top}px`;
+  };
+  const repositionOnViewportChange = () => {
+    if (menu.open) positionActions();
+  };
+  menu.addEventListener("toggle", () => {
+    menu.classList.toggle("is-open", menu.open);
+    menu.closest(".media-card")?.classList.toggle("card-menu-open", menu.open);
+    if (menu.open) {
+      positionActions();
+      window.addEventListener("resize", repositionOnViewportChange);
+      window.addEventListener("scroll", repositionOnViewportChange, true);
+    } else {
+      window.removeEventListener("resize", repositionOnViewportChange);
+      window.removeEventListener("scroll", repositionOnViewportChange, true);
+    }
+  });
   const addToShelf = document.createElement("button");
   addToShelf.type = "button";
   addToShelf.textContent = "Add to shelf";
