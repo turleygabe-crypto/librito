@@ -972,12 +972,7 @@ function renderBooks() {
   const shelfRecommendations = recommendations.filter(({ book }) => !pickedKeys.has(getBookKey(book)));
   const moreByOwnedAuthors = shelfRecommendations.filter(({ book }) =>
     libraryBooks.some((owned) => owned.author && owned.author.toLowerCase() === book.author.toLowerCase()));
-  const shelfTiles = state.shelves.map((shelf) => ({
-    name: shelf.name,
-    count: libraryBooks.filter((book) => book.shelf === shelf.name).length,
-    color: shelf.color || "#8b5e3c",
-    book: libraryBooks.find((book) => book.shelf === shelf.name),
-  }));
+  const currentlyReadingBooks = libraryBooks.filter((book) => book.reading_status === "reading");
   const genres = [...new Set(libraryBooks.map((book) => book.genre).filter(Boolean))];
   const genreTiles = [...new Set([...genres, "Fiction", "Nonfiction", "Mystery", "Fantasy", "Essays"])]
     .map((genre, index) => ({
@@ -987,12 +982,7 @@ function renderBooks() {
     }));
 
   const homeSections = [
-    ["Jump back in", () => createCardRow("Jump back in", shelfTiles.length
-      ? shelfTiles.slice(0, 6).map((shelf) => ({ type: "shelf", ...shelf }))
-      : orderedBooks.slice(0, 6).map((book) => ({ type: "compact-book", book })), {
-        compact: true,
-        emptyMessage: state.loading ? "Loading your shelves and books…" : "",
-      })],
+    ["Currently reading", () => createCurrentlyReadingHomeSection(currentlyReadingBooks)],
     ["Picked for your library", () => createCardRow("Picked for your library", pickedRecommendations
       .map(({ book, reason }) => ({ type: "book", book, subtitle: reason, recommendation: true })), {
         emptyMessage: state.catalogLoading
@@ -1169,6 +1159,33 @@ function getBookRecommendations(libraryBooks = getLibraryBooks()) {
   return scoreRecommendations(state.recommendationPool.filter((book) =>
     !libraryBooks.some((owned) => isSameBookWork(owned, book))
       && !state.dismissedRecommendations.has(getBookKey(book))));
+}
+
+function createCurrentlyReadingHomeSection(books) {
+  const section = document.createElement("section");
+  section.className = "home-section card-row-section";
+  const heading = document.createElement("div");
+  heading.className = "section-heading-row";
+  const title = document.createElement("h2");
+  title.textContent = "Currently reading";
+  const showAll = document.createElement("button");
+  showAll.type = "button";
+  showAll.className = "text-btn show-all-btn";
+  showAll.textContent = "View list";
+  showAll.setAttribute("aria-label", "View all currently reading books");
+  showAll.addEventListener("click", () => navigateTo("shelf", { name: "Currently Reading" }));
+  heading.append(title, showAll);
+
+  const booksList = state.loading
+    ? document.createElement("p")
+    : createCurrentlyReadingList(books);
+  if (state.loading) {
+    booksList.className = "row-empty-state";
+    booksList.textContent = "Loading your reading list…";
+    booksList.setAttribute("role", "status");
+  }
+  section.append(heading, booksList);
+  return section;
 }
 
 function scoreRecommendations(candidates) {
