@@ -613,10 +613,6 @@ function renderShelves() {
     empty.textContent = "Your shelves will appear here.";
     shelfList.append(empty);
   }
-  const actionsHeading = document.createElement("th");
-  actionsHeading.scope = "col";
-  actionsHeading.textContent = "Actions";
-  headerRow.append(actionsHeading);
 }
 
 function getBookShelfNames(book) {
