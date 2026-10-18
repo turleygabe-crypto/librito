@@ -3830,9 +3830,9 @@ body {
 
 .book-audiobook-panel {
   display: grid;
-  grid-column: 1 / -1;
-  width: min(100%, 19rem);
-  justify-self: end;
+  grid-column: 2;
+  width: 100%;
+  justify-self: stretch;
   align-content: start;
   align-self: start;
   gap: 0.65rem;
@@ -3919,7 +3919,7 @@ body {
 
 .book-profile-recommendations {
   display: grid;
-  grid-column: 1 / -1;
+  grid-column: 1;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.9rem;
 }
