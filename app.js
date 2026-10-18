@@ -2275,27 +2275,73 @@ function renderBookPage(book) {
   state.currentBook = book;
   updateActiveNavigation("");
   const page = showPage("book");
-  const header = createPageHeader("Book · Your library", book.title, book.author || "Unknown author");
+  const breadcrumb = document.createElement("nav");
+  breadcrumb.className = "book-breadcrumb";
+  breadcrumb.setAttribute("aria-label", "Breadcrumb");
+  const homeLink = document.createElement("button");
+  homeLink.type = "button";
+  homeLink.textContent = "Home";
+  homeLink.addEventListener("click", () => navigateTo("home"));
+  const separator = document.createElement("span");
+  separator.setAttribute("aria-hidden", "true");
+  separator.textContent = "›";
+  const currentCrumb = document.createElement("span");
+  currentCrumb.textContent = book.title || "Book";
+  currentCrumb.setAttribute("aria-current", "page");
+  breadcrumb.append(homeLink, separator, currentCrumb);
+
   const layout = document.createElement("div");
   layout.className = "book-detail-layout";
   const cover = createBookCover(book, "book-detail-cover");
+  const intro = document.createElement("div");
+  intro.className = "book-profile-intro";
+  const heading = document.createElement("h1");
+  heading.className = "book-profile-title";
+  heading.textContent = book.title || "Untitled";
+  const author = document.createElement("p");
+  author.className = "book-profile-author";
+  author.textContent = book.author || "Unknown author";
+  intro.append(heading, author);
+  const descriptionText = typeof book.description === "string"
+    ? book.description.trim()
+    : typeof book.description?.value === "string"
+      ? book.description.value.trim()
+      : "";
+  if (descriptionText) {
+    const description = document.createElement("p");
+    description.className = "book-profile-description";
+    description.textContent = descriptionText;
+    intro.append(description);
+  }
+  if (book.genre) {
+    const genre = document.createElement("span");
+    genre.className = "book-profile-genre";
+    genre.textContent = book.genre;
+    intro.append(genre);
+  }
+
   const content = document.createElement("div");
   content.className = "book-detail-content";
+  const metadata = document.createElement("div");
+  metadata.className = "book-detail-metadata";
   const details = [
-    ["Author", book.author || "Unknown author"],
     ["Genre", book.genre || "—"],
     ["ISBN", book.isbn || "—"],
+    ["Published", book.publish_date || book.first_publish_year || "—"],
     ["Date added", formatDate(book.added || book.added_on)],
     ["Pages", book.page_count || book.pages || "—"],
     ["Value", formatCurrency(book.cost)],
   ];
   details.forEach(([label, value]) => {
     const field = document.createElement("p");
+    field.className = "book-detail-field";
     const strong = document.createElement("strong");
-    strong.textContent = `${label} `;
+    strong.textContent = label;
     field.append(strong, document.createTextNode(value));
-    content.append(field);
+    metadata.append(field);
   });
+  content.append(metadata);
+
   const actions = document.createElement("div");
   actions.className = "page-actions";
   const ownedBook = state.books.find((item) => getBookKey(item) === getBookKey(book));
@@ -2354,6 +2400,29 @@ function renderBookPage(book) {
     const readingActions = document.createElement("div");
     readingActions.className = "reading-actions";
     const isCurrentlyReading = ownedBook.reading_status === "reading";
+    const pageCount = Number(ownedBook.page_count || ownedBook.pages);
+    if (isCurrentlyReading && Number.isInteger(pageCount) && pageCount > 0) {
+      const currentPage = Math.min(pageCount, Math.max(0, Number(ownedBook.current_page) || 0));
+      const percentage = Math.round(currentPage / pageCount * 100);
+      const progress = document.createElement("div");
+      progress.className = "book-reading-progress";
+      const progressCopy = document.createElement("span");
+      progressCopy.textContent = `${currentPage} of ${pageCount} pages`;
+      const progressPercent = document.createElement("span");
+      progressPercent.textContent = `${percentage}%`;
+      const progressTrack = document.createElement("div");
+      progressTrack.className = "book-reading-progress-track";
+      progressTrack.setAttribute("role", "progressbar");
+      progressTrack.setAttribute("aria-label", `Reading progress for ${book.title}`);
+      progressTrack.setAttribute("aria-valuemin", "0");
+      progressTrack.setAttribute("aria-valuemax", String(pageCount));
+      progressTrack.setAttribute("aria-valuenow", String(currentPage));
+      const progressFill = document.createElement("span");
+      progressFill.style.width = `${percentage}%`;
+      progressTrack.append(progressFill);
+      progress.append(progressCopy, progressPercent, progressTrack);
+      readingActions.append(progress);
+    }
     const currentlyReading = document.createElement("button");
     currentlyReading.type = "button";
     currentlyReading.className = `currently-reading-button${isCurrentlyReading ? " is-reading" : ""}`;
@@ -2381,8 +2450,8 @@ function renderBookPage(book) {
     if (isCurrentlyReading) readingActions.append(createCurrentlyReadingControls(ownedBook));
     content.append(readingActions);
   }
-  layout.append(cover, content);
-  page.append(header, layout);
+  layout.append(cover, intro, content);
+  page.append(breadcrumb, layout);
   page.append(createBookEditionPicker(book));
   const similar = discoveryBooks.filter((item) => item.genre === book.genre && getBookKey(item) !== getBookKey(book));
   if (similar.length) page.append(createCardRow("More like this", similar.slice(0, 6).map((item) => ({ type: "book", book: item }))));
@@ -2391,21 +2460,27 @@ function renderBookPage(book) {
 function createBookEditionPicker(book) {
   const section = document.createElement("section");
   section.className = "edition-picker";
+  const header = document.createElement("div");
+  header.className = "edition-picker-heading";
+  const copy = document.createElement("div");
+  copy.className = "edition-picker-copy";
   const heading = document.createElement("h2");
-  heading.textContent = "Choose an edition and cover";
+  heading.textContent = "Choose your edition";
   const description = document.createElement("p");
   description.className = "page-description";
-  description.textContent = `Browse ${getOpenLibraryLanguageName(getDefaultBookLanguage())} editions and choose the cover you prefer.`;
+  description.textContent = "Compare available editions and choose the cover you prefer.";
+  copy.append(heading, description);
   const loadButton = document.createElement("button");
   loadButton.type = "button";
-  loadButton.className = "secondary-btn";
-  loadButton.textContent = "Show editions and covers";
+  loadButton.className = "secondary-btn edition-picker-button";
+  loadButton.textContent = "View editions";
+  header.append(copy, loadButton);
   const status = document.createElement("p");
   status.className = "edition-picker-status";
   status.setAttribute("role", "status");
   const choices = document.createElement("div");
   choices.className = "edition-cover-choices";
-  section.append(heading, description, loadButton, status, choices);
+  section.append(header, status, choices);
 
   loadButton.addEventListener("click", async () => {
     loadButton.disabled = true;
@@ -2485,15 +2560,17 @@ function createBookEditionPicker(book) {
 function updateBookPageDetails(book) {
   state.currentBook = book;
   const page = document.getElementById("pageView");
-  const heading = page.querySelector(".page-header h1");
+  const heading = page.querySelector(".book-profile-title");
   if (heading) heading.textContent = book.title || "Untitled";
+  const breadcrumb = page.querySelector(".book-breadcrumb [aria-current='page']");
+  if (breadcrumb) breadcrumb.textContent = book.title || "Book";
   const existingCover = page.querySelector(".book-detail-cover");
   if (existingCover) existingCover.replaceWith(createBookCover(book, "book-detail-cover"));
   const values = {
     ISBN: book.isbn || "—",
     Pages: book.page_count || book.pages || "—",
   };
-  page.querySelectorAll(".book-detail-content > p").forEach((field) => {
+  page.querySelectorAll(".book-detail-field").forEach((field) => {
     const label = field.querySelector("strong")?.textContent.trim();
     if (!label || !(label in values)) return;
     field.replaceChildren(field.querySelector("strong"), document.createTextNode(` ${values[label]}`));
