@@ -898,8 +898,12 @@ function createShelfNavigationItem(name, count, color, book = null) {
   title.textContent = name;
   const subtitle = document.createElement("span");
   subtitle.textContent = `${name === "Liked Books" ? "Collection" : "Shelf"} · ${count} books`;
+  const itemCount = document.createElement("span");
+  itemCount.className = "shelf-item-count";
+  itemCount.textContent = count;
+  itemCount.setAttribute("aria-hidden", "true");
   copy.append(title, subtitle);
-  item.append(thumbnail, copy);
+  item.append(thumbnail, copy, itemCount);
   return item;
 }
 
@@ -3761,6 +3765,12 @@ document.getElementById("topHomeBtn").addEventListener("click", () => {
   navigateTo("home");
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
+
+document.getElementById("sidebarAddBookBtn").addEventListener("click", () => {
+  if (window.matchMedia("(max-width: 899px)").matches) setLibraryDrawerOpen(false);
+  openDialog();
+});
+document.getElementById("sidebarCreateShelfBtn").addEventListener("click", openShelfDrawer);
 
 window.addEventListener("popstate", restoreRouteFromLocation);
 window.addEventListener("scroll", trackRecommendationScroll, { capture: true, passive: true });
