@@ -1,6 +1,7 @@
 import { createSupabaseClient } from "./lib/supabase-client.js";
 
 const storageKey = "librito-library-v1";
+const shelvesStorageKey = "librito-shelves-v1";
 const openLibraryLanguages = [
   ["eng", "English"],
   ["spa", "Spanish"],
@@ -391,6 +392,21 @@ function loadBooks() {
   return defaultBooks;
 }
 
+function loadLocalShelves() {
+  try {
+    const saved = localStorage.getItem(shelvesStorageKey);
+    if (saved) {
+      const shelves = JSON.parse(saved);
+      if (Array.isArray(shelves)) return shelves;
+      throw new TypeError("Saved shelves must be an array.");
+    }
+  } catch (error) {
+    console.warn("Could not read saved shelves", error);
+  }
+  return [...new Set(state.books.flatMap((book) => getBookShelfNames(book)))]
+    .map((name) => ({ id: `local:${name}`, name, color: "#8b5e3c" }));
+}
+
 function getLibraryBooks() {
   return state.books.filter((book) => !book.disposition);
 }
@@ -450,7 +466,7 @@ async function runBookSchemaRetry(operation, payload) {
 
 async function updateBookFields(book, fields) {
   const updatedFields = { ...fields };
-  if (("current_page" in updatedFields || "page_count" in updatedFields)
+  if (("current_page" in updatedFields || "page_count" in updatedFields || "reading_status" in updatedFields)
     && !("edition_progress" in updatedFields)) {
     const progress = { ...(book.edition_progress || {}) };
     const editionKey = getBookEditionProgressKey(book);
@@ -460,6 +476,9 @@ async function updateBookFields(book, fields) {
         page_count: updatedFields.page_count === undefined
           ? (book.page_count ?? book.pages ?? null)
           : updatedFields.page_count,
+        reading_status: updatedFields.reading_status === undefined
+          ? (book.reading_status || "")
+          : updatedFields.reading_status,
       };
       updatedFields.edition_progress = progress;
     }
@@ -545,13 +564,8 @@ async function saveCurrentPage(book, currentPage) {
 }
 
 async function addBookToShelf(book, shelf) {
-  if (!state.session) {
-    showToast("Sign in to save books to shelves.");
-    openAuthModal();
-    return;
-  }
-  if (!book.id || !shelf?.id) {
-    showToast("This book must be in your library before it can be added to a shelf.");
+  if (!shelf?.id) {
+    showToast("Choose a valid shelf.");
     return;
   }
   const names = getBookShelfNames(book);
@@ -559,19 +573,26 @@ async function addBookToShelf(book, shelf) {
     showToast("This book is already on that shelf.");
     return;
   }
-  const { error } = await state.supabase.from("book_shelves").insert({
-    book_id: book.id,
-    shelf_id: shelf.id,
-    user_id: state.session.user.id,
-  });
-  if (error) {
-    console.error(error);
-    showToast("Could not add book to shelf. Run the latest Supabase schema first.");
-    return;
+  if (state.supabase && state.session) {
+    if (!book.id) {
+      showToast("This book must be in your library before it can be added to a shelf.");
+      return;
+    }
+    const { error } = await state.supabase.from("book_shelves").insert({
+      book_id: book.id,
+      shelf_id: shelf.id,
+      user_id: state.session.user.id,
+    });
+    if (error) {
+      console.error(error);
+      showToast("Could not add book to shelf. Run the latest Supabase schema first.");
+      return;
+    }
   }
   book.shelves = [...names, shelf.name];
   book.shelf ||= shelf.name;
-  render();
+  if (state.session) render();
+  else saveBooks();
   if (state.view === "shelf") showShelfPage(state.currentShelf);
   showToast(`Added to ${shelf.name}`);
 }
@@ -649,14 +670,16 @@ async function renameShelf(shelf, name) {
     showToast("Choose a unique shelf name.");
     return;
   }
-  const { error } = await state.supabase.from("shelves")
-    .update({ name })
-    .eq("id", shelf.id)
-    .eq("user_id", state.session.user.id);
-  if (error) {
-    console.error(error);
-    showToast("Could not rename shelf.");
-    return;
+  if (state.supabase && state.session) {
+    const { error } = await state.supabase.from("shelves")
+      .update({ name })
+      .eq("id", shelf.id)
+      .eq("user_id", state.session.user.id);
+    if (error) {
+      console.error(error);
+      showToast("Could not rename shelf.");
+      return;
+    }
   }
   const oldName = shelf.name;
   shelf.name = name;
@@ -664,35 +687,45 @@ async function renameShelf(shelf, name) {
     if (book.shelf === oldName) book.shelf = name;
     book.shelves = getBookShelfNames(book).map((item) => item === oldName ? name : item);
   });
+  if (!state.session) {
+    localStorage.setItem(shelvesStorageKey, JSON.stringify(state.shelves));
+    localStorage.setItem(storageKey, JSON.stringify(state.books));
+  }
   navigateTo("shelf", { name });
   renderShelves();
   showToast("Shelf renamed");
 }
 
 async function deleteShelf(shelf) {
-  const { error: booksError } = await state.supabase.from("books")
-    .update({ shelf: null })
-    .eq("shelf", shelf.name)
-    .eq("user_id", state.session.user.id);
-  if (booksError) {
-    console.error(booksError);
-    showToast("Could not detach books from this shelf.");
-    return;
-  }
-  const { error } = await state.supabase.from("shelves")
-    .delete()
-    .eq("id", shelf.id)
-    .eq("user_id", state.session.user.id);
-  if (error) {
-    console.error(error);
-    showToast("Could not delete shelf.");
-    return;
+  if (state.supabase && state.session) {
+    const { error: booksError } = await state.supabase.from("books")
+      .update({ shelf: null })
+      .eq("shelf", shelf.name)
+      .eq("user_id", state.session.user.id);
+    if (booksError) {
+      console.error(booksError);
+      showToast("Could not detach books from this shelf.");
+      return;
+    }
+    const { error } = await state.supabase.from("shelves")
+      .delete()
+      .eq("id", shelf.id)
+      .eq("user_id", state.session.user.id);
+    if (error) {
+      console.error(error);
+      showToast("Could not delete shelf.");
+      return;
+    }
   }
   state.shelves = state.shelves.filter((item) => item.id !== shelf.id);
   state.books.forEach((book) => {
     book.shelves = getBookShelfNames(book).filter((name) => name !== shelf.name);
     if (book.shelf === shelf.name) book.shelf = book.shelves[0] || "";
   });
+  if (!state.session) {
+    localStorage.setItem(shelvesStorageKey, JSON.stringify(state.shelves));
+    localStorage.setItem(storageKey, JSON.stringify(state.books));
+  }
   if (state.view === "shelf") navigateTo("home");
   render();
   showToast("Shelf deleted");
@@ -2465,12 +2498,20 @@ function renderBookPage(book) {
           window.open(book.preview_url, "_blank", "noopener,noreferrer");
           return;
         }
-        moreMenu.open = true;
-        const pageInput = moreMenu.querySelector(".current-page-input");
-        if (!pageInput) return;
-        pageInput.scrollIntoView({ block: "center", behavior: "smooth" });
-        pageInput.focus({ preventScroll: true });
-        pageInput.select();
+        showAppPrompt("Enter the page you want to continue from.", {
+          title: "Continue reading",
+          confirmLabel: "Save page",
+          value: String(ownedBook.current_page || 0),
+          placeholder: "Page number",
+        }).then((value) => {
+          if (value === null) return;
+          const pageNumber = value.trim() ? Number(value) : Number.NaN;
+          if (!Number.isInteger(pageNumber)) {
+            showToast("Enter a whole page number.");
+            return;
+          }
+          saveCurrentPage(ownedBook, pageNumber);
+        });
       });
       readingActions.append(continueButton);
     }
@@ -2596,32 +2637,31 @@ function normalizeBookIsbn(value) {
 
 function getBookEditionProgressKey(edition) {
   const isbn = normalizeBookIsbn(edition.isbn);
-  if (isbn) return `isbn:${isbn.toUpperCase()}`;
-  if (edition.cover_url) {
-    const cover = edition.cover_url.replace(/[?#].*$/, "")
-      .replace(/-\w+\.(jpg|jpeg|png|webp)$/i, ".$1");
-    return `cover:${cover}`;
+  if (!isbn) return "";
+  const isbn10Valid = /^\d{9}[\dX]$/i.test(isbn)
+    && [...isbn.toUpperCase()].reduce((sum, digit, index) =>
+      sum + (digit === "X" ? 10 : Number(digit)) * (10 - index), 0) % 11 === 0;
+  if (isbn10Valid) {
+    const base = `978${isbn.slice(0, 9)}`;
+    const checksum = [...base].reduce((sum, digit, index) =>
+      sum + Number(digit) * (index % 2 === 0 ? 1 : 3), 0);
+    return `isbn:${base}${(10 - checksum % 10) % 10}`;
   }
-  const identity = [edition.title, edition.publisher, edition.publish_date, edition.format]
-    .filter(Boolean).join("|").trim().toLowerCase();
-  return identity ? `edition:${identity}` : "";
+  return `isbn:${isbn.toUpperCase()}`;
 }
 
 function getEditionProgress(book, editionKey = getBookEditionProgressKey(book)) {
   if (!editionKey) return null;
-  const progress = book.edition_progress?.[editionKey];
+  const isbn = normalizeBookIsbn(book.isbn);
+  const legacyIsbnKey = isbn ? `isbn:${isbn.toUpperCase()}` : "";
+  const progress = book.edition_progress?.[editionKey]
+    || (legacyIsbnKey !== editionKey ? book.edition_progress?.[legacyIsbnKey] : null);
   return progress && typeof progress === "object" ? progress : null;
 }
 
 function isCurrentBookEdition(book, details) {
-  const bookIsbn = normalizeBookIsbn(book.isbn);
-  const editionIsbn = normalizeBookIsbn(details.isbn);
-  if (bookIsbn && editionIsbn && bookIsbn === editionIsbn) return true;
-  if (book.cover_url && details.cover_url) {
-    const normalizeCover = (url) => url.replace(/[?#].*$/, "").replace(/-\w+\.(jpg|jpeg|png|webp)$/i, ".$1");
-    if (normalizeCover(book.cover_url) === normalizeCover(details.cover_url)) return true;
-  }
-  return false;
+  const bookKey = getBookEditionProgressKey(book);
+  return Boolean(bookKey && bookKey === getBookEditionProgressKey(details));
 }
 
 function createBookReadingProgress(book, ownedBook, pageCount) {
@@ -2731,8 +2771,12 @@ function createBookMoreMenu(book, ownedBook) {
   summary.setAttribute("aria-label", "More book actions");
   const panel = document.createElement("div");
   panel.className = "book-more-menu-panel";
-  if (ownedBook && !ownedBook.disposition) {
-    panel.append(createCurrentlyReadingControls(ownedBook));
+  if (ownedBook?.reading_status === "reading") {
+    const finished = document.createElement("button");
+    finished.type = "button";
+    finished.textContent = "Mark as finished";
+    finished.addEventListener("click", () => markBookAsRead(ownedBook));
+    panel.append(finished);
   }
   if (ownedBook) {
     const remove = document.createElement("button");
@@ -3260,6 +3304,12 @@ function openBookEditionDetails(book, details, section, volumes, returnFocus) {
     currentNotice.setAttribute("role", "status");
     currentNotice.textContent = "This is the edition currently in use.";
     actions.append(currentNotice);
+  } else if (!normalizeBookIsbn(details.isbn)) {
+    const isbnNotice = document.createElement("p");
+    isbnNotice.className = "edition-current-notice";
+    isbnNotice.setAttribute("role", "status");
+    isbnNotice.textContent = "This edition has no ISBN, so it cannot be tracked separately.";
+    actions.append(isbnNotice);
   } else {
     const useEdition = document.createElement("button");
     useEdition.type = "button";
@@ -3292,19 +3342,24 @@ function openBookEditionDetails(book, details, section, volumes, returnFocus) {
           current_page: Number(progressOwner.current_page || 0),
           page_count: progressOwner.page_count || progressOwner.pages
             || book.page_count || book.pages || null,
+          reading_status: progressOwner.reading_status || "",
         };
       }
       const selectedProgress = getEditionProgress({ edition_progress: editionProgress }, selectedEditionKey);
       const pageCount = Number(details.page_count || selectedProgress?.page_count) || null;
       fields.page_count = pageCount;
       fields.current_page = Number(selectedProgress?.current_page) || 0;
+      fields.reading_status = selectedProgress?.reading_status ?? progressOwner.reading_status ?? "";
       if (Number.isInteger(pageCount) && pageCount > 0) {
-        fields.current_page = Math.min(fields.current_page, pageCount);
+        fields.current_page = fields.reading_status === "completed"
+          ? pageCount
+          : Math.min(fields.current_page, pageCount);
       }
       if (selectedEditionKey) {
         editionProgress[selectedEditionKey] = {
           current_page: fields.current_page,
           page_count: pageCount,
+          reading_status: fields.reading_status,
         };
       }
       fields.edition_progress = editionProgress;
@@ -4340,11 +4395,6 @@ function openShelfDrawer() {
   if (window.matchMedia("(max-width: 899px)").matches && sidebar.classList.contains("is-open")) {
     setLibraryDrawerOpen(false);
   }
-  if (!state.session) {
-    showToast("Sign in with Google to create shelves.");
-    openAuthModal();
-    return;
-  }
   shelfReturnFocus = document.activeElement;
   shelfDrawerOverlay.classList.remove("hidden");
   newShelfInput.focus();
@@ -4759,7 +4809,8 @@ async function initializeSupabaseOnce() {
         state.loading = false;
         state.loadError = "";
         state.books = loadBooks();
-        state.shelves = [];
+        state.shelves = loadLocalShelves();
+        state.shelves = loadLocalShelves();
         render();
       }
     });
@@ -4767,6 +4818,7 @@ async function initializeSupabaseOnce() {
     if (!session) {
       state.loading = false;
       state.books = loadBooks();
+      state.shelves = loadLocalShelves();
       render();
       if (!authPrompted) {
         openAuthModal();
@@ -4854,6 +4906,25 @@ async function createShelfInSupabase() {
   }
   if (["currently reading", "completed books"].includes(name.toLowerCase())) {
     showToast(`${name} is a generated shelf. Choose another name.`);
+    return;
+  }
+  if (state.shelves.some((shelf) => shelf.name.toLowerCase() === name.toLowerCase())) {
+    showToast("A shelf with that name already exists.");
+    return;
+  }
+  if (!state.session || !state.supabase) {
+    const shelf = {
+      id: `local:${crypto.randomUUID()}`,
+      name,
+      color: shelfColorInput?.value || "#8b5e3c",
+    };
+    state.shelves = [shelf, ...state.shelves];
+    localStorage.setItem(shelvesStorageKey, JSON.stringify(state.shelves));
+    newShelfInput.value = "";
+    if (shelfColorInput) shelfColorInput.value = "#8b5e3c";
+    render();
+    closeShelfDrawer();
+    showToast("Shelf created");
     return;
   }
   let session;
@@ -5247,7 +5318,7 @@ authButton.addEventListener("click", async () => {
     state.session = null;
     state.profile = null;
     state.books = loadBooks();
-    state.shelves = [];
+    state.shelves = loadLocalShelves();
     render();
     updateAuthButton();
     showToast("Signed out");
