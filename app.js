@@ -1054,6 +1054,8 @@ function renderBooks() {
     ["Browse by genre", () => createCardRow("Browse by genre", genreTiles.map((genre) => ({ type: "genre", ...genre })))],
   ];
 
+  container.append(createHomeHero());
+
   let hadSectionError = false;
   homeSections.forEach(([title, createSection]) => {
     try {
@@ -1071,6 +1073,31 @@ function renderBooks() {
     }
   });
   if (hadSectionError) showToast("Some home sections could not be displayed.");
+}
+
+function createHomeHero() {
+  const hero = document.createElement("section");
+  hero.className = "home-hero";
+  hero.setAttribute("aria-labelledby", "homeHeroTitle");
+
+  const copy = document.createElement("div");
+  copy.className = "home-hero-copy";
+  const title = document.createElement("h1");
+  title.id = "homeHeroTitle";
+  title.textContent = "Your next favorite book is waiting.";
+  const description = document.createElement("p");
+  description.textContent = "Track your library, discover new reads, and keep your love for books close.";
+  const action = document.createElement("button");
+  action.className = "action-btn";
+  action.type = "button";
+  action.textContent = "Explore recommendations";
+  action.addEventListener("click", () => {
+    document.querySelector('[data-recommendation-section="true"]')?.scrollIntoView({ behavior: "smooth" });
+  });
+
+  copy.append(title, description, action);
+  hero.append(copy);
+  return hero;
 }
 
 function shuffleBooks(books) {

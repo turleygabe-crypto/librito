@@ -3,7 +3,7 @@
 Librito is a cozy, mobile-first library platform concept for scanning books, organizing them into shelves, and tracking spending. It is intentionally simple as a website so it can run on phones without app-store packaging.
 
 ## What is included
-- Mobile-first layout with cozy, bookish styling
+- Responsive library dashboard with a cozy banner, warm paper tones, and bookish styling
 - Local demo library with mock data
 - Books are added to the library by default and can optionally be assigned to user-created shelves
 - Currently Reading and Completed Books are dedicated shelves; completed books can be restarted or managed for selling or donating
