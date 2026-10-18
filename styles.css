@@ -3752,6 +3752,38 @@ body {
   font-size: 0.82rem;
 }
 
+.edition-language-finder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.6rem;
+}
+
+.edition-language-label {
+  display: grid;
+  gap: 0.3rem;
+  color: #68584a;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.edition-language-select {
+  min-height: 2.6rem;
+  min-width: 11rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid #dbc8b6;
+  border-radius: 0.65rem;
+  background: #fffdf9;
+  color: #302720;
+  font: inherit;
+  font-weight: 400;
+}
+
+.edition-picker-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .edition-cover-choices {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

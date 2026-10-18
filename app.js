@@ -2564,9 +2564,36 @@ function createBookEditionPicker(book) {
   const choices = document.createElement("div");
   choices.className = "edition-cover-choices";
   status.textContent = "Finding available editions…";
-  section.append(header, status, choices);
 
-  loadButton.addEventListener("click", () => loadBookProfileEditions(book, section));
+  const languageFinder = document.createElement("div");
+  languageFinder.className = "edition-language-finder";
+  const languageLabel = document.createElement("label");
+  languageLabel.className = "edition-language-label";
+  languageLabel.textContent = "Find in another language";
+  const languageSelect = document.createElement("select");
+  languageSelect.className = "edition-language-select";
+  languageSelect.add(new Option("Choose a language", ""));
+  openLibraryLanguages.forEach(([code, name]) => languageSelect.add(new Option(name, code)));
+  languageLabel.append(languageSelect);
+  const languageButton = document.createElement("button");
+  languageButton.type = "button";
+  languageButton.className = "secondary-btn edition-picker-button edition-language-button";
+  languageButton.textContent = "Search";
+  languageButton.disabled = true;
+  languageSelect.addEventListener("change", () => {
+    languageButton.disabled = !languageSelect.value;
+  });
+  languageButton.addEventListener("click", () =>
+    loadBookProfileEditionsInLanguage(book, section, languageSelect.value)
+  );
+  languageFinder.append(languageLabel, languageButton);
+  section.append(header, languageFinder, status, choices);
+
+  loadButton.addEventListener("click", () => {
+    languageSelect.value = "";
+    languageButton.disabled = true;
+    loadBookProfileEditions(book, section);
+  });
   section.dataset.status = "loading";
   return section;
 }
@@ -2953,6 +2980,7 @@ function getGoogleBookDetails(volume) {
     page_count: Number(info.pageCount) || null,
     publish_date: formatCatalogDate(info.publishedDate),
     publisher: info.publisher || "",
+    language: info.language || "",
     categories: Array.isArray(info.categories) ? info.categories : [],
     description: info.description
       ? new DOMParser().parseFromString(info.description, "text/html").body.textContent.trim()
@@ -2965,6 +2993,12 @@ function getGoogleBookDetails(volume) {
     price: volume.saleInfo?.retailPrice?.amount ?? volume.saleInfo?.listPrice?.amount ?? null,
     currency: volume.saleInfo?.retailPrice?.currencyCode || volume.saleInfo?.listPrice?.currencyCode || "",
   };
+}
+
+function getEditionLanguageName(code) {
+  if (!code) return "";
+  if (code.length === 3) return getOpenLibraryLanguageName(code);
+  return new Intl.DisplayNames([navigator.language], { type: "language" }).of(code) || code;
 }
 
 function getBookEditionCoverUrl(book, details, size = "M") {
@@ -3418,7 +3452,11 @@ function openEditionShopping(book, details, returnFocus) {
   const title = document.createElement("h3");
   title.textContent = details.title || book.title || "Untitled";
   const byline = document.createElement("p");
-  byline.textContent = `${details.author || book.author || "Unknown author"} · ${details.format}`;
+  byline.textContent = [
+    details.author || book.author || "Unknown author",
+    details.format,
+    getEditionLanguageName(details.language),
+  ].filter(Boolean).join(" · ");
   copy.append(title, byline);
   summary.append(copy);
   const identifier = document.createElement("p");
@@ -3437,6 +3475,7 @@ function openEditionShopping(book, details, returnFocus) {
     details.title || book.title,
     details.author || book.author,
     details.format,
+    isbn ? "" : getEditionLanguageName(details.language),
     details.publisher,
     details.publish_date,
   ].filter(Boolean).join(" ");
@@ -3526,6 +3565,55 @@ async function loadBookProfileEditions(book, section, knownVolumes = null) {
     }
   } finally {
     button.disabled = false;
+  }
+}
+
+async function loadBookProfileEditionsInLanguage(book, section, language) {
+  if (!language) return;
+  const status = section.querySelector(".edition-picker-status");
+  const buttons = section.querySelectorAll(".edition-picker-button");
+  const languageName = getOpenLibraryLanguageName(language);
+  buttons.forEach((button) => { button.disabled = true; });
+  status.textContent = `Finding ${languageName} editions…`;
+  section.dataset.status = "loading";
+  try {
+    const editions = await getOpenLibraryEditionsForBook(book, language);
+    if (state.view !== "book" || state.currentBook !== book || !section.isConnected) return;
+    if (!editions.length) {
+      section.querySelector(".edition-cover-choices").replaceChildren();
+      status.textContent = `No ${languageName} editions with covers were found for this book. Try another language.`;
+      section.dataset.status = "empty";
+      return;
+    }
+    const volumes = editions.map((edition) => ({
+      id: `ol:${language}:${edition.isbn}:${edition.coverUrl}`,
+      volumeInfo: {
+        title: edition.title,
+        authors: [book.author || "Unknown author"],
+        industryIdentifiers: edition.isbn ? [{ type: "ISBN_13", identifier: edition.isbn }] : [],
+        imageLinks: { thumbnail: edition.coverUrl },
+        pageCount: edition.pageCount || undefined,
+        publishedDate: edition.publishDate || "",
+        publisher: edition.publisher || "",
+        physical_format: edition.format || "",
+        language: edition.language,
+      },
+      saleInfo: {},
+    }));
+    renderBookProfileEditions(book, section, volumes);
+    if (section.dataset.status === "loaded") {
+      const count = section.querySelectorAll(".edition-cover-choice").length;
+      status.textContent = `${count} ${languageName} edition${count === 1 ? "" : "s"}. Select one to update your book.`;
+    }
+  } catch (error) {
+    console.error("Could not load editions in another language", error);
+    status.textContent = `Could not search for ${languageName} editions. Try again.`;
+    section.dataset.status = "error";
+  } finally {
+    const languageSelect = section.querySelector(".edition-language-select");
+    buttons.forEach((button) => {
+      button.disabled = button.classList.contains("edition-language-button") && !languageSelect.value;
+    });
   }
 }
 
@@ -3996,7 +4084,7 @@ function renderProfileRecommendationResults(target, books, emptyMessage) {
   section.append(row);
 }
 
-async function getOpenLibraryEditionsForBook(book) {
+async function getOpenLibraryEditionsForBook(book, language = getDefaultBookLanguage()) {
   let workKeys = [];
   const isbn = normalizeBookIsbn(book.isbn);
   if (isbn) {
@@ -4014,7 +4102,7 @@ async function getOpenLibraryEditionsForBook(book) {
 
   if (!workKeys.length) {
     const params = new URLSearchParams({
-      q: `${book.title || ""} ${book.author || ""} language:${getDefaultBookLanguage()}`.trim(),
+      q: `${book.title || ""} ${book.author || ""} ${language === getDefaultBookLanguage() ? `language:${language}` : ""}`.trim(),
       fields: "key,title,author_name",
       limit: "10",
     });
@@ -4035,7 +4123,6 @@ async function getOpenLibraryEditionsForBook(book) {
     const payload = await response.json();
     return Array.isArray(payload.entries) ? payload.entries : [];
   }));
-  const language = getDefaultBookLanguage();
   const choices = results.flat().flatMap((edition) => {
     const languages = (edition.languages || []).map((entry) => entry.key.split("/").pop());
     if (!languages.includes(language)) return [];
@@ -4045,6 +4132,7 @@ async function getOpenLibraryEditionsForBook(book) {
       .map((coverId) => ({
         title: edition.title || book.title || "Untitled",
         isbn,
+        language,
         coverUrl: `https://covers.openlibrary.org/b/id/${coverId}-L.jpg?default=false`,
         publisher: edition.publishers?.[0] || "",
         publishDate: edition.publish_date || "",
