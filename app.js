@@ -1141,11 +1141,11 @@ async function fetchOpenLibraryRecommendations({ genre = "", author = "" }) {
   const query = genre
     ? `subject:${JSON.stringify(genre)}`
     : `author:${JSON.stringify(author)}`;
-  const normalizedAuthor = author.toLowerCase();
+  const normalizedAuthor = normalizeBookText(author);
   const mapWorks = (works) => works.flatMap((work) => {
     const authors = Array.isArray(work.author_name) ? work.author_name : [];
     if (!work.title || !authors.length
-      || (author && !authors.some((name) => name.toLowerCase() === normalizedAuthor))) return [];
+      || (author && !authors.some((name) => normalizeBookText(name) === normalizedAuthor))) return [];
     const isbn = Array.isArray(work.isbn) ? work.isbn[0] || "" : "";
     return [{
       title: work.title,
@@ -3264,33 +3264,88 @@ function mapGoogleVolumeToBook(volume) {
 
 async function loadBookProfileRecommendations(book, moreByAuthor, readersEnjoyed) {
   const queryForAuthor = book.author ? `inauthor:${JSON.stringify(book.author)}` : "";
-  const genre = book.genre || book.subjects?.[0] || "";
-  const queryForGenre = genre
-    ? `subject:${JSON.stringify(genre)}`
-    : `intitle:${JSON.stringify(book.title || "")}`;
-  const requests = await Promise.allSettled([
+  const googleRequests = await Promise.allSettled([
     queryForAuthor ? fetchGoogleBookVolumes(queryForAuthor) : Promise.resolve([]),
-    fetchGoogleBookVolumes(queryForGenre),
+    book.genre ? fetchGoogleBookVolumes(`subject:${JSON.stringify(book.genre)}`) : Promise.resolve([]),
   ]);
   if (state.view !== "book" || state.currentBook !== book) return;
-  const mapResults = (result) => result.status === "fulfilled"
-    ? result.value.map(mapGoogleVolumeToBook).filter((item) =>
-      item.title !== "Untitled" && !isSameBookWork(item, book)
-    ).filter((item, index, all) =>
-      all.findIndex((candidate) => getBookKey(candidate) === getBookKey(item)) === index
-    )
-    : [];
-  const authorName = normalizeBookText(book.author);
-  const authorBooks = mapResults(requests[0]).filter((item) =>
-    normalizeBookText(item.author).includes(authorName)
-  ).slice(0, 8);
-  const relatedBooks = mapResults(requests[1]).slice(0, 8);
-  if (requests[0].status === "rejected") console.error("Could not load author recommendations", requests[0].reason);
-  if (requests[1].status === "rejected") console.error("Could not load related-book recommendations", requests[1].reason);
-  renderProfileRecommendationResults(moreByAuthor, authorBooks, requests[0].status === "rejected"
+
+  const uniqueBooks = (books) => [...new Map(books
+    .filter((item) => item.title !== "Untitled" && item.author && !isSameBookWork(item, book))
+    .map((item) => [getRecommendationKey(item), item])).values()].slice(0, 8);
+  const googleBooks = googleRequests.map((result) => result.status === "fulfilled"
+    ? result.value.map(mapGoogleVolumeToBook)
+    : []);
+  const normalizedAuthor = normalizeBookText(book.author);
+  let authorBooks = uniqueBooks(googleBooks[0].filter((item) =>
+    normalizeBookText(item.author).split(", ").some((name) => name === normalizedAuthor)
+  ));
+  let relatedBooks = uniqueBooks(googleBooks[1]);
+  let authorError = googleRequests[0].status === "rejected" ? googleRequests[0].reason : null;
+  let relatedError = googleRequests[1].status === "rejected" ? googleRequests[1].reason : null;
+
+  if (!authorBooks.length && book.author) {
+    try {
+      authorBooks = uniqueBooks(await fetchOpenLibraryRecommendations({ author: book.author }));
+      authorError = null;
+    } catch (error) {
+      authorError = error;
+      console.error("Could not load author recommendations", error);
+    }
+  }
+  if (state.view !== "book" || state.currentBook !== book) return;
+  if (!relatedBooks.length) {
+    try {
+      let subjects = [...(Array.isArray(book.subjects) ? book.subjects : []), book.genre].filter(Boolean);
+      const broadSubjects = new Set([
+        "fiction",
+        "nonfiction",
+        "literature",
+        "juvenile fiction",
+        "juvenile nonfiction",
+        "new york times bestseller",
+      ]);
+      if (!subjects.some((subject) => !broadSubjects.has(normalizeBookText(subject)))) {
+        try {
+          const details = await fetchOpenLibraryBookDetails(book);
+          if (state.view !== "book" || state.currentBook !== book) return;
+          subjects.push(...details.categories);
+        } catch (error) {
+          if (!subjects.length) throw error;
+          console.error("Could not load related-book subjects", error);
+        }
+      }
+      const specificSubjects = subjects.filter((subject) =>
+        !broadSubjects.has(normalizeBookText(subject)) && !subject.includes(":")
+      );
+      const recommendationSubjects = specificSubjects.length ? specificSubjects : subjects;
+      const subjectResults = await Promise.allSettled(
+        [...new Set(recommendationSubjects)].slice(0, 3)
+          .map((genre) => fetchOpenLibraryRecommendations({ genre }))
+      );
+      const openLibraryBooks = subjectResults.flatMap((result) => {
+        if (result.status === "rejected") {
+          relatedError = result.reason;
+          console.error("Could not load related-book recommendations", result.reason);
+          return [];
+        }
+        return result.value;
+      });
+      if (subjectResults.some((result) => result.status === "fulfilled")) relatedError = null;
+      relatedBooks = uniqueBooks(openLibraryBooks);
+      if (!relatedBooks.length && !subjectResults.some((result) => result.status === "fulfilled")) {
+        throw relatedError || new Error("No related-book subjects could be loaded.");
+      }
+    } catch (error) {
+      relatedError = error;
+      console.error("Could not load related-book recommendations", error);
+    }
+  }
+  if (state.view !== "book" || state.currentBook !== book) return;
+  renderProfileRecommendationResults(moreByAuthor, authorBooks, authorError
     ? "Could not load author recommendations. Check your connection and try again."
     : "No other books by this author were found.");
-  renderProfileRecommendationResults(readersEnjoyed, relatedBooks, requests[1].status === "rejected"
+  renderProfileRecommendationResults(readersEnjoyed, relatedBooks, relatedError
     ? "Could not load recommendations. Check your connection and try again."
     : "No similar books were found in the catalog.");
 }
