@@ -26,6 +26,21 @@
           </div>
           <button id="closeLibraryBtn" class="mobile-sidebar-close" type="button" aria-label="Close library">×</button>
         </div>
+        <form id="globalSearchForm" class="global-search sidebar-search" role="search">
+          <label class="visually-hidden" for="globalSearchInput">Find a book</label>
+          <input id="globalSearchInput" type="search" placeholder="Search your library or discover books..." autocomplete="off" />
+          <button id="previewBtn" type="submit" aria-label="Search books"><span class="search-icon" aria-hidden="true"></span></button>
+        </form>
+        <details class="account-menu sidebar-account">
+          <summary aria-label="Open account menu">
+            <span class="account-avatar" aria-hidden="true">L</span>
+            <span class="account-menu-label">Account</span>
+          </summary>
+          <div class="account-menu-panel">
+            <p id="sidebarAuthCopy">Sign in to build your own shelves.</p>
+            <button id="authButton" class="action-btn" type="button">Sign in</button>
+          </div>
+        </details>
         <nav class="sidebar-nav" aria-label="Primary navigation">
           <button class="nav-pill active" type="button">Home</button>
           <button class="nav-pill" type="button">Your shelves</button>
@@ -51,22 +66,7 @@
         <header class="topbar spotify-topbar">
           <button id="libraryToggleBtn" class="library-toggle-btn" type="button" aria-label="Open library" aria-controls="sidebar" aria-expanded="false">☰</button>
           <button id="topHomeBtn" class="home-button" type="button" aria-label="Home">⌂</button>
-          <form id="globalSearchForm" class="global-search" role="search">
-            <label class="visually-hidden" for="globalSearchInput">Find a book</label>
-            <input id="globalSearchInput" type="search" placeholder="Search your library or discover books..." autocomplete="off" />
-            <button id="previewBtn" type="submit" aria-label="Search books"><span class="search-icon" aria-hidden="true"></span></button>
-          </form>
           <button id="openModalBtn" class="add-book-btn" type="button" aria-label="Add book"><span aria-hidden="true">＋</span><span class="add-book-label">Add book</span></button>
-          <details class="account-menu">
-            <summary aria-label="Open account menu">
-              <span class="account-avatar" aria-hidden="true">L</span>
-              <span class="account-menu-label">Account</span>
-            </summary>
-            <div class="account-menu-panel">
-              <p id="sidebarAuthCopy">Sign in to build your own shelves.</p>
-              <button id="authButton" class="action-btn">Sign in</button>
-            </div>
-          </details>
         </header>
 
         <main class="spotify-home">

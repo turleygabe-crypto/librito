@@ -2110,6 +2110,7 @@ body {
 }
 
 .sidebar {
+  gap: 0.85rem;
   color: #f8eee6;
   background: #21130f;
 }
@@ -2163,6 +2164,64 @@ body {
   border-bottom: 1px solid rgba(245, 221, 201, 0.12);
 }
 
+.sidebar-search {
+  width: 100%;
+  min-height: 2.6rem;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0.35rem 0.65rem;
+  border-color: rgba(245, 221, 201, 0.18);
+  background: #35241e;
+  color: #e8d8cc;
+}
+
+.sidebar-search input {
+  color: #fff8ef;
+  font-size: 0.82rem;
+}
+
+.sidebar-search input::placeholder {
+  color: #c1b3ac;
+}
+
+.sidebar-search button {
+  color: #f7e8de;
+}
+
+.sidebar-account {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.sidebar-account summary {
+  min-height: 2.75rem;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid rgba(245, 221, 201, 0.14);
+  border-radius: 0.55rem;
+}
+
+.sidebar-account summary::after {
+  margin-left: auto;
+  color: #d4beb0;
+}
+
+.sidebar-account .account-menu-label {
+  color: #f7e8de;
+}
+
+.sidebar-account .account-menu-panel {
+  position: static;
+  width: 100%;
+  margin-top: 0.4rem;
+  border-color: rgba(245, 221, 201, 0.14);
+  background: #2d1c16;
+  box-shadow: none;
+}
+
+.sidebar-account .account-menu-panel p {
+  color: #e0d0c7;
+}
+
 .nav-pill {
   display: flex;
   align-items: center;
@@ -2182,11 +2241,11 @@ body {
 .nav-pill:nth-child(4)::before { content: "▥"; }
 
 .sidebar-filters .category-tab {
-  padding: 0.4rem 0.75rem;
+  padding: 0.45rem 0.8rem;
   border-radius: 999px;
   background: #3b2a23;
   color: #f6e9df;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
 }
 
 .sidebar-filters .category-tab.active {
@@ -2199,9 +2258,9 @@ body {
 }
 
 .shelf-thumbnail {
-  width: 2.5rem;
-  height: 2.5rem;
-  flex-basis: 2.5rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-basis: 2.75rem;
   border-radius: 0.3rem;
 }
 
@@ -2224,6 +2283,7 @@ body {
   border-radius: 0;
   background: transparent;
   backdrop-filter: none;
+  justify-content: flex-end;
 }
 
 .home-button,
@@ -2312,7 +2372,7 @@ body {
 .home-hero {
   position: relative;
   display: flex;
-  min-height: clamp(11.5rem, 17vw, 13rem);
+  min-height: clamp(15rem, 20vw, 17rem);
   align-items: center;
   overflow: hidden;
   margin-bottom: 0.8rem;
@@ -2374,21 +2434,21 @@ body {
 .card-row-section .section-heading-row h2 {
   color: #302720;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
 
 .show-all-btn {
   color: #9d452b;
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   font-weight: 400;
 }
 
 .card-row {
-  grid-auto-columns: minmax(6.2rem, 7.2rem);
-  gap: 0.65rem;
-  padding: 0.1rem 0.05rem 0.4rem;
+  grid-auto-columns: minmax(8rem, 9.25rem);
+  gap: 0.75rem;
+  padding: 0.2rem 0.1rem 0.55rem;
   scrollbar-width: none;
 }
 
@@ -2397,7 +2457,7 @@ body {
 }
 
 .card-open-button {
-  padding: 0.2rem;
+  padding: 0.3rem;
 }
 
 .card-open-button .book-cover-art {
@@ -2407,9 +2467,9 @@ body {
 }
 
 .card-open-button .book-cover-title {
-  margin-top: 0.35rem;
+  margin-top: 0.45rem;
   color: #28211c;
-  font-size: 0.7rem;
+  font-size: 0.84rem;
   font-weight: 700;
 }
 
@@ -2417,7 +2477,7 @@ body {
   min-height: 0;
   margin-top: 0.15rem;
   color: #746b63;
-  font-size: 0.64rem;
+  font-size: 0.75rem;
   -webkit-line-clamp: 1;
 }
 
@@ -2446,14 +2506,15 @@ body {
 
 @media (min-width: 900px) {
   .app-shell {
-    grid-template-columns: clamp(11.5rem, 17vw, 20rem) minmax(0, 1fr);
+    grid-template-columns: clamp(16rem, 18vw, 21rem) minmax(0, 1fr);
     gap: 0;
   }
 
   .sidebar {
     top: 0;
     height: 100vh;
-    padding: 1rem 0.75rem;
+    gap: 0.85rem;
+    padding: 1rem;
     border: 0;
     border-radius: 0;
     background: #21130f;
@@ -2466,9 +2527,9 @@ body {
   }
 
   .sidebar .brand-mark {
-    width: 2.5rem;
-    height: 2.5rem;
-    flex: 0 0 2.5rem;
+    width: 2.85rem;
+    height: 2.85rem;
+    flex: 0 0 2.85rem;
   }
 
   .sidebar .brand-mark::before,
@@ -2486,21 +2547,21 @@ body {
   }
 
   .sidebar .brand h2 {
-    font-size: 1.25rem;
+    font-size: 1.4rem;
   }
 
   .sidebar-nav {
-    gap: 0.1rem;
-    padding-bottom: 0.75rem;
+    gap: 0.2rem;
+    padding-bottom: 0.9rem;
   }
 
   .nav-pill {
-    padding: 0.55rem 0.6rem;
-    font-size: 0.78rem;
+    padding: 0.7rem 0.7rem;
+    font-size: 0.9rem;
   }
 
   .sidebar-library .library-heading h2 {
-    font-size: 0.85rem;
+    font-size: 1rem;
   }
 
   .sidebar-filters {
@@ -2509,15 +2570,15 @@ body {
   }
 
   .sidebar-filters .category-tab {
-    padding: 0.35rem 0.55rem;
-    font-size: 0.65rem;
+    padding: 0.4rem 0.65rem;
+    font-size: 0.75rem;
   }
 
   .sidebar .shelf-list {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     align-content: start;
-    gap: 0.4rem;
+    gap: 0.65rem 0.4rem;
     overflow: visible;
   }
 
@@ -2530,9 +2591,9 @@ body {
   }
 
   .sidebar .shelf-thumbnail {
-    width: 2.3rem;
-    height: 2.3rem;
-    flex-basis: 2.3rem;
+    width: 2.9rem;
+    height: 2.9rem;
+    flex-basis: 2.9rem;
   }
 
   .sidebar .shelf-item-copy {
@@ -2541,7 +2602,7 @@ body {
   }
 
   .sidebar .shelf-item-copy strong {
-    font-size: 0.58rem;
+    font-size: 0.7rem;
     font-weight: 400;
   }
 
@@ -2559,11 +2620,15 @@ body {
   }
 
   .home-hero {
-    min-height: clamp(11.5rem, 16vw, 13rem);
+    min-height: clamp(15rem, 20vw, 17rem);
   }
 }
 
 @media (max-width: 899px) {
+  .spotify-topbar > .library-toggle-btn {
+    display: grid;
+  }
+
   .sidebar {
     background: #21130f;
   }
@@ -2574,6 +2639,12 @@ body {
 
   .spotify-topbar {
     gap: 0.5rem;
+    justify-content: space-between;
+  }
+
+  .sidebar-search {
+    width: 100%;
+    margin: 0;
   }
 
   .global-search {
@@ -2582,7 +2653,7 @@ body {
   }
 
   .home-hero {
-    min-height: 12rem;
+    min-height: 14rem;
     background-position: center, 58% 60%;
   }
 
@@ -2630,7 +2701,7 @@ body {
   }
 
   .card-row {
-    grid-auto-columns: minmax(6.1rem, 31vw);
+    grid-auto-columns: minmax(7.25rem, 42vw);
   }
 
   .reading-feature-card {
