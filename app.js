@@ -449,6 +449,21 @@ async function runBookSchemaRetry(operation, payload) {
 }
 
 async function updateBookFields(book, fields) {
+  const updatedFields = { ...fields };
+  if (("current_page" in updatedFields || "page_count" in updatedFields)
+    && !("edition_progress" in updatedFields)) {
+    const progress = { ...(book.edition_progress || {}) };
+    const editionKey = getBookEditionProgressKey(book);
+    if (editionKey) {
+      progress[editionKey] = {
+        current_page: Number(updatedFields.current_page ?? book.current_page ?? 0),
+        page_count: updatedFields.page_count === undefined
+          ? (book.page_count ?? book.pages ?? null)
+          : updatedFields.page_count,
+      };
+      updatedFields.edition_progress = progress;
+    }
+  }
   if (state.supabase && state.session) {
     const result = await runBookSchemaRetry(async (candidate) => {
       const { error } = await state.supabase.from("books")
@@ -456,7 +471,7 @@ async function updateBookFields(book, fields) {
         .eq("id", book.id)
         .eq("user_id", state.session.user.id);
       return { error };
-    }, fields);
+    }, updatedFields);
 
     if (result.error) {
       console.error(result.error);
@@ -464,7 +479,7 @@ async function updateBookFields(book, fields) {
       return false;
     }
   }
-  Object.assign(book, fields);
+  Object.assign(book, updatedFields);
   if (!state.session) localStorage.setItem(storageKey, JSON.stringify(state.books));
   return true;
 }
@@ -2579,6 +2594,25 @@ function normalizeBookIsbn(value) {
   return (Array.isArray(value) ? value[0] : value || "").toString().replace(/[^0-9Xx]/g, "");
 }
 
+function getBookEditionProgressKey(edition) {
+  const isbn = normalizeBookIsbn(edition.isbn);
+  if (isbn) return `isbn:${isbn.toUpperCase()}`;
+  if (edition.cover_url) {
+    const cover = edition.cover_url.replace(/[?#].*$/, "")
+      .replace(/-\w+\.(jpg|jpeg|png|webp)$/i, ".$1");
+    return `cover:${cover}`;
+  }
+  const identity = [edition.title, edition.publisher, edition.publish_date, edition.format]
+    .filter(Boolean).join("|").trim().toLowerCase();
+  return identity ? `edition:${identity}` : "";
+}
+
+function getEditionProgress(book, editionKey = getBookEditionProgressKey(book)) {
+  if (!editionKey) return null;
+  const progress = book.edition_progress?.[editionKey];
+  return progress && typeof progress === "object" ? progress : null;
+}
+
 function isCurrentBookEdition(book, details) {
   const bookIsbn = normalizeBookIsbn(book.isbn);
   const editionIsbn = normalizeBookIsbn(details.isbn);
@@ -3241,18 +3275,39 @@ function openBookEditionDetails(book, details, section, volumes, returnFocus) {
       useEdition.disabled = true;
       const fields = {
         title: details.title || book.title,
-        isbn: details.isbn || normalizeBookIsbn(book.isbn),
+        isbn: details.isbn || "",
         cover_url: getBookEditionCoverUrl(book, details, "L"),
         page_count: details.page_count,
       };
       const ownedBook = state.books.find((item) =>
         (book.id && item.id === book.id) || getBookKey(item) === getBookKey(book)
       );
-      if (ownedBook && Number.isInteger(details.page_count) && details.page_count > 0) {
-        fields.current_page = ownedBook.reading_status === "completed"
-          ? details.page_count
-          : Math.min(Math.max(0, Number(ownedBook.current_page) || 0), details.page_count);
+      const progressOwner = ownedBook || book;
+      const editionProgress = { ...(progressOwner.edition_progress || {}) };
+      const currentEditionKey = getBookEditionProgressKey(progressOwner);
+      const selectedEdition = { ...progressOwner, ...fields };
+      const selectedEditionKey = getBookEditionProgressKey(selectedEdition);
+      if (currentEditionKey) {
+        editionProgress[currentEditionKey] = {
+          current_page: Number(progressOwner.current_page || 0),
+          page_count: progressOwner.page_count || progressOwner.pages
+            || book.page_count || book.pages || null,
+        };
       }
+      const selectedProgress = getEditionProgress({ edition_progress: editionProgress }, selectedEditionKey);
+      const pageCount = Number(details.page_count || selectedProgress?.page_count) || null;
+      fields.page_count = pageCount;
+      fields.current_page = Number(selectedProgress?.current_page) || 0;
+      if (Number.isInteger(pageCount) && pageCount > 0) {
+        fields.current_page = Math.min(fields.current_page, pageCount);
+      }
+      if (selectedEditionKey) {
+        editionProgress[selectedEditionKey] = {
+          current_page: fields.current_page,
+          page_count: pageCount,
+        };
+      }
+      fields.edition_progress = editionProgress;
       if (ownedBook && !await updateBookFields(ownedBook, fields)) {
         useEdition.disabled = false;
         return;
@@ -4859,6 +4914,9 @@ async function loadFromSupabase() {
     reading_status: book.reading_status || "",
     disposition: book.disposition || "",
     current_page: Number(book.current_page || 0),
+    edition_progress: book.edition_progress && typeof book.edition_progress === "object"
+      ? book.edition_progress
+      : {},
     bookmarked_at: book.bookmarked_at || null,
     page_count: book.page_count ? Number(book.page_count) : null,
     cost: Number(book.cost || 0),
@@ -4922,6 +4980,7 @@ async function saveBookToSupabase(book) {
     reading_status: book.reading_status || null,
     disposition: book.disposition || null,
     current_page: Number(book.current_page || 0),
+    edition_progress: book.edition_progress || {},
     bookmarked_at: book.bookmarked_at || null,
     page_count: book.page_count || null,
     cost: Number(book.cost || 0),
