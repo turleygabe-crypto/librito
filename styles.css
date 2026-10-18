@@ -2167,7 +2167,8 @@ body {
 .sidebar-search {
   width: 100%;
   min-height: 2.6rem;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
   padding: 0.35rem 0.65rem;
   border-color: rgba(245, 221, 201, 0.18);
@@ -2188,9 +2189,24 @@ body {
   color: #f7e8de;
 }
 
+.sidebar-tools {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sidebar-tools .add-book-btn {
+  gap: 0.2rem;
+  padding: 0.5rem 0.65rem;
+  white-space: nowrap;
+}
+
 .sidebar-account {
   position: relative;
   flex: 0 0 auto;
+  margin-top: auto;
 }
 
 .sidebar-account summary {
@@ -2210,9 +2226,13 @@ body {
 }
 
 .sidebar-account .account-menu-panel {
-  position: static;
+  position: absolute;
+  top: auto;
+  right: 0;
+  bottom: calc(100% + 0.4rem);
+  left: 0;
   width: 100%;
-  margin-top: 0.4rem;
+  margin: 0;
   border-color: rgba(245, 221, 201, 0.14);
   background: #2d1c16;
   box-shadow: none;
@@ -2372,7 +2392,8 @@ body {
 .home-hero {
   position: relative;
   display: flex;
-  min-height: clamp(15rem, 20vw, 17rem);
+  aspect-ratio: 3.25 / 1;
+  min-height: 0;
   align-items: center;
   overflow: hidden;
   margin-bottom: 0.8rem;
@@ -2616,11 +2637,13 @@ body {
   }
 
   .spotify-topbar {
-    min-height: 3.25rem;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
   }
 
   .home-hero {
-    min-height: clamp(15rem, 20vw, 17rem);
+    aspect-ratio: 3.25 / 1;
   }
 }
 
@@ -2653,7 +2676,7 @@ body {
   }
 
   .home-hero {
-    min-height: 14rem;
+    aspect-ratio: 2.2 / 1;
     background-position: center, 58% 60%;
   }
 
