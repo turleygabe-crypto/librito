@@ -1301,6 +1301,109 @@ h1, h2, h3, h4, p { margin-top: 0; }
   font-size: 1rem;
 }
 
+.reading-home-layout {
+  display: grid;
+  grid-template-columns: minmax(18rem, 20rem) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 1rem;
+}
+
+.reading-feature-card {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.65rem;
+  border: 1px solid #ebe3da;
+  border-radius: 0.65rem;
+  background: #fffdf9;
+  box-shadow: 0 2px 10px rgba(67, 46, 30, 0.04);
+}
+
+.reading-feature-cover {
+  width: 5rem;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0.25rem;
+  background: transparent;
+}
+
+.reading-feature-cover .book-cover-art {
+  aspect-ratio: 0.72;
+  border-radius: inherit;
+  box-shadow: 0 2px 6px rgba(55, 37, 23, 0.18);
+}
+
+.reading-feature-details {
+  display: grid;
+  min-width: 0;
+  gap: 0.35rem;
+}
+
+.reading-feature-title {
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #302720;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reading-feature-author {
+  overflow: hidden;
+  margin: 0;
+  color: #655a50;
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reading-feature-progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem 0.5rem;
+  align-items: center;
+  color: #51463d;
+  font-size: 0.68rem;
+}
+
+.reading-feature-progress-bar {
+  grid-column: 1 / -1;
+  height: 0.25rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8e0d7;
+}
+
+.reading-feature-progress-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #b64d2c;
+}
+
+.reading-continue-btn {
+  justify-self: start;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.4rem 0.8rem;
+  background: #b64d2c;
+  color: #fffaf5;
+  font-size: 0.7rem;
+}
+
+.reading-home-row {
+  min-width: 0;
+  grid-auto-columns: minmax(6.2rem, 7.2rem);
+}
+
 .page-view {
   display: grid;
   gap: clamp(1.5rem, 4vw, 2.5rem);
@@ -1987,6 +2090,7 @@ h1, h2, h3, h4, p { margin-top: 0; }
 
 :root {
   color-scheme: light;
+  font-size: max(16px, 1rem);
   --black: #f5f1eb;
   --panel: #fffdf9;
   --muted: #716860;
@@ -2111,9 +2215,15 @@ body {
 }
 
 .spotify-topbar {
+  position: relative;
+  margin-bottom: 0.35rem;
   min-height: 3.9rem;
   gap: 1rem;
   padding: 0.6rem 0.8rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
 }
 
 .home-button,
@@ -2124,7 +2234,7 @@ body {
 .global-search {
   width: min(100%, 24rem);
   min-height: 2.35rem;
-  margin-right: auto;
+  margin: 0 auto 0 0;
   border: 1px solid #ddd5cb;
   background: #f8f4ee;
   color: #51463d;
@@ -2211,20 +2321,20 @@ body {
   background-image:
     linear-gradient(90deg, rgba(35, 17, 8, 0.9) 0%, rgba(35, 17, 8, 0.74) 27%, rgba(35, 17, 8, 0.08) 60%),
     url("/cozy%20banner%20librito.png");
-  background-position: center, center 60%;
+  background-position: center, center 50%;
   background-size: cover;
   color: #fff8ef;
 }
 
 .home-hero-copy {
-  width: min(42%, 24rem);
-  padding: 1.2rem 1.7rem;
+  width: min(33%, 18rem);
+  padding: 1.2rem 1.4rem;
 }
 
 .home-hero h1 {
   margin: 0;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(1.7rem, 3vw, 2.35rem);
+  font-size: clamp(1.7rem, 2.6vw, 2rem);
   font-weight: 400;
   line-height: 1.02;
   letter-spacing: -0.035em;
@@ -2291,7 +2401,7 @@ body {
 }
 
 .card-open-button .book-cover-art {
-  aspect-ratio: 0.72;
+  aspect-ratio: 1;
   border-radius: 0.25rem;
   box-shadow: 0 2px 7px rgba(55, 37, 23, 0.2);
 }
@@ -2336,7 +2446,7 @@ body {
 
 @media (min-width: 900px) {
   .app-shell {
-    grid-template-columns: clamp(11.5rem, 17vw, 15rem) minmax(0, 1fr);
+    grid-template-columns: clamp(11.5rem, 17vw, 20rem) minmax(0, 1fr);
     gap: 0;
   }
 
@@ -2481,6 +2591,10 @@ body {
     padding: 1rem;
   }
 
+  .reading-home-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .home-hero h1 {
     font-size: clamp(1.65rem, 7vw, 2rem);
   }
@@ -2499,6 +2613,7 @@ body {
   .home-hero {
     min-height: 11rem;
     margin-bottom: 0.55rem;
+    background-position: center, 58% 50%;
   }
 
   .home-hero-copy {
@@ -2516,5 +2631,9 @@ body {
 
   .card-row {
     grid-auto-columns: minmax(6.1rem, 31vw);
+  }
+
+  .reading-feature-card {
+    width: min(100%, 21rem);
   }
 }

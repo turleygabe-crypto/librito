@@ -1264,19 +1264,25 @@ function createCurrentlyReadingHomeSection(books, libraryBooks) {
   title.textContent = "Currently reading";
   heading.append(title);
   if (books.length) {
-    const row = document.createElement("div");
-    row.className = "card-row";
-    row.setAttribute("role", "region");
-    row.setAttribute("aria-label", "Currently reading books");
-    row.tabIndex = 0;
-    row.addEventListener("keydown", (event) => {
-      if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
-        event.preventDefault();
-        row.scrollBy({ left: event.key === "ArrowRight" ? 240 : -240, behavior: "smooth" });
-      }
-    });
-    books.forEach((book) => row.append(createReadingBookCard(book)));
-    section.append(heading, row);
+    const content = document.createElement("div");
+    content.className = "reading-home-layout";
+    content.append(createFeaturedReadingCard(books[0]));
+    if (books.length > 1) {
+      const row = document.createElement("div");
+      row.className = "card-row reading-home-row";
+      row.setAttribute("role", "region");
+      row.setAttribute("aria-label", "Currently reading books");
+      row.tabIndex = 0;
+      row.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+          event.preventDefault();
+          row.scrollBy({ left: event.key === "ArrowRight" ? 240 : -240, behavior: "smooth" });
+        }
+      });
+      books.slice(1).forEach((book) => row.append(createReadingBookCard(book)));
+      content.append(row);
+    }
+    section.append(heading, content);
     return section;
   }
 
@@ -1311,6 +1317,63 @@ function createCurrentlyReadingHomeSection(books, libraryBooks) {
     section.append(addBook);
   }
   return section;
+}
+
+function createFeaturedReadingCard(book) {
+  const card = document.createElement("article");
+  card.className = "reading-feature-card";
+
+  const coverButton = document.createElement("button");
+  coverButton.type = "button";
+  coverButton.className = "reading-feature-cover";
+  coverButton.setAttribute("aria-label", `Open ${book.title} by ${book.author || "Unknown author"}`);
+  coverButton.append(createBookCover(book));
+  coverButton.addEventListener("click", () => openBookProfile(book));
+
+  const details = document.createElement("div");
+  details.className = "reading-feature-details";
+  const title = document.createElement("button");
+  title.type = "button";
+  title.className = "reading-feature-title";
+  title.textContent = book.title || "Untitled";
+  title.addEventListener("click", () => openBookProfile(book));
+  const author = document.createElement("p");
+  author.className = "reading-feature-author";
+  author.textContent = book.author || "Unknown author";
+  const pageCount = Number(book.page_count || book.pages);
+  const currentPage = Math.max(0, Number(book.current_page) || 0);
+  const hasPageCount = Number.isInteger(pageCount) && pageCount > 0;
+  const progress = document.createElement("div");
+  progress.className = "reading-feature-progress";
+  const progressLabel = document.createElement("span");
+  const percentage = hasPageCount
+    ? Math.max(0, Math.min(100, Math.round((currentPage / pageCount) * 100)))
+    : 0;
+  progressLabel.textContent = hasPageCount
+    ? `Page ${currentPage} of ${pageCount}`
+    : `Page ${currentPage}`;
+  const progressValue = document.createElement("span");
+  progressValue.textContent = hasPageCount ? `${percentage}%` : "";
+  const progressBar = document.createElement("span");
+  progressBar.className = "reading-feature-progress-bar";
+  progressBar.setAttribute("role", "progressbar");
+  progressBar.setAttribute("aria-label", `Reading progress for ${book.title}`);
+  progressBar.setAttribute("aria-valuemin", "0");
+  progressBar.setAttribute("aria-valuemax", "100");
+  progressBar.setAttribute("aria-valuenow", String(percentage));
+  const progressFill = document.createElement("span");
+  progressFill.style.width = `${percentage}%`;
+  progressBar.append(progressFill);
+  progress.append(progressLabel, progressValue, progressBar);
+
+  const continueButton = document.createElement("button");
+  continueButton.type = "button";
+  continueButton.className = "reading-continue-btn";
+  continueButton.textContent = "Continue reading";
+  continueButton.addEventListener("click", () => openBookProfile(book));
+  details.append(title, author, progress, continueButton);
+  card.append(coverButton, details);
+  return card;
 }
 
 function createReadingBookCard(book) {
