@@ -182,6 +182,7 @@ const state = {
   currentBook: null,
   searchQuery: "",
   searchResults: null,
+  searchLanguage: "default",
   searchMessage: "",
   searchLoading: false,
   loading: true,
@@ -255,6 +256,7 @@ const shelfDrawerOverlay = document.getElementById("shelfDrawerOverlay");
 const closeShelfDrawerBtn = document.getElementById("closeShelfDrawerBtn");
 const globalSearchForm = document.getElementById("globalSearchForm");
 const globalSearchInput = document.getElementById("globalSearchInput");
+const globalSearchLanguage = document.getElementById("globalSearchLanguage");
 const sidebar = document.getElementById("sidebar");
 const libraryToggleBtn = document.getElementById("libraryToggleBtn");
 const sidebarBackdrop = document.getElementById("sidebarBackdrop");
@@ -363,7 +365,10 @@ function restoreRouteFromLocation() {
       showSuggestedShelfPage(params.get("key") || "");
       break;
     case "/search":
-      runNaturalSearch(params.get("q") || "", { updateHistory: false });
+      runNaturalSearch(params.get("q") || "", {
+        updateHistory: false,
+        language: params.get("lang") || "default",
+      });
       break;
     case "/stats":
       showStatsPage();
@@ -827,16 +832,51 @@ function getDefaultBookLanguage() {
   return browserLanguageCodes[language] || "eng";
 }
 
-function initializeBookLanguageOptions() {
+function fillLanguageSelect(select, allLabel = "All languages") {
   const defaultLanguage = getDefaultBookLanguage();
   const defaultName = openLibraryLanguages.find(([code]) => code === defaultLanguage)?.[1]
     || new Intl.DisplayNames([navigator.language], { type: "language" }).of(navigator.language.split("-")[0])
     || defaultLanguage;
-  lookupLanguage.replaceChildren(new Option(`Default (${defaultName})`, "default"));
+  select.replaceChildren(new Option(`Default (${defaultName})`, "default"));
   openLibraryLanguages
     .filter(([code]) => code !== defaultLanguage)
-    .forEach(([code, name]) => lookupLanguage.add(new Option(name, code)));
-  lookupLanguage.add(new Option("Any language", "all"));
+    .forEach(([code, name]) => select.add(new Option(name, code)));
+  select.add(new Option(allLabel, "all"));
+}
+
+function initializeBookLanguageOptions() {
+  fillLanguageSelect(lookupLanguage, "Any language");
+  fillLanguageSelect(globalSearchLanguage);
+}
+
+// Returns "" when searching every language.
+function resolveSearchLanguage(value) {
+  if (value === "all") return "";
+  return !value || value === "default" ? getDefaultBookLanguage() : value;
+}
+
+function pickResultLanguage(languages) {
+  const codes = (languages || []).map((code) => String(code).split("/").pop());
+  return codes.includes(getDefaultBookLanguage()) ? getDefaultBookLanguage() : codes[0] || "";
+}
+
+function groupByLanguage(items, getCode) {
+  const groups = new Map();
+  items.forEach((item) => {
+    const code = getCode(item) || "";
+    if (!groups.has(code)) groups.set(code, []);
+    groups.get(code).push(item);
+  });
+  const label = (code) => (code ? getEditionLanguageName(code) : "Language not specified");
+  return [...groups.entries()]
+    .sort(([first], [second]) => {
+      if (!first || !second) return Number(!first) - Number(!second);
+      if (first === getDefaultBookLanguage() || second === getDefaultBookLanguage()) {
+        return Number(second === getDefaultBookLanguage()) - Number(first === getDefaultBookLanguage());
+      }
+      return label(first).localeCompare(label(second));
+    })
+    .map(([code, group]) => [label(code), group]);
 }
 
 function renderStats() {
@@ -2574,6 +2614,7 @@ function createBookEditionPicker(book) {
   languageSelect.className = "edition-language-select";
   languageSelect.add(new Option("Choose a language", ""));
   openLibraryLanguages.forEach(([code, name]) => languageSelect.add(new Option(name, code)));
+  languageSelect.add(new Option("All languages", "all"));
   languageLabel.append(languageSelect);
   const languageButton = document.createElement("button");
   languageButton.type = "button";
@@ -2997,8 +3038,12 @@ function getGoogleBookDetails(volume) {
 
 function getEditionLanguageName(code) {
   if (!code) return "";
-  if (code.length === 3) return getOpenLibraryLanguageName(code);
-  return new Intl.DisplayNames([navigator.language], { type: "language" }).of(code) || code;
+  if (code.length === 3 && openLibraryLanguages.some(([known]) => known === code)) return getOpenLibraryLanguageName(code);
+  try {
+    return new Intl.DisplayNames([navigator.language], { type: "language" }).of(code) || code;
+  } catch {
+    return code;
+  }
 }
 
 function getBookEditionCoverUrl(book, details, size = "M") {
@@ -3046,7 +3091,7 @@ function renderBookProfileDescription(container, button, text) {
   button.setAttribute("aria-expanded", "false");
 }
 
-function renderBookProfileEditions(book, section, volumes) {
+function renderBookProfileEditions(book, section, volumes, { groupByLanguage: grouped = false } = {}) {
   const status = section.querySelector(".edition-picker-status");
   const choices = section.querySelector(".edition-cover-choices");
   choices.replaceChildren();
@@ -3059,56 +3104,70 @@ function renderBookProfileEditions(book, section, volumes) {
       if (seenEditionIsbns.has(isbnKey)) return false;
       seenEditionIsbns.add(isbnKey);
       return true;
-    })
-    .slice(0, 8);
-  if (!editions.length) {
+    });
+  const languageGroups = grouped
+    ? groupByLanguage(editions, ({ details }) => details.language)
+      .map(([label, group]) => [label, group.slice(0, 8)])
+    : [["", editions.slice(0, 8)]];
+  const visibleCount = languageGroups.reduce((total, [, group]) => total + group.length, 0);
+  if (!visibleCount) {
     status.textContent = "No editions with covers are available in the catalog.";
     section.dataset.status = "empty";
     return;
   }
-  status.textContent = `${editions.length} available edition${editions.length === 1 ? "" : "s"}. Select one to update your book.`;
+  status.textContent = grouped
+    ? `${visibleCount} edition${visibleCount === 1 ? "" : "s"} in ${languageGroups.length} language${languageGroups.length === 1 ? "" : "s"}. Select one to update your book.`
+    : `${visibleCount} available edition${visibleCount === 1 ? "" : "s"}. Select one to update your book.`;
   section.dataset.status = "loaded";
-  editions.forEach(({ volume, details }) => {
-    const choice = document.createElement("button");
-    choice.type = "button";
-    choice.className = "edition-cover-choice";
-    const selected = isCurrentBookEdition(book, details);
-    choice.setAttribute("aria-pressed", String(selected));
-    choice.setAttribute("aria-label", `Select ${details.format} edition of ${details.title || book.title}`);
-    choice.append(createBookCover({
-      title: details.title || book.title,
-      cover_url: getBookEditionCoverUrl(book, details),
-    }, "edition-cover-choice-cover"));
-    const copy = document.createElement("span");
-    copy.className = "edition-cover-copy";
-    const format = document.createElement("span");
-    format.className = "edition-format";
-    format.textContent = details.format;
-    const title = document.createElement("strong");
-    title.textContent = details.title || book.title || "Untitled";
-    const metadata = document.createElement("span");
-    metadata.textContent = [
-      details.author || book.author || "",
-      details.publisher,
-      details.publish_date,
-      details.page_count && `${details.page_count} pages`,
-      details.isbn && `ISBN ${details.isbn}`,
-    ].filter(Boolean).join(" · ");
-    const price = document.createElement("span");
-    price.className = "edition-price";
-    price.textContent = details.price === null
-      ? "Price not listed"
-      : new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: details.currency || "USD",
-      }).format(details.price);
-    const selectedLabel = document.createElement("span");
-    selectedLabel.className = "edition-select-label";
-    selectedLabel.textContent = selected ? "✓ Current edition" : "View edition details";
-    copy.append(format, title, metadata, price, selectedLabel);
-    choice.append(copy);
-    choice.addEventListener("click", () => openBookEditionDetails(book, details, section, volumes, choice));
-    choices.append(choice);
+  languageGroups.forEach(([groupLabel, group]) => {
+    if (grouped) {
+      const heading = document.createElement("h3");
+      heading.className = "edition-language-heading";
+      heading.textContent = groupLabel;
+      choices.append(heading);
+    }
+    group.forEach(({ volume, details }) => {
+      const choice = document.createElement("button");
+      choice.type = "button";
+      choice.className = "edition-cover-choice";
+      const selected = isCurrentBookEdition(book, details);
+      choice.setAttribute("aria-pressed", String(selected));
+      choice.setAttribute("aria-label", `Select ${details.format} edition of ${details.title || book.title}`);
+      choice.append(createBookCover({
+        title: details.title || book.title,
+        cover_url: getBookEditionCoverUrl(book, details),
+      }, "edition-cover-choice-cover"));
+      const copy = document.createElement("span");
+      copy.className = "edition-cover-copy";
+      const format = document.createElement("span");
+      format.className = "edition-format";
+      format.textContent = details.format;
+      const title = document.createElement("strong");
+      title.textContent = details.title || book.title || "Untitled";
+      const metadata = document.createElement("span");
+      metadata.textContent = [
+        details.author || book.author || "",
+        details.publisher,
+        details.publish_date,
+        details.page_count && `${details.page_count} pages`,
+        details.isbn && `ISBN ${details.isbn}`,
+      ].filter(Boolean).join(" · ");
+      const price = document.createElement("span");
+      price.className = "edition-price";
+      price.textContent = details.price === null
+        ? "Price not listed"
+        : new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: details.currency || "USD",
+        }).format(details.price);
+      const selectedLabel = document.createElement("span");
+      selectedLabel.className = "edition-select-label";
+      selectedLabel.textContent = selected ? "✓ Current edition" : "View edition details";
+      copy.append(format, title, metadata, price, selectedLabel);
+      choice.append(copy);
+      choice.addEventListener("click", () => openBookEditionDetails(book, details, section, volumes, choice));
+      choices.append(choice);
+    });
   });
 }
 
@@ -3572,7 +3631,7 @@ async function loadBookProfileEditionsInLanguage(book, section, language) {
   if (!language) return;
   const status = section.querySelector(".edition-picker-status");
   const buttons = section.querySelectorAll(".edition-picker-button");
-  const languageName = getOpenLibraryLanguageName(language);
+  const languageName = language === "all" ? "all-language" : getOpenLibraryLanguageName(language);
   buttons.forEach((button) => { button.disabled = true; });
   status.textContent = `Finding ${languageName} editions…`;
   section.dataset.status = "loading";
@@ -3600,8 +3659,8 @@ async function loadBookProfileEditionsInLanguage(book, section, language) {
       },
       saleInfo: {},
     }));
-    renderBookProfileEditions(book, section, volumes);
-    if (section.dataset.status === "loaded") {
+    renderBookProfileEditions(book, section, volumes, { groupByLanguage: language === "all" });
+    if (language !== "all" && section.dataset.status === "loaded") {
       const count = section.querySelectorAll(".edition-cover-choice").length;
       status.textContent = `${count} ${languageName} edition${count === 1 ? "" : "s"}. Select one to update your book.`;
     }
@@ -3908,7 +3967,13 @@ function createSearchHeader(query) {
   crumbs.append(home, separator, current);
   const heading = document.createElement("h1");
   heading.textContent = `Search results for “${query}”`;
-  header.append(crumbs, heading);
+  const language = document.createElement("p");
+  language.className = "search-language-note";
+  const selectedLanguage = resolveSearchLanguage(state.searchLanguage);
+  language.textContent = selectedLanguage
+    ? `Showing ${getOpenLibraryLanguageName(selectedLanguage)} editions`
+    : "Showing editions in all languages, grouped by language";
+  header.append(crumbs, heading, language);
   return header;
 }
 
@@ -4125,14 +4190,15 @@ async function getOpenLibraryEditionsForBook(book, language = getDefaultBookLang
   }));
   const choices = results.flat().flatMap((edition) => {
     const languages = (edition.languages || []).map((entry) => entry.key.split("/").pop());
-    if (!languages.includes(language)) return [];
+    if (language !== "all" && !languages.includes(language)) return [];
+    const editionLanguage = language === "all" ? languages[0] || "" : language;
     const isbn = [...(edition.isbn_13 || []), ...(edition.isbn_10 || [])][0] || "";
     return (edition.covers || [])
       .filter((coverId) => Number.isInteger(coverId) && coverId > 0)
       .map((coverId) => ({
         title: edition.title || book.title || "Untitled",
         isbn,
-        language,
+        language: editionLanguage,
         coverUrl: `https://covers.openlibrary.org/b/id/${coverId}-L.jpg?default=false`,
         publisher: edition.publishers?.[0] || "",
         publishDate: edition.publish_date || "",
@@ -4187,7 +4253,12 @@ function showSearchPage(query = "") {
   }
   const books = document.createElement("section");
   books.className = "search-result-group";
-  books.append(createCardRow("Books", matches.map((book) => ({ type: "book", book })), { emptyMessage: "No books found." }));
+  const bookGroups = state.searchLanguage === "all"
+    ? groupByLanguage(matches, (book) => book.language)
+    : [["Books", matches]];
+  bookGroups.forEach(([label, group]) => {
+    books.append(createCardRow(label, group.map((book) => ({ type: "book", book })), { emptyMessage: "No books found." }));
+  });
   page.append(books);
   const authors = [...new Set(matches.map((book) => book.author).filter(Boolean))];
   if (authors.length) {
@@ -4267,11 +4338,17 @@ function findLocalSearchMatches(query) {
   });
 }
 
-async function runNaturalSearch(query, { updateHistory = true } = {}) {
+async function runNaturalSearch(query, { updateHistory = true, language = globalSearchLanguage.value } = {}) {
+  const languageValue = language && language !== "default" ? language : "";
   if (updateHistory) {
-    navigateTo("search", { q: query.trim() });
+    navigateTo("search", { q: query.trim(), lang: languageValue });
     return;
   }
+  globalSearchLanguage.value = languageValue || "default";
+  if (globalSearchLanguage.value !== (languageValue || "default")) globalSearchLanguage.value = "default";
+  state.searchLanguage = globalSearchLanguage.value;
+  const selectedLanguage = resolveSearchLanguage(state.searchLanguage);
+  const languageName = selectedLanguage ? getOpenLibraryLanguageName(selectedLanguage) : "any language";
   state.searchQuery = query.trim();
   state.searchMessage = "";
   state.searchLoading = false;
@@ -4296,12 +4373,12 @@ async function runNaturalSearch(query, { updateHistory = true } = {}) {
     const offset = searchGenre ? Math.floor(Math.random() * 10) * 24 : 0;
     const fetchWorks = async (searchOffset) => {
       const params = new URLSearchParams({
-        q: `${catalogQuery} language:${getDefaultBookLanguage()}`,
-        fields: `key,title,author_name,isbn,cover_i,subject,number_of_pages_median,${OPEN_LIBRARY_EDITION_FIELDS}`,
-        lang: getDefaultBookLanguage(),
+        q: selectedLanguage ? `${catalogQuery} language:${selectedLanguage}` : catalogQuery,
+        fields: `key,title,author_name,isbn,cover_i,subject,language,number_of_pages_median,${OPEN_LIBRARY_EDITION_FIELDS}`,
         limit: "24",
         offset: String(searchOffset),
       });
+      if (selectedLanguage) params.set("lang", selectedLanguage);
       const response = await fetch(`https://openlibrary.org/search.json?${params}`, { signal: AbortSignal.timeout(20000) });
       if (!response.ok) throw new Error(`Open Library search failed with ${response.status}`);
       const data = await response.json();
@@ -4321,15 +4398,46 @@ async function runNaturalSearch(query, { updateHistory = true } = {}) {
           cover_i: work.cover_i,
           subjects: work.subject || [],
           genre: searchGenre,
+          language: selectedLanguage || pickResultLanguage(work.language),
           pages: work.number_of_pages_median,
           page_count: work.number_of_pages_median,
         };
         return !parsed.pageLimit || (book.pages && book.pages <= parsed.pageLimit) ? [book] : [];
       });
+    } else if (!selectedLanguage) {
+      const editionResults = await Promise.allSettled(works.slice(0, 8).map(async (work) => {
+        if (!work.key) return [];
+        const editions = await getBestEditionsByLanguage(work.key);
+        return editions.map((edition) => {
+          const isbnList = [...(edition.isbn_13 || []), ...(edition.isbn_10 || [])];
+          const pages = Number(edition.number_of_pages) || work.number_of_pages_median;
+          return {
+            title: edition.title || work.title || "Untitled",
+            author: work.author_name?.[0] || "Unknown author",
+            author_name: work.author_name || [],
+            isbn: isbnList[0] || "",
+            isbnList,
+            cover_i: edition.covers?.find((id) => Number.isInteger(id) && id > 0),
+            subjects: work.subject || [],
+            genre: work.subject?.[0] || "",
+            language: edition.language,
+            pages,
+            page_count: pages,
+          };
+        });
+      }));
+      externalBooks = editionResults.flatMap((result) => {
+        if (result.status === "rejected") {
+          editionLookupFailures += 1;
+          console.error(result.reason);
+          return [];
+        }
+        return result.value.filter((book) => !parsed.pageLimit || (book.pages && book.pages <= parsed.pageLimit));
+      });
     } else {
       const editionResults = await Promise.allSettled(works.map(async (work) => {
         if (!work.key) return null;
-        const edition = getEmbeddedOpenLibraryEdition(work, getDefaultBookLanguage());
+        const edition = getEmbeddedOpenLibraryEdition(work, selectedLanguage);
         if (!edition) return null;
         const isbnList = edition.isbn;
         return {
@@ -4341,6 +4449,7 @@ async function runNaturalSearch(query, { updateHistory = true } = {}) {
           cover_i: edition.cover_i || work.cover_i,
           subjects: work.subject || [],
           genre: work.subject?.[0] || "",
+          language: selectedLanguage,
           pages: work.number_of_pages_median,
           page_count: work.number_of_pages_median,
         };
@@ -4357,17 +4466,17 @@ async function runNaturalSearch(query, { updateHistory = true } = {}) {
     }
     state.searchResults = [...state.searchResults, ...externalBooks]
       .filter((book, index, all) =>
-        all.findIndex((candidate) => isSameBookWork(candidate, book)) === index);
+        all.findIndex((candidate) =>
+          isSameBookWork(candidate, book) && (candidate.language || "") === (book.language || "")) === index);
     if (editionLookupFailures) {
-      const languageName = getOpenLibraryLanguageName(getDefaultBookLanguage());
       state.searchMessage = `Some matching ${languageName} editions could not be checked; showing verified editions only.`;
     }
     if (!state.searchResults.length && parsed.pageLimit) {
       state.searchMessage = `No results with a verified page count under ${parsed.pageLimit} pages.`;
     } else if (!state.searchResults.length && searchGenre) {
-      state.searchMessage = `No books found for ${searchGenre} in ${getOpenLibraryLanguageName(getDefaultBookLanguage())}.`;
+      state.searchMessage = `No books found for ${searchGenre} in ${languageName}.`;
     } else if (!state.searchResults.length && works.length && !externalBooks.length && !editionLookupFailures) {
-      state.searchMessage = `No matching editions found in ${getOpenLibraryLanguageName(getDefaultBookLanguage())}.`;
+      state.searchMessage = `No matching editions found in ${languageName}.`;
     }
   } catch (error) {
     console.warn("Natural-language search used local results because Open Library was unavailable.", error);
@@ -4736,6 +4845,19 @@ async function getMatchingOpenLibraryEdition(workKey, selectedLanguage) {
   if (!edition) return null;
   const editionLanguages = (edition.languages || []).map((language) => language.key.split("/").pop());
   return { ...edition, language: editionLanguages };
+}
+
+async function getBestEditionsByLanguage(workKey) {
+  const response = await fetch(`https://openlibrary.org${workKey}/editions.json?limit=100`);
+  if (!response.ok) throw new Error(`Open Library editions responded with ${response.status}`);
+  const payload = await response.json();
+  const score = (edition) => Number(Boolean(edition.covers?.length)) * 2 + Number(Boolean(edition.isbn_13?.length));
+  const best = new Map();
+  (Array.isArray(payload.entries) ? payload.entries : []).forEach((edition) => {
+    const code = edition.languages?.[0]?.key?.split("/").pop() || "";
+    if (!best.has(code) || score(edition) > score(best.get(code))) best.set(code, edition);
+  });
+  return [...best.entries()].map(([language, edition]) => ({ ...edition, language }));
 }
 
 function renderTitleSearchResults() {
@@ -5349,7 +5471,7 @@ async function saveBookToSupabase(book) {
 globalSearchForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const query = globalSearchInput.value.trim();
-  await runNaturalSearch(query);
+  await runNaturalSearch(query, { language: globalSearchLanguage.value });
 });
 
 document.getElementById("topHomeBtn").addEventListener("click", () => {

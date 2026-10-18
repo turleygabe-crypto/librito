@@ -4558,3 +4558,50 @@ body {
   .search-book-page,
   .search-book-spark { animation-duration: 6s; }
 }
+
+.global-search-language {
+  flex: 0 0 auto;
+  max-width: 8.5rem;
+  min-height: 2rem;
+  padding: 0.2rem 0.4rem;
+  border: 0;
+  border-left: 1px solid rgba(245, 221, 201, 0.2);
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  color: #f7e8de;
+  font: inherit;
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+}
+
+.global-search-language option {
+  background: #352420;
+  color: #fff8ef;
+}
+
+.search-language-note {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.edition-language-heading {
+  grid-column: 1 / -1;
+  margin: 0.4rem 0 0;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid #e8ddd2;
+  color: #302720;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1rem;
+}
+
+.edition-language-heading:first-child {
+  margin-top: 0;
+}
+
+@media (max-width: 600px) {
+  .global-search-language {
+    max-width: 5.5rem;
+  }
+}
