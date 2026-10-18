@@ -279,6 +279,8 @@ let dialogReturnFocus = null;
 let shelfReturnFocus = null;
 let authReturnFocus = null;
 let bookProfileReturnFocus = null;
+let editionDialogOverlay = null;
+let editionDialogReturnFocus = null;
 const oauthRedirectKey = "librito-oauth-redirect";
 let authPrompted = sessionStorage.getItem(oauthRedirectKey) === "true";
 let authMode = "signin";
@@ -2855,6 +2857,14 @@ function getGoogleBookDetails(volume) {
   };
 }
 
+function getBookEditionCoverUrl(book, details, size = "M") {
+  if (details.cover_url) return details.cover_url;
+  if (details.isbn) {
+    return `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(details.isbn)}-${size}.jpg?default=false`;
+  }
+  return book.cover_url || "";
+}
+
 function renderBookRating(container, details, book) {
   container.replaceChildren();
   const average = details?.average_rating || 0;
@@ -2916,9 +2926,7 @@ function renderBookProfileEditions(book, section, volumes) {
     choice.setAttribute("aria-label", `Select ${details.format} edition of ${details.title || book.title}`);
     choice.append(createBookCover({
       title: details.title || book.title,
-      cover_url: details.cover_url || (details.isbn
-        ? `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(details.isbn)}-M.jpg?default=false`
-        : ""),
+      cover_url: getBookEditionCoverUrl(book, details),
     }, "edition-cover-choice-cover"));
     const copy = document.createElement("span");
     copy.className = "edition-cover-copy";
@@ -2945,36 +2953,236 @@ function renderBookProfileEditions(book, section, volumes) {
       }).format(details.price);
     const selectedLabel = document.createElement("span");
     selectedLabel.className = "edition-select-label";
-    selectedLabel.textContent = selected ? "✓ Selected" : "Select edition";
+    selectedLabel.textContent = selected ? "✓ Selected" : "View edition details";
     copy.append(format, title, metadata, price, selectedLabel);
     choice.append(copy);
-    choice.addEventListener("click", async () => {
-      choice.disabled = true;
-      const fields = {
-        title: details.title || book.title,
-        isbn: details.isbn || normalizeBookIsbn(book.isbn),
-        cover_url: details.cover_url || book.cover_url || "",
-        ...(details.page_count ? { page_count: details.page_count } : {}),
-      };
-      const ownedBook = state.books.find((item) =>
-        (book.id && item.id === book.id) || getBookKey(item) === getBookKey(book)
-      );
-      if (ownedBook && !await updateBookFields(ownedBook, fields)) {
-        choice.disabled = false;
-        return;
-      }
-      Object.assign(book, fields);
-      if (ownedBook && ownedBook !== book) {
-        Object.assign(ownedBook, fields);
-        delete ownedBook.cover_i;
-      }
-      delete book.cover_i;
-      updateBookPageDetails(book);
-      renderBookProfileEditions(book, section, volumes);
-      showToast(ownedBook ? "Edition updated" : "Edition selected");
-    });
+    choice.addEventListener("click", () => openBookEditionDetails(book, details, section, volumes, choice));
     choices.append(choice);
   });
+}
+
+function ensureEditionDialog() {
+  if (editionDialogOverlay) return editionDialogOverlay;
+  const overlay = document.createElement("div");
+  overlay.className = "dialog-overlay hidden edition-dialog-overlay";
+  const dialog = document.createElement("section");
+  dialog.className = "dialog-card edition-dialog-card";
+  dialog.setAttribute("role", "dialog");
+  dialog.setAttribute("aria-modal", "true");
+  const header = document.createElement("div");
+  header.className = "dialog-head";
+  const title = document.createElement("h2");
+  title.className = "edition-dialog-title";
+  title.id = "editionDialogTitle";
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "icon-btn";
+  close.setAttribute("aria-label", "Close edition details");
+  close.textContent = "✕";
+  close.addEventListener("click", () => closeBookEditionDialog());
+  header.append(title, close);
+  const content = document.createElement("div");
+  content.className = "edition-dialog-content";
+  dialog.append(header, content);
+  overlay.append(dialog);
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) closeBookEditionDialog();
+  });
+  document.body.append(overlay);
+  editionDialogOverlay = overlay;
+  return overlay;
+}
+
+function openBookEditionDialog(titleText, content, returnFocus) {
+  const overlay = ensureEditionDialog();
+  const heading = overlay.querySelector(".edition-dialog-title");
+  const dialog = overlay.querySelector("[role='dialog']");
+  const body = overlay.querySelector(".edition-dialog-content");
+  heading.textContent = titleText;
+  dialog.setAttribute("aria-labelledby", heading.id);
+  body.replaceChildren(content);
+  editionDialogReturnFocus = returnFocus instanceof HTMLElement ? returnFocus : document.activeElement;
+  overlay.classList.remove("hidden");
+  overlay.querySelector(".icon-btn").focus();
+}
+
+function closeBookEditionDialog(restoreFocus = true) {
+  if (!editionDialogOverlay) return;
+  editionDialogOverlay.classList.add("hidden");
+  editionDialogOverlay.querySelector(".edition-dialog-content").replaceChildren();
+  if (restoreFocus && editionDialogReturnFocus instanceof HTMLElement && editionDialogReturnFocus.isConnected) {
+    editionDialogReturnFocus.focus();
+  }
+  editionDialogReturnFocus = null;
+}
+
+function createEditionMetadataList(details, book) {
+  const list = document.createElement("dl");
+  list.className = "edition-detail-list";
+  const metadata = [
+    ["Format", details.format],
+    ["Publisher", details.publisher],
+    ["Publication date", details.publish_date],
+    ["Pages", details.page_count],
+    ["ISBN", details.isbn],
+  ].filter(([, value]) => value && value !== "—");
+  metadata.forEach(([label, value]) => {
+    const row = document.createElement("div");
+    const term = document.createElement("dt");
+    term.textContent = label;
+    const description = document.createElement("dd");
+    description.textContent = String(value);
+    row.append(term, description);
+    list.append(row);
+  });
+  const catalogPrice = document.createElement("p");
+  catalogPrice.className = "edition-catalog-price";
+  catalogPrice.textContent = details.price === null
+    ? "Catalog price unavailable. Check retailers for current pricing."
+    : `Catalog price: ${new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: details.currency || "USD",
+    }).format(details.price)}`;
+  const byline = book.author ? `Edition of ${book.title || details.title}` : "";
+  list.setAttribute("aria-label", byline ? `${byline} details` : "Edition details");
+  const metadataGroup = document.createElement("div");
+  metadataGroup.append(list, catalogPrice);
+  return metadataGroup;
+}
+
+function openBookEditionDetails(book, details, section, volumes, returnFocus) {
+  const content = document.createElement("div");
+  content.className = "edition-detail-profile";
+  const summary = document.createElement("div");
+  summary.className = "edition-detail-summary";
+  summary.append(createBookCover({
+    title: details.title || book.title,
+    cover_url: getBookEditionCoverUrl(book, details, "L"),
+  }, "edition-detail-cover"));
+  const copy = document.createElement("div");
+  const title = document.createElement("h3");
+  title.textContent = details.title || book.title || "Untitled";
+  const author = document.createElement("p");
+  author.textContent = details.author || book.author || "Unknown author";
+  copy.append(title, author);
+  summary.append(copy);
+  content.append(summary, createEditionMetadataList(details, book));
+  if (details.description) {
+    const synopsis = document.createElement("p");
+    synopsis.className = "edition-detail-description";
+    synopsis.textContent = details.description;
+    content.append(synopsis);
+  }
+  const actions = document.createElement("div");
+  actions.className = "edition-dialog-actions";
+  const useEdition = document.createElement("button");
+  useEdition.type = "button";
+  useEdition.className = "action-btn";
+  useEdition.textContent = "Use this edition";
+  useEdition.addEventListener("click", async () => {
+    const format = details.format || "book";
+    if (!window.confirm(`Use this ${format.toLowerCase()} edition of “${details.title || book.title}”?`)) return;
+    useEdition.disabled = true;
+    const fields = {
+      title: details.title || book.title,
+      isbn: details.isbn || normalizeBookIsbn(book.isbn),
+      cover_url: getBookEditionCoverUrl(book, details, "L"),
+      ...(details.page_count ? { page_count: details.page_count } : {}),
+    };
+    const ownedBook = state.books.find((item) =>
+      (book.id && item.id === book.id) || getBookKey(item) === getBookKey(book)
+    );
+    if (ownedBook && !await updateBookFields(ownedBook, fields)) {
+      useEdition.disabled = false;
+      return;
+    }
+    if (!section.isConnected || state.view !== "book" || state.currentBook !== book) {
+      closeBookEditionDialog();
+      return;
+    }
+    Object.assign(book, fields);
+    if (ownedBook && ownedBook !== book) {
+      Object.assign(ownedBook, fields);
+      delete ownedBook.cover_i;
+    }
+    delete book.cover_i;
+    updateBookPageDetails(book);
+    renderBookProfileEditions(book, section, volumes);
+    const selectedChoice = section.querySelector('.edition-cover-choice[aria-pressed="true"]');
+    closeBookEditionDialog(false);
+    selectedChoice?.focus();
+    showToast(ownedBook ? "Edition updated" : "Edition selected");
+  });
+  const shopEdition = document.createElement("button");
+  shopEdition.type = "button";
+  shopEdition.className = "secondary-btn";
+  shopEdition.textContent = "Shop for this edition";
+  shopEdition.addEventListener("click", () =>
+    openEditionShopping(book, details, editionDialogReturnFocus)
+  );
+  actions.append(useEdition, shopEdition);
+  content.append(actions);
+  openBookEditionDialog("Edition details", content, returnFocus);
+}
+
+function openEditionShopping(book, details, returnFocus) {
+  const content = document.createElement("div");
+  content.className = "edition-shopping-content";
+  const summary = document.createElement("div");
+  summary.className = "edition-detail-summary";
+  summary.append(createBookCover({
+    title: details.title || book.title,
+    cover_url: getBookEditionCoverUrl(book, details, "L"),
+  }, "edition-shopping-cover"));
+  const copy = document.createElement("div");
+  const title = document.createElement("h3");
+  title.textContent = details.title || book.title || "Untitled";
+  const byline = document.createElement("p");
+  byline.textContent = `${details.author || book.author || "Unknown author"} · ${details.format}`;
+  copy.append(title, byline);
+  summary.append(copy);
+  const identifier = document.createElement("p");
+  identifier.className = "edition-shopping-identifier";
+  identifier.textContent = details.isbn ? `ISBN ${details.isbn}` : "Retailer listings may include other editions.";
+  const catalogPrice = document.createElement("p");
+  catalogPrice.className = "edition-catalog-price";
+  catalogPrice.textContent = details.price === null
+    ? "Catalog price unavailable. Check each retailer for current pricing."
+    : `Catalog price: ${new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: details.currency || "USD",
+    }).format(details.price)} (Google Books; retailer prices may differ).`;
+  const searchTerm = details.isbn || `${details.title || book.title} ${details.author || book.author}`.trim();
+  const encodedSearch = encodeURIComponent(searchTerm);
+  const retailers = [
+    ["Amazon", "Shop new and used editions", `https://www.amazon.com/s?k=${encodedSearch}&i=stripbooks`],
+    ["Bookshop.org", "Support independent bookstores", `https://bookshop.org/search?keywords=${encodedSearch}`],
+    ["Barnes & Noble", "Browse books and editions", `https://www.barnesandnoble.com/s/${encodedSearch}`],
+    ["ThriftBooks", "Find pre-owned copies", `https://www.thriftbooks.com/browse/?b.search=${encodedSearch}`],
+    ["Better World Books", "Shop new and used books", `https://www.betterworldbooks.com/search/results?q=${encodedSearch}`],
+  ];
+  const list = document.createElement("div");
+  list.className = "edition-retailer-list";
+  retailers.forEach(([name, description, url]) => {
+    const link = createBookExternalLink(name, url, "edition-retailer-link");
+    const note = document.createElement("span");
+    note.textContent = description;
+    const price = document.createElement("span");
+    price.className = "edition-retailer-price";
+    price.textContent = "Check retailer for price";
+    link.replaceChildren();
+    const linkCopy = document.createElement("span");
+    const retailer = document.createElement("strong");
+    retailer.textContent = name;
+    linkCopy.append(retailer, note);
+    link.append(linkCopy, price);
+    list.append(link);
+  });
+  const disclosure = document.createElement("p");
+  disclosure.className = "edition-shopping-disclosure";
+  disclosure.textContent = "Retailer prices, formats, shipping, and availability can change. These links are not affiliate links.";
+  content.append(summary, identifier, catalogPrice, list, disclosure);
+  openBookEditionDialog("Shop for this edition", content, returnFocus);
 }
 
 async function loadBookProfileEditions(book, section, knownVolumes = null) {
@@ -4647,7 +4855,8 @@ document.querySelectorAll(".nav-pill").forEach((item) => {
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
-    if (!shelfDrawerOverlay.classList.contains("hidden")) closeShelfDrawer();
+    if (editionDialogOverlay && !editionDialogOverlay.classList.contains("hidden")) closeBookEditionDialog();
+    else if (!shelfDrawerOverlay.classList.contains("hidden")) closeShelfDrawer();
     else if (!authOverlay.classList.contains("hidden")) closeAuthModal();
     else if (!dialogOverlay.classList.contains("hidden")) closeDialog();
     else if (!bookProfileOverlay.classList.contains("hidden")) closeBookProfile();
