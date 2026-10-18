@@ -3751,23 +3751,113 @@ function createBookExternalLink(label, url, className = "") {
   return link;
 }
 
+const RETAILER_ICONS = {
+  Amazon: '<span class="retailer-glyph retailer-glyph-amazon">a</span>',
+  "Bookshop.org": '<span class="retailer-glyph">B</span>',
+  "Barnes & Noble": '<span class="retailer-glyph retailer-glyph-bn">BN</span>',
+  ThriftBooks: '<svg class="retailer-glyph" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 4h4v16H4zM9 6h4v14H9zM14.2 5.2l3.8-1 3 14.6-3.8 1z"/></svg>',
+};
+const EXTERNAL_LINK_ICON = '<svg class="retailer-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>';
+const OPEN_BOOK_ICON = '<svg viewBox="0 0 48 40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M24 9C19 5 11 4 4 6v27c7-2 15-1 20 3 5-4 13-5 20-3V6c-7-2-15-1-20 3zM24 9v27"/></svg>';
+
 function createRetailerFallback(searchTerm) {
   const encoded = encodeURIComponent(searchTerm);
-  const section = document.createElement("div");
+  const section = document.createElement("section");
   section.className = "retailer-fallback";
   const intro = document.createElement("p");
-  intro.className = "page-description";
   intro.textContent = "Not in the Open Library catalog? Try searching these retailers:";
   const list = document.createElement("div");
-  list.className = "author-result-list";
+  list.className = "retailer-chip-list";
   [
     ["Amazon", `https://www.amazon.com/s?k=${encoded}&i=stripbooks`],
     ["Bookshop.org", `https://bookshop.org/search?keywords=${encoded}`],
     ["Barnes & Noble", `https://www.barnesandnoble.com/s/${encoded}`],
     ["ThriftBooks", `https://www.thriftbooks.com/browse/?b.search=${encoded}`],
-  ].forEach(([name, url]) => list.append(createBookExternalLink(name, url, "author-result")));
+  ].forEach(([name, url]) => {
+    const link = createBookExternalLink("", url, "retailer-chip");
+    link.innerHTML = `${RETAILER_ICONS[name]}<span>${name}</span>${EXTERNAL_LINK_ICON}`;
+    list.append(link);
+  });
   section.append(intro, list);
   return section;
+}
+
+function createSearchHeader(query) {
+  const header = document.createElement("header");
+  header.className = "search-header";
+  const crumbs = document.createElement("nav");
+  crumbs.className = "search-breadcrumb";
+  crumbs.setAttribute("aria-label", "Breadcrumb");
+  const home = document.createElement("a");
+  home.href = "#/";
+  home.textContent = "Home";
+  home.addEventListener("click", (event) => {
+    event.preventDefault();
+    navigateTo("home");
+  });
+  const separator = document.createElement("span");
+  separator.className = "search-breadcrumb-sep";
+  separator.textContent = "›";
+  const current = document.createElement("span");
+  current.textContent = "Discover";
+  crumbs.append(home, separator, current);
+  const heading = document.createElement("h1");
+  heading.textContent = `Search results for “${query}”`;
+  header.append(crumbs, heading);
+  return header;
+}
+
+function createSearchLoading() {
+  const status = document.createElement("div");
+  status.className = "search-loading";
+  status.setAttribute("role", "status");
+  status.innerHTML = `
+    <svg class="search-book" viewBox="0 0 240 190" aria-hidden="true">
+      <defs>
+        <linearGradient id="sbPage" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fbeed3"/><stop offset="1" stop-color="#efd9b4"/></linearGradient>
+        <linearGradient id="sbCover" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b8512f"/><stop offset="1" stop-color="#8a3319"/></linearGradient>
+        <radialGradient id="sbShadow"><stop offset="0" stop-color="#5a3a22" stop-opacity=".28"/><stop offset="1" stop-color="#5a3a22" stop-opacity="0"/></radialGradient>
+      </defs>
+      <ellipse cx="120" cy="170" rx="86" ry="10" fill="url(#sbShadow)"/>
+      <path d="M26 74 L120 108 L214 74 L214 150 L120 176 L26 150Z" fill="url(#sbCover)"/>
+      <path d="M34 66 L120 98 L120 166 L34 142Z" fill="url(#sbPage)" stroke="#d9bf92" stroke-width="1.5"/>
+      <path d="M206 66 L120 98 L120 166 L206 142Z" fill="url(#sbPage)" stroke="#d9bf92" stroke-width="1.5"/>
+      <g stroke="#b99a72" stroke-width="2" stroke-linecap="round" opacity=".75">
+        <path d="M46 84 L108 107M46 94 L108 117M46 104 L108 127M46 114 L108 137"/>
+        <path d="M194 84 L132 107M194 94 L132 117M194 104 L132 127M194 114 L132 137"/>
+      </g>
+      <g class="search-book-page">
+        <path d="M120 100 C118 70 124 40 138 22 C158 20 176 28 186 40 C176 62 170 84 168 104 C154 96 136 94 120 100Z" fill="url(#sbPage)" stroke="#d9bf92" stroke-width="1.5"/>
+        <g stroke="#b99a72" stroke-width="2" stroke-linecap="round" opacity=".75"><path d="M138 44 L168 42M138 56 L166 54M138 68 L164 66M138 80 L162 78"/></g>
+      </g>
+      <g class="search-book-spark" fill="#d9825a">
+        <path d="M32 40l3 7 7 3-7 3-3 7-3-7-7-3 7-3z"/>
+        <path d="M206 26l2.5 5.5 5.5 2.5-5.5 2.5-2.5 5.5-2.5-5.5-5.5-2.5 5.5-2.5z"/>
+        <path d="M222 92l2 4 4 2-4 2-2 4-2-4-4-2 4-2z"/>
+      </g>
+    </svg>
+    <h2>Searching the book catalog...</h2>
+    <p>We're looking through thousands of books to find your results.</p>`;
+  return status;
+}
+
+function createSearchEmptyState(query) {
+  const card = document.createElement("section");
+  card.className = "search-empty-card";
+  const icon = document.createElement("span");
+  icon.className = "search-empty-icon";
+  icon.innerHTML = OPEN_BOOK_ICON;
+  const heading = document.createElement("h2");
+  heading.textContent = `No results found for “${query}”`;
+  const copy = document.createElement("p");
+  copy.textContent = "Try checking your spelling or searching for a different title, author, or genre.";
+  const back = document.createElement("button");
+  back.type = "button";
+  back.className = "search-empty-back";
+  back.innerHTML = '<span aria-hidden="true">←</span> Back to Discover';
+  back.addEventListener("click", () => navigateTo("search"));
+  card.append(icon, heading, copy, back);
+  return card;
 }
 
 function mapGoogleVolumeToBook(volume) {
@@ -3955,7 +4045,9 @@ function showSearchPage(query = "") {
   state.searchQuery = query;
   updateActiveNavigation("Discover");
   const page = showPage("search");
-  page.append(createPageHeader("Discover", query ? `Search results for “${query}”` : "Browse by genre"));
+  page.classList.toggle("search-page", Boolean(query));
+  if (query) page.append(createSearchHeader(query));
+  else page.append(createPageHeader("Discover", "Browse by genre"));
   if (!query) {
     state.searchResults = null;
     state.searchMessage = "";
@@ -3974,31 +4066,18 @@ function showSearchPage(query = "") {
   const matches = state.searchResults || findLocalSearchMatches(query);
   if (state.searchMessage) {
     const message = document.createElement("p");
-    message.className = "page-description";
+    message.className = "search-message";
     message.textContent = state.searchMessage;
     page.append(message);
   }
   if (state.searchLoading) {
-    const status = document.createElement("p");
-    status.className = "page-description search-loading";
-    status.setAttribute("role", "status");
-    const flipper = document.createElement("span");
-    flipper.className = "book-flipper";
-    flipper.setAttribute("aria-hidden", "true");
-    flipper.innerHTML = '<span class="book-flipper-cover"></span><span class="book-flipper-page"></span><span class="book-flipper-page"></span><span class="book-flipper-page"></span>';
-    const label = document.createElement("span");
-    label.textContent = "Searching the book catalog…";
-    status.append(flipper, label);
-    page.append(status);
+    page.append(createSearchLoading());
   }
   const terms = normalizeSearchText(query).toLowerCase().split(/\s+/).filter(Boolean);
   const shelves = state.shelves.filter((shelf) => terms.every((term) => shelf.name.toLowerCase().includes(term)));
   if (!matches.length && !shelves.length) {
     if (state.searchLoading) return;
-    const empty = document.createElement("p");
-    empty.className = "row-empty-state";
-    empty.textContent = "No matches found. Try a different title, author, or genre.";
-    page.append(empty, createRetailerFallback(query));
+    page.append(createRetailerFallback(query), createSearchEmptyState(query));
     return;
   }
   const books = document.createElement("section");
