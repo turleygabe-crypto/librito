@@ -3184,6 +3184,96 @@ body {
   }
 }
 
+.book-detail-cover {
+  width: min(100%, 9.25rem);
+}
+
+.book-detail-content .page-actions > .currently-reading-button {
+  min-height: 2.3rem;
+  border: 1px solid #527c61;
+  border-radius: 999px;
+  padding: 0.52rem 0.8rem;
+  background: #527c61;
+  color: #fff;
+  font-size: 0.78rem;
+}
+
+.book-detail-content .page-actions > .currently-reading-button:not(.is-reading) {
+  border-color: #dfd2c5;
+  background: transparent;
+  color: #51463d;
+}
+
+.book-detail-content .reading-actions {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 0.65rem;
+}
+
+.book-detail-content .book-reading-progress {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+}
+
+.book-reading-progress-label {
+  color: #51463d;
+  font-weight: 600;
+}
+
+.book-reading-progress-percent {
+  grid-column: 2;
+  justify-self: end;
+}
+
+.book-detail-content .book-reading-progress-track {
+  height: 0.55rem;
+}
+
+.book-detail-content .reading-actions > .book-continue-reading {
+  width: 100%;
+  min-height: 2.3rem;
+  justify-self: stretch;
+  border-radius: 999px;
+  padding: 0.52rem 0.8rem;
+  font-size: 0.78rem;
+}
+
+.book-detail-content .reading-actions > .book-shelf-menu {
+  width: 100%;
+  justify-self: stretch;
+}
+
+.book-detail-content .reading-actions > .book-shelf-menu > summary {
+  min-height: 2.3rem;
+  padding: 0.52rem 0.8rem;
+  font-size: 0.78rem;
+}
+
+.book-detail-content .reading-actions > .book-more-menu {
+  margin-left: 0;
+  justify-self: end;
+}
+
+.book-more-menu-panel > .currently-reading-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+}
+
+.book-more-menu-panel .bookmarked-page-field {
+  flex-basis: 100%;
+}
+
+@media (max-width: 680px) {
+  .book-detail-content .reading-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .book-detail-content .reading-actions > .book-more-menu {
+    justify-self: start;
+  }
+}
+
 .page-view {
   gap: 1rem;
 }

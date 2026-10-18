@@ -2354,67 +2354,10 @@ function renderBookPage(book) {
   const actions = document.createElement("div");
   actions.className = "page-actions";
   const ownedBook = state.books.find((item) => getBookKey(item) === getBookKey(book));
-  const add = document.createElement("button");
-  add.type = "button";
-  add.className = "action-btn";
-  add.textContent = ownedBook?.disposition
-    ? "In Completed Books"
-    : ownedBook
-      ? "Already in your library"
-      : "＋ Mark as owned";
-  add.disabled = Boolean(ownedBook);
-  add.addEventListener("click", () => {
-    openDialog();
-    if (state.session) {
-      bookForm.elements.title.value = book.title || "";
-      bookForm.elements.author.value = book.author || "";
-      bookForm.elements.isbn.value = book.isbn || "";
-      bookForm.elements.cover_url.value = book.cover_url
-        || (book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-L.jpg?default=false` : "");
-      bookForm.elements.genre.value = book.genre || "";
-      bookForm.elements.page_count.value = String(book.page_count || book.pages || "");
-    }
-  });
-  const like = document.createElement("button");
-  like.type = "button";
-  like.className = "secondary-btn";
-  like.textContent = ownedBook?.liked ? "♥ Liked" : "♡ Like";
-  like.setAttribute("aria-pressed", String(Boolean(ownedBook?.liked)));
-  like.addEventListener("click", () => {
-    if (ownedBook) toggleBookLike(ownedBook);
-    else showToast("Add this book to your library before liking it.");
-  });
-  actions.append(add, like);
-  if (ownedBook && !ownedBook.disposition) actions.append(createBookShelfMenu(ownedBook));
-  actions.append(createBookMoreMenu(book, ownedBook));
-  content.append(actions);
-  if (ownedBook && !ownedBook.disposition) {
-    const readingActions = document.createElement("div");
-    readingActions.className = "reading-actions";
-    const isCurrentlyReading = ownedBook.reading_status === "reading";
-    const pageCount = Number(ownedBook.page_count || ownedBook.pages);
-    if (isCurrentlyReading && Number.isInteger(pageCount) && pageCount > 0) {
-      const currentPage = Math.min(pageCount, Math.max(0, Number(ownedBook.current_page) || 0));
-      const percentage = Math.round(currentPage / pageCount * 100);
-      const progress = document.createElement("div");
-      progress.className = "book-reading-progress";
-      const progressCopy = document.createElement("span");
-      progressCopy.textContent = `${currentPage} of ${pageCount} pages`;
-      const progressPercent = document.createElement("span");
-      progressPercent.textContent = `${percentage}%`;
-      const progressTrack = document.createElement("div");
-      progressTrack.className = "book-reading-progress-track";
-      progressTrack.setAttribute("role", "progressbar");
-      progressTrack.setAttribute("aria-label", `Reading progress for ${book.title}`);
-      progressTrack.setAttribute("aria-valuemin", "0");
-      progressTrack.setAttribute("aria-valuemax", String(pageCount));
-      progressTrack.setAttribute("aria-valuenow", String(currentPage));
-      const progressFill = document.createElement("span");
-      progressFill.style.width = `${percentage}%`;
-      progressTrack.append(progressFill);
-      progress.append(progressCopy, progressPercent, progressTrack);
-      readingActions.append(progress);
-    }
+  const isActiveLibraryBook = Boolean(ownedBook && !ownedBook.disposition);
+  const isCurrentlyReading = ownedBook?.reading_status === "reading";
+  const moreMenu = createBookMoreMenu(book, ownedBook);
+  if (isActiveLibraryBook) {
     const currentlyReading = document.createElement("button");
     currentlyReading.type = "button";
     currentlyReading.className = `currently-reading-button${isCurrentlyReading ? " is-reading" : ""}`;
@@ -2438,7 +2381,46 @@ function renderBookPage(book) {
       ownedBook,
       isCurrentlyReading ? "" : "reading"
     ));
-    readingActions.append(currentlyReading);
+    actions.append(currentlyReading);
+  } else {
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "action-btn";
+    add.textContent = ownedBook?.disposition ? "In Completed Books" : "＋ Mark as owned";
+    add.disabled = Boolean(ownedBook);
+    add.addEventListener("click", () => {
+      openDialog();
+      if (state.session) {
+        bookForm.elements.title.value = book.title || "";
+        bookForm.elements.author.value = book.author || "";
+        bookForm.elements.isbn.value = book.isbn || "";
+        bookForm.elements.cover_url.value = book.cover_url
+          || (book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-L.jpg?default=false` : "");
+        bookForm.elements.genre.value = book.genre || "";
+        bookForm.elements.page_count.value = String(book.page_count || book.pages || "");
+      }
+    });
+    actions.append(add);
+  }
+  const like = document.createElement("button");
+  like.type = "button";
+  like.className = "secondary-btn";
+  like.textContent = ownedBook?.liked ? "♥ Liked" : "♡ Like";
+  like.setAttribute("aria-pressed", String(Boolean(ownedBook?.liked)));
+  like.addEventListener("click", () => {
+    if (ownedBook) toggleBookLike(ownedBook);
+    else showToast("Add this book to your library before liking it.");
+  });
+  actions.append(like);
+  if (!isActiveLibraryBook) actions.append(moreMenu);
+  content.append(actions);
+  if (isActiveLibraryBook) {
+    const readingActions = document.createElement("div");
+    readingActions.className = "reading-actions";
+    const pageCount = Number(ownedBook.page_count || ownedBook.pages);
+    if (isCurrentlyReading && Number.isInteger(pageCount) && pageCount > 0) {
+      readingActions.append(createBookReadingProgress(book, ownedBook, pageCount));
+    }
     if (isCurrentlyReading) {
       const continueButton = document.createElement("button");
       continueButton.type = "button";
@@ -2449,14 +2431,16 @@ function renderBookPage(book) {
           window.open(book.preview_url, "_blank", "noopener,noreferrer");
           return;
         }
-        const pageInput = readingActions.querySelector(".current-page-input");
+        moreMenu.open = true;
+        const pageInput = moreMenu.querySelector(".current-page-input");
         if (!pageInput) return;
         pageInput.scrollIntoView({ block: "center", behavior: "smooth" });
         pageInput.focus({ preventScroll: true });
         pageInput.select();
       });
-      readingActions.append(continueButton, createCurrentlyReadingControls(ownedBook));
+      readingActions.append(continueButton);
     }
+    readingActions.append(createBookShelfMenu(ownedBook), moreMenu);
     content.append(readingActions);
   }
   layout.append(cover, intro, content);
@@ -2564,10 +2548,56 @@ function updateBookPageDetails(book) {
     if (value) value.textContent = values[label];
     else field.replaceChildren(field.querySelector("strong"), document.createTextNode(` ${values[label]}`));
   });
+  updateBookReadingProgress(book);
 }
 
 function normalizeBookIsbn(value) {
   return (Array.isArray(value) ? value[0] : value || "").toString().replace(/[^0-9Xx]/g, "");
+}
+
+function createBookReadingProgress(book, ownedBook, pageCount) {
+  const currentPage = Math.min(pageCount, Math.max(0, Number(ownedBook.current_page) || 0));
+  const percentage = Math.round(currentPage / pageCount * 100);
+  const progress = document.createElement("div");
+  progress.className = "book-reading-progress";
+  const progressLabel = document.createElement("span");
+  progressLabel.className = "book-reading-progress-label";
+  progressLabel.textContent = "Page progress";
+  const progressCopy = document.createElement("span");
+  progressCopy.className = "book-reading-progress-copy";
+  progressCopy.textContent = `${currentPage} of ${pageCount} pages`;
+  const progressTrack = document.createElement("div");
+  progressTrack.className = "book-reading-progress-track";
+  progressTrack.setAttribute("role", "progressbar");
+  progressTrack.setAttribute("aria-label", `Reading progress for ${book.title}`);
+  progressTrack.setAttribute("aria-valuemin", "0");
+  progressTrack.setAttribute("aria-valuemax", String(pageCount));
+  progressTrack.setAttribute("aria-valuenow", String(currentPage));
+  const progressFill = document.createElement("span");
+  progressFill.style.width = `${percentage}%`;
+  progressTrack.append(progressFill);
+  const progressPercent = document.createElement("span");
+  progressPercent.className = "book-reading-progress-percent";
+  progressPercent.textContent = `${percentage}%`;
+  progress.append(progressLabel, progressCopy, progressTrack, progressPercent);
+  return progress;
+}
+
+function updateBookReadingProgress(book) {
+  const page = document.getElementById("pageView");
+  const readingActions = page.querySelector(".reading-actions");
+  if (!readingActions) return;
+  const progress = readingActions.querySelector(".book-reading-progress");
+  const ownedBook = state.books.find((item) => getBookKey(item) === getBookKey(book));
+  const pageCount = Number(ownedBook?.page_count || ownedBook?.pages);
+  if (!ownedBook || ownedBook.disposition || ownedBook.reading_status !== "reading"
+    || !Number.isInteger(pageCount) || pageCount <= 0) {
+    progress?.remove();
+    return;
+  }
+  const updatedProgress = createBookReadingProgress(book, ownedBook, pageCount);
+  if (progress) progress.replaceWith(updatedProgress);
+  else readingActions.prepend(updatedProgress);
 }
 
 function renderBookGenreTags(container, genres) {
@@ -2632,18 +2662,7 @@ function createBookMoreMenu(book, ownedBook) {
   const panel = document.createElement("div");
   panel.className = "book-more-menu-panel";
   if (ownedBook && !ownedBook.disposition) {
-    const finish = document.createElement("button");
-    finish.type = "button";
-    finish.textContent = "Finished reading";
-    finish.addEventListener("click", () => markBookAsRead(ownedBook));
-    panel.append(finish);
-    if (ownedBook.reading_status === "reading") {
-      const removeReading = document.createElement("button");
-      removeReading.type = "button";
-      removeReading.textContent = "Remove from Currently Reading";
-      removeReading.addEventListener("click", () => setReadingStatus(ownedBook, ""));
-      panel.append(removeReading);
-    }
+    panel.append(createCurrentlyReadingControls(ownedBook));
   }
   if (ownedBook) {
     const remove = document.createElement("button");
