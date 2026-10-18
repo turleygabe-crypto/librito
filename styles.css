@@ -4224,6 +4224,14 @@ body {
   gap: 0.65rem;
 }
 
+.edition-current-notice {
+  align-self: center;
+  margin: 0 auto 0 0;
+  color: #526d4d;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 .edition-dialog-actions .action-btn {
   background: #b64d2c;
   color: #fffaf5;

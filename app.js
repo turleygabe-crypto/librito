@@ -2555,23 +2555,39 @@ function updateBookPageDetails(book) {
   const existingCover = page.querySelector(".book-detail-cover");
   if (existingCover) existingCover.replaceWith(createBookCover(book, "book-detail-cover"));
   const values = {
-    Genre: book.genre || "—",
-    ISBN: book.isbn || "—",
-    "Publication date": formatCatalogDate(book.publish_date || book.first_publish_year),
-    Pages: book.page_count || book.pages || "—",
+    Genre: book.genre || null,
+    ISBN: book.isbn || null,
+    "Publication date": book.publish_date || book.first_publish_year
+      ? formatCatalogDate(book.publish_date || book.first_publish_year)
+      : null,
+    Pages: book.page_count || book.pages || null,
   };
   page.querySelectorAll(".book-detail-field").forEach((field) => {
     const label = field.querySelector("strong")?.textContent.trim();
-    if (!label || !(label in values)) return;
+    if (!label || !(label in values) || values[label] === null) return;
     const value = field.querySelector(".book-detail-value");
-    if (value) value.textContent = values[label];
+    if (value && label === "Genre") renderBookGenreTags(value, String(values[label]).split(","));
+    else if (value) value.textContent = values[label];
     else field.replaceChildren(field.querySelector("strong"), document.createTextNode(` ${values[label]}`));
   });
+  const introGenres = page.querySelector(".book-profile-genres");
+  if (introGenres && book.genre) renderBookGenreTags(introGenres, String(book.genre).split(","));
   updateBookReadingProgress(book);
 }
 
 function normalizeBookIsbn(value) {
   return (Array.isArray(value) ? value[0] : value || "").toString().replace(/[^0-9Xx]/g, "");
+}
+
+function isCurrentBookEdition(book, details) {
+  const bookIsbn = normalizeBookIsbn(book.isbn);
+  const editionIsbn = normalizeBookIsbn(details.isbn);
+  if (bookIsbn && editionIsbn && bookIsbn === editionIsbn) return true;
+  if (book.cover_url && details.cover_url) {
+    const normalizeCover = (url) => url.replace(/[?#].*$/, "").replace(/-\w+\.(jpg|jpeg|png|webp)$/i, ".$1");
+    if (normalizeCover(book.cover_url) === normalizeCover(details.cover_url)) return true;
+  }
+  return false;
 }
 
 function createBookReadingProgress(book, ownedBook, pageCount) {
@@ -2608,7 +2624,8 @@ function updateBookReadingProgress(book, catalogPageCount = null) {
   if (!readingActions) return;
   const progress = readingActions.querySelector(".book-reading-progress");
   const ownedBook = state.books.find((item) => getBookKey(item) === getBookKey(book));
-  const pageCount = Number(catalogPageCount || ownedBook?.page_count || ownedBook?.pages);
+  const pageCount = Number(catalogPageCount || ownedBook?.page_count || ownedBook?.pages
+    || book.page_count || book.pages);
   if (!ownedBook || ownedBook.disposition || ownedBook.reading_status !== "reading"
     || !Number.isInteger(pageCount) || pageCount <= 0) {
     progress?.remove();
@@ -2937,8 +2954,7 @@ function renderBookProfileEditions(book, section, volumes) {
     const choice = document.createElement("button");
     choice.type = "button";
     choice.className = "edition-cover-choice";
-    const selected = Boolean(details.isbn && normalizeBookIsbn(book.isbn) === normalizeBookIsbn(details.isbn))
-      || (!details.isbn && details.cover_url && book.cover_url === details.cover_url);
+    const selected = isCurrentBookEdition(book, details);
     choice.setAttribute("aria-pressed", String(selected));
     choice.setAttribute("aria-label", `Select ${details.format} edition of ${details.title || book.title}`);
     choice.append(createBookCover({
@@ -2970,7 +2986,7 @@ function renderBookProfileEditions(book, section, volumes) {
       }).format(details.price);
     const selectedLabel = document.createElement("span");
     selectedLabel.className = "edition-select-label";
-    selectedLabel.textContent = selected ? "✓ Selected" : "View edition details";
+    selectedLabel.textContent = selected ? "✓ Current edition" : "View edition details";
     copy.append(format, title, metadata, price, selectedLabel);
     choice.append(copy);
     choice.addEventListener("click", () => openBookEditionDetails(book, details, section, volumes, choice));
@@ -3179,6 +3195,7 @@ function createEditionMetadataList(details, book) {
 }
 
 function openBookEditionDetails(book, details, section, volumes, returnFocus) {
+  const isCurrentEdition = isCurrentBookEdition(book, details);
   const content = document.createElement("div");
   content.className = "edition-detail-profile";
   const summary = document.createElement("div");
@@ -3203,48 +3220,57 @@ function openBookEditionDetails(book, details, section, volumes, returnFocus) {
   }
   const actions = document.createElement("div");
   actions.className = "edition-dialog-actions";
-  const useEdition = document.createElement("button");
-  useEdition.type = "button";
-  useEdition.className = "action-btn";
-  useEdition.textContent = "Use this edition";
-  useEdition.addEventListener("click", async () => {
-    const format = details.format || "book";
-    const confirmed = await showAppConfirm(
-      `Use this ${format.toLowerCase()} edition of “${details.title || book.title}”?`,
-      { title: "Use this edition", confirmLabel: "Use edition" }
-    );
-    if (!confirmed) return;
-    useEdition.disabled = true;
-    const fields = {
-      title: details.title || book.title,
-      isbn: details.isbn || normalizeBookIsbn(book.isbn),
-      cover_url: getBookEditionCoverUrl(book, details, "L"),
-      ...(details.page_count ? { page_count: details.page_count } : {}),
-    };
-    const ownedBook = state.books.find((item) =>
-      (book.id && item.id === book.id) || getBookKey(item) === getBookKey(book)
-    );
-    if (ownedBook && !await updateBookFields(ownedBook, fields)) {
-      useEdition.disabled = false;
-      return;
-    }
-    if (!section.isConnected || state.view !== "book" || state.currentBook !== book) {
-      closeBookEditionDialog();
-      return;
-    }
-    Object.assign(book, fields);
-    if (ownedBook && ownedBook !== book) {
-      Object.assign(ownedBook, fields);
-      delete ownedBook.cover_i;
-    }
-    delete book.cover_i;
-    updateBookPageDetails(book);
-    renderBookProfileEditions(book, section, volumes);
-    const selectedChoice = section.querySelector('.edition-cover-choice[aria-pressed="true"]');
-    closeBookEditionDialog(false);
-    selectedChoice?.focus();
-    showToast(ownedBook ? "Edition updated" : "Edition selected");
-  });
+  if (isCurrentEdition) {
+    const currentNotice = document.createElement("p");
+    currentNotice.className = "edition-current-notice";
+    currentNotice.setAttribute("role", "status");
+    currentNotice.textContent = "This is the edition currently in use.";
+    actions.append(currentNotice);
+  } else {
+    const useEdition = document.createElement("button");
+    useEdition.type = "button";
+    useEdition.className = "action-btn";
+    useEdition.textContent = "Use this edition";
+    useEdition.addEventListener("click", async () => {
+      const format = details.format || "book";
+      const confirmed = await showAppConfirm(
+        `Use this ${format.toLowerCase()} edition of “${details.title || book.title}”?`,
+        { title: "Use this edition", confirmLabel: "Use edition" }
+      );
+      if (!confirmed) return;
+      useEdition.disabled = true;
+      const fields = {
+        title: details.title || book.title,
+        isbn: details.isbn || normalizeBookIsbn(book.isbn),
+        cover_url: getBookEditionCoverUrl(book, details, "L"),
+        ...(details.page_count ? { page_count: details.page_count } : {}),
+      };
+      const ownedBook = state.books.find((item) =>
+        (book.id && item.id === book.id) || getBookKey(item) === getBookKey(book)
+      );
+      if (ownedBook && !await updateBookFields(ownedBook, fields)) {
+        useEdition.disabled = false;
+        return;
+      }
+      if (!section.isConnected || state.view !== "book" || state.currentBook !== book) {
+        closeBookEditionDialog();
+        return;
+      }
+      Object.assign(book, fields);
+      if (ownedBook && ownedBook !== book) {
+        Object.assign(ownedBook, fields);
+        delete ownedBook.cover_i;
+      }
+      delete book.cover_i;
+      updateBookPageDetails(book);
+      renderBookProfileEditions(book, section, volumes);
+      const selectedChoice = section.querySelector('.edition-cover-choice[aria-pressed="true"]');
+      closeBookEditionDialog(false);
+      selectedChoice?.focus();
+      showToast(ownedBook ? "Edition updated" : "Edition selected");
+    });
+    actions.append(useEdition);
+  }
   const shopEdition = document.createElement("button");
   shopEdition.type = "button";
   shopEdition.className = "secondary-btn";
@@ -3252,7 +3278,7 @@ function openBookEditionDetails(book, details, section, volumes, returnFocus) {
   shopEdition.addEventListener("click", () =>
     openEditionShopping(book, details, editionDialogReturnFocus)
   );
-  actions.append(useEdition, shopEdition);
+  actions.append(shopEdition);
   content.append(actions);
   openBookEditionDialog("Edition details", content, returnFocus);
 }
@@ -3372,6 +3398,9 @@ async function loadBookProfileCatalog(book, { page, rating, description, readMor
     const primary = getGoogleBookDetails(getBestGoogleBookVolume(book, volumes));
     if (!primary.title) throw new Error("No matching book details were found.");
     if (primary.preview_url) book.preview_url = primary.preview_url;
+    if (!book.genre && primary.categories.length) book.genre = primary.categories.join(", ");
+    if (!book.publish_date && primary.publish_date !== "—") book.publish_date = primary.publish_date;
+    if (!book.page_count && primary.page_count) book.page_count = primary.page_count;
     renderBookRating(rating, primary, book);
     if (!getBookProfileDescription(book)) {
       renderBookProfileDescription(description, readMore, primary.description);
@@ -3403,6 +3432,9 @@ async function loadBookProfileCatalog(book, { page, rating, description, readMor
     try {
       const fallback = await fetchOpenLibraryBookDetails(book);
       if (!bookProfileIsActive(book, page)) return;
+      if (!book.genre && fallback.categories.length) book.genre = fallback.categories.join(", ");
+      if (!book.publish_date && fallback.publish_date) book.publish_date = fallback.publish_date;
+      if (!book.page_count && fallback.page_count) book.page_count = fallback.page_count;
       renderBookRating(rating, fallback, book);
       if (!getBookProfileDescription(book)) {
         renderBookProfileDescription(description, readMore, fallback.description);
