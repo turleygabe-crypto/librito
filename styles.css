@@ -3190,11 +3190,17 @@ body {
 
 .book-detail-content .page-actions > .currently-reading-button {
   min-height: 2.3rem;
-  border: 1px solid #527c61;
+  border: 1px solid #b64d2c;
   border-radius: 999px;
   padding: 0.52rem 0.8rem;
-  background: #527c61;
+  background: #b64d2c;
   color: #fff;
+  font-size: 0.78rem;
+}
+
+.book-detail-content .page-actions > .secondary-btn {
+  min-height: 2.3rem;
+  padding: 0.52rem 0.8rem;
   font-size: 0.78rem;
 }
 
@@ -3205,8 +3211,8 @@ body {
 }
 
 .book-detail-content .reading-actions {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-  gap: 0.65rem;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) 2.5rem;
+  gap: 0.5rem;
 }
 
 .book-detail-content .book-reading-progress {
@@ -3227,6 +3233,7 @@ body {
 
 .book-detail-content .book-reading-progress-track {
   height: 0.55rem;
+  grid-column: 1;
 }
 
 .book-detail-content .reading-actions > .book-continue-reading {
@@ -3250,8 +3257,15 @@ body {
 }
 
 .book-detail-content .reading-actions > .book-more-menu {
+  width: 2.5rem;
   margin-left: 0;
-  justify-self: end;
+  justify-self: stretch;
+}
+
+.book-detail-content .reading-actions > .book-more-menu > summary {
+  width: 2.5rem;
+  height: 2.3rem;
+  border-radius: 999px;
 }
 
 .book-more-menu-panel > .currently-reading-controls {
@@ -3415,6 +3429,8 @@ body {
   min-height: 0;
   align-content: center;
   gap: 0.8rem;
+  padding-left: 1.25rem;
+  border-left: 1px solid #e6d7c8;
   color: #40352d;
 }
 
@@ -3430,8 +3446,7 @@ body {
   gap: 0.5rem;
   min-width: 0;
   margin: 0;
-  padding: 0.58rem 0;
-  border-bottom: 1px solid #eadfd4;
+  padding: 0.38rem 0;
   color: #40352d;
   font-size: 0.88rem;
   line-height: 1.3;
@@ -3512,7 +3527,7 @@ body {
 
 .book-detail-content .reading-actions {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) 2.5rem;
   gap: 0.55rem;
   align-items: center;
   margin: 0;
@@ -3529,7 +3544,7 @@ body {
 
 .book-detail-content .book-reading-progress-track {
   height: 0.55rem;
-  grid-column: 1 / -1;
+  grid-column: 1;
   overflow: hidden;
   border-radius: 999px;
   background: #e8dfd7;
@@ -3544,9 +3559,9 @@ body {
 
 .book-detail-content .reading-actions > .currently-reading-button {
   justify-self: start;
-  border-color: #47735a;
-  background: #47735a;
-  color: white;
+  border-color: #b64d2c;
+  background: #b64d2c;
+  color: #fffaf5;
 }
 
 .book-detail-content .book-continue-reading {

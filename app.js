@@ -2583,13 +2583,13 @@ function createBookReadingProgress(book, ownedBook, pageCount) {
   return progress;
 }
 
-function updateBookReadingProgress(book) {
+function updateBookReadingProgress(book, catalogPageCount = null) {
   const page = document.getElementById("pageView");
   const readingActions = page.querySelector(".reading-actions");
   if (!readingActions) return;
   const progress = readingActions.querySelector(".book-reading-progress");
   const ownedBook = state.books.find((item) => getBookKey(item) === getBookKey(book));
-  const pageCount = Number(ownedBook?.page_count || ownedBook?.pages);
+  const pageCount = Number(catalogPageCount || ownedBook?.page_count || ownedBook?.pages);
   if (!ownedBook || ownedBook.disposition || ownedBook.reading_status !== "reading"
     || !Number.isInteger(pageCount) || pageCount <= 0) {
     progress?.remove();
@@ -3050,6 +3050,13 @@ async function loadBookProfileCatalog(book, { page, rating, description, readMor
       const value = publishedField.querySelector(".book-detail-value");
       if (value) value.textContent = primary.publish_date;
     }
+    const pagesField = [...page.querySelectorAll(".book-detail-field")]
+      .find((field) => field.querySelector("strong")?.textContent === "Pages");
+    if (pagesField && primary.page_count) {
+      const value = pagesField.querySelector(".book-detail-value");
+      if (value) value.textContent = String(primary.page_count);
+    }
+    updateBookReadingProgress(book, primary.page_count);
   } catch (error) {
     console.error("Could not load book catalog details", error);
     if (!bookProfileIsActive(book, page)) return;
@@ -3078,6 +3085,7 @@ async function loadBookProfileCatalog(book, { page, rating, description, readMor
         const value = pagesField.querySelector(".book-detail-value");
         if (value) value.textContent = String(fallback.page_count);
       }
+      updateBookReadingProgress(book, fallback.page_count);
     } catch (fallbackError) {
       console.error("Could not load Open Library book details", fallbackError);
       if (!bookProfileIsActive(book, page)) return;
