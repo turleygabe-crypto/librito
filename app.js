@@ -563,10 +563,11 @@ async function saveCurrentPage(book, currentPage) {
   showToast("Page bookmarked");
 }
 
-async function moveBookBookmark(book) {
+async function setBookBookmark(book) {
+  const hasBookmark = Number(book.current_page) > 0;
   const value = await showAppPrompt("Choose the page to bookmark.", {
-    title: "Move bookmark",
-    confirmLabel: "Save bookmark",
+    title: hasBookmark ? "Move bookmark" : "Set bookmark",
+    confirmLabel: hasBookmark ? "Move bookmark" : "Set bookmark",
     value: String(book.current_page || 0),
     placeholder: "Page number",
   });
@@ -1419,8 +1420,8 @@ function createFeaturedReadingCard(book) {
   const continueButton = document.createElement("button");
   continueButton.type = "button";
   continueButton.className = "reading-continue-btn";
-  continueButton.textContent = "Move bookmark";
-  continueButton.addEventListener("click", () => moveBookBookmark(book));
+  continueButton.textContent = Number(book.current_page) > 0 ? "Move bookmark" : "Set bookmark";
+  continueButton.addEventListener("click", () => setBookBookmark(book));
   details.append(title, author, progress, continueButton);
   card.append(coverButton, details);
   return card;
@@ -2508,8 +2509,8 @@ function renderBookPage(book) {
       const continueButton = document.createElement("button");
       continueButton.type = "button";
       continueButton.className = "action-btn book-continue-reading";
-      continueButton.textContent = "Move bookmark";
-      continueButton.addEventListener("click", () => moveBookBookmark(ownedBook));
+      continueButton.textContent = Number(ownedBook.current_page) > 0 ? "Move bookmark" : "Set bookmark";
+      continueButton.addEventListener("click", () => setBookBookmark(ownedBook));
       readingActions.append(continueButton);
     }
     readingActions.append(createBookShelfMenu(ownedBook), moreMenu);
@@ -3346,7 +3347,7 @@ function openBookEditionDetails(book, details, section, volumes, returnFocus) {
       const pageCount = Number(details.page_count || selectedProgress?.page_count) || null;
       fields.page_count = pageCount;
       fields.current_page = Number(selectedProgress?.current_page) || 0;
-      fields.reading_status = selectedProgress?.reading_status ?? progressOwner.reading_status ?? "";
+      fields.reading_status = selectedProgress?.reading_status || "";
       if (Number.isInteger(pageCount) && pageCount > 0) {
         fields.current_page = fields.reading_status === "completed"
           ? pageCount
