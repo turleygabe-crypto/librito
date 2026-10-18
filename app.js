@@ -563,6 +563,22 @@ async function saveCurrentPage(book, currentPage) {
   showToast("Page bookmarked");
 }
 
+async function moveBookBookmark(book) {
+  const value = await showAppPrompt("Choose the page to bookmark.", {
+    title: "Move bookmark",
+    confirmLabel: "Save bookmark",
+    value: String(book.current_page || 0),
+    placeholder: "Page number",
+  });
+  if (value === null) return;
+  const pageNumber = value.trim() ? Number(value) : Number.NaN;
+  if (!Number.isInteger(pageNumber)) {
+    showToast("Enter a whole page number.");
+    return;
+  }
+  await saveCurrentPage(book, pageNumber);
+}
+
 async function addBookToShelf(book, shelf) {
   if (!shelf?.id) {
     showToast("Choose a valid shelf.");
@@ -1403,8 +1419,8 @@ function createFeaturedReadingCard(book) {
   const continueButton = document.createElement("button");
   continueButton.type = "button";
   continueButton.className = "reading-continue-btn";
-  continueButton.textContent = "Continue reading";
-  continueButton.addEventListener("click", () => openBookProfile(book));
+  continueButton.textContent = "Move bookmark";
+  continueButton.addEventListener("click", () => moveBookBookmark(book));
   details.append(title, author, progress, continueButton);
   card.append(coverButton, details);
   return card;
@@ -2492,27 +2508,8 @@ function renderBookPage(book) {
       const continueButton = document.createElement("button");
       continueButton.type = "button";
       continueButton.className = "action-btn book-continue-reading";
-      continueButton.textContent = "▶  Continue reading";
-      continueButton.addEventListener("click", () => {
-        if (book.preview_url) {
-          window.open(book.preview_url, "_blank", "noopener,noreferrer");
-          return;
-        }
-        showAppPrompt("Enter the page you want to continue from.", {
-          title: "Continue reading",
-          confirmLabel: "Save page",
-          value: String(ownedBook.current_page || 0),
-          placeholder: "Page number",
-        }).then((value) => {
-          if (value === null) return;
-          const pageNumber = value.trim() ? Number(value) : Number.NaN;
-          if (!Number.isInteger(pageNumber)) {
-            showToast("Enter a whole page number.");
-            return;
-          }
-          saveCurrentPage(ownedBook, pageNumber);
-        });
-      });
+      continueButton.textContent = "Move bookmark";
+      continueButton.addEventListener("click", () => moveBookBookmark(ownedBook));
       readingActions.append(continueButton);
     }
     readingActions.append(createBookShelfMenu(ownedBook), moreMenu);
