@@ -2545,7 +2545,7 @@ function createProfileRecommendationSection(title, message) {
   return { section: wrapper, status };
 }
 
-function updateBookPageDetails(book) {
+function updateBookPageDetails(book, { clearMissingPageCount = false } = {}) {
   state.currentBook = book;
   const page = document.getElementById("pageView");
   const heading = page.querySelector(".book-profile-title");
@@ -2560,7 +2560,7 @@ function updateBookPageDetails(book) {
     "Publication date": book.publish_date || book.first_publish_year
       ? formatCatalogDate(book.publish_date || book.first_publish_year)
       : null,
-    Pages: book.page_count || book.pages || null,
+    Pages: book.page_count || book.pages || (clearMissingPageCount ? "—" : null),
   };
   page.querySelectorAll(".book-detail-field").forEach((field) => {
     const label = field.querySelector("strong")?.textContent.trim();
@@ -3243,11 +3243,16 @@ function openBookEditionDetails(book, details, section, volumes, returnFocus) {
         title: details.title || book.title,
         isbn: details.isbn || normalizeBookIsbn(book.isbn),
         cover_url: getBookEditionCoverUrl(book, details, "L"),
-        ...(details.page_count ? { page_count: details.page_count } : {}),
+        page_count: details.page_count,
       };
       const ownedBook = state.books.find((item) =>
         (book.id && item.id === book.id) || getBookKey(item) === getBookKey(book)
       );
+      if (ownedBook && Number.isInteger(details.page_count) && details.page_count > 0) {
+        fields.current_page = ownedBook.reading_status === "completed"
+          ? details.page_count
+          : Math.min(Math.max(0, Number(ownedBook.current_page) || 0), details.page_count);
+      }
       if (ownedBook && !await updateBookFields(ownedBook, fields)) {
         useEdition.disabled = false;
         return;
@@ -3260,9 +3265,13 @@ function openBookEditionDetails(book, details, section, volumes, returnFocus) {
       if (ownedBook && ownedBook !== book) {
         Object.assign(ownedBook, fields);
         delete ownedBook.cover_i;
+        delete ownedBook.pages;
       }
+      if (ownedBook === book) delete ownedBook.pages;
+      delete book.pages;
       delete book.cover_i;
-      updateBookPageDetails(book);
+      if (!state.session) localStorage.setItem(storageKey, JSON.stringify(state.books));
+      updateBookPageDetails(book, { clearMissingPageCount: true });
       renderBookProfileEditions(book, section, volumes);
       const selectedChoice = section.querySelector('.edition-cover-choice[aria-pressed="true"]');
       closeBookEditionDialog(false);
