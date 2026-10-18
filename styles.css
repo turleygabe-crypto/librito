@@ -3695,6 +3695,7 @@ body {
 }
 
 .edition-picker {
+  grid-column: 1 / -1;
   display: grid;
   align-content: start;
   gap: 0.8rem;
@@ -3829,6 +3830,9 @@ body {
 
 .book-audiobook-panel {
   display: grid;
+  grid-column: 1 / -1;
+  width: min(100%, 19rem);
+  justify-self: end;
   align-content: start;
   align-self: start;
   gap: 0.65rem;
