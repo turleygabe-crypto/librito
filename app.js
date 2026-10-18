@@ -185,7 +185,6 @@ const state = {
   searchLoading: false,
   loading: true,
   loadError: "",
-  shelfFilter: "All",
   dismissedRecommendations: new Set(),
   catalogBooks: [],
   catalogLibraryKey: "",
@@ -813,16 +812,10 @@ function renderShelves() {
     "#8b5e3c",
     completedBooks[0]
   ));
-  const visibleShelves = shelvesToRender.filter(({ books }) => matchesShelfFilter(books));
-  visibleShelves.forEach((shelf) => {
+  shelvesToRender.forEach((shelf) => {
     shelfList.append(createShelfNavigationItem(shelf.name, String(shelf.books.length), shelf.color, shelf.books[0]));
   });
-  if (!visibleShelves.length && state.shelfFilter !== "All") {
-    const empty = document.createElement("p");
-    empty.className = "sidebar-empty";
-    empty.textContent = "No shelves match this filter.";
-    shelfList.append(empty);
-  } else if (!visibleShelves.length && libraryBooks.length === 0) {
+  if (!shelvesToRender.length && libraryBooks.length === 0) {
     const empty = document.createElement("p");
     empty.className = "sidebar-empty";
     empty.textContent = "Your shelves will appear here.";
@@ -833,27 +826,6 @@ function renderShelves() {
 function getBookShelfNames(book) {
   if (Array.isArray(book.shelves) && book.shelves.length) return book.shelves;
   return book.shelf ? [book.shelf] : [];
-}
-
-function matchesShelfFilter(books) {
-  if (state.shelfFilter === "All") return true;
-  const genres = books.map((book) => (book.genre || "").toLowerCase());
-  if (state.shelfFilter === "Fiction") return genres.some((genre) => genre.includes("fiction") && !genre.includes("nonfiction"));
-  if (state.shelfFilter === "Nonfiction") return genres.some((genre) => genre.includes("nonfiction") || genre.includes("non-fiction"));
-  return genres.some((genre) => genre && !genre.includes("fiction") && !genre.includes("nonfiction") && genre !== "non-fiction");
-}
-
-function setShelfFilter(filter) {
-  state.shelfFilter = filter;
-  document.querySelectorAll(".sidebar-filters .category-tab").forEach((button) => {
-    const active = button.textContent.trim() === filter;
-    button.classList.toggle("active", active);
-    button.setAttribute("aria-pressed", String(active));
-  });
-  renderShelves();
-  if (window.matchMedia("(max-width: 899px)").matches && sidebar.classList.contains("is-open")) {
-    setLibraryDrawerOpen(false);
-  }
 }
 
 function setLibraryDrawerOpen(open) {
@@ -3750,10 +3722,6 @@ async function saveBookToSupabase(book) {
   showToast("Book saved to your library");
   return true;
 }
-
-document.querySelectorAll(".sidebar-filters .category-tab").forEach((tab) => {
-  tab.addEventListener("click", () => setShelfFilter(tab.textContent.trim()));
-});
 
 globalSearchForm.addEventListener("submit", async (event) => {
   event.preventDefault();
