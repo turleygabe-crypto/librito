@@ -2301,24 +2301,28 @@ function renderBookPage(book) {
   const author = document.createElement("p");
   author.className = "book-profile-author";
   author.textContent = book.author || "Unknown author";
-  intro.append(heading, author);
-  const descriptionText = typeof book.description === "string"
-    ? book.description.trim()
-    : typeof book.description?.value === "string"
-      ? book.description.value.trim()
-      : "";
-  if (descriptionText) {
-    const description = document.createElement("p");
-    description.className = "book-profile-description";
-    description.textContent = descriptionText;
-    intro.append(description);
-  }
-  if (book.genre) {
-    const genre = document.createElement("span");
-    genre.className = "book-profile-genre";
-    genre.textContent = book.genre;
-    intro.append(genre);
-  }
+  const rating = document.createElement("div");
+  rating.className = "book-profile-rating";
+  rating.setAttribute("aria-live", "polite");
+  rating.textContent = "Loading ratings…";
+  const description = document.createElement("p");
+  description.className = "book-profile-description";
+  description.textContent = getBookProfileDescription(book) || "Looking up the book description…";
+  const readMore = document.createElement("button");
+  readMore.type = "button";
+  readMore.className = "book-profile-read-more";
+  readMore.textContent = "Read more";
+  readMore.setAttribute("aria-expanded", "false");
+  readMore.hidden = description.textContent.length <= 260;
+  readMore.addEventListener("click", () => {
+    const expanded = description.classList.toggle("is-expanded");
+    readMore.setAttribute("aria-expanded", String(expanded));
+    readMore.textContent = expanded ? "Read less" : "Read more";
+  });
+  const genres = document.createElement("div");
+  genres.className = "book-profile-genres";
+  renderBookGenreTags(genres, book.genre ? [book.genre] : []);
+  intro.append(heading, author, rating, description, readMore, genres);
 
   const content = document.createElement("div");
   content.className = "book-detail-content";
@@ -2327,17 +2331,22 @@ function renderBookPage(book) {
   const details = [
     ["Genre", book.genre || "—"],
     ["ISBN", book.isbn || "—"],
-    ["Published", book.publish_date || book.first_publish_year || "—"],
-    ["Date added", formatDate(book.added || book.added_on)],
+    ["Publication date", formatCatalogDate(book.publish_date || book.first_publish_year)],
     ["Pages", book.page_count || book.pages || "—"],
-    ["Value", formatCurrency(book.cost)],
   ];
-  details.forEach(([label, value]) => {
-    const field = document.createElement("p");
+  details.forEach(([label, value], index) => {
+    const field = document.createElement("div");
     field.className = "book-detail-field";
+    const icon = document.createElement("span");
+    icon.className = "book-metadata-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = ["◈", "▣", "▦", "▤"][index];
     const strong = document.createElement("strong");
     strong.textContent = label;
-    field.append(strong, document.createTextNode(value));
+    const valueNode = document.createElement("span");
+    valueNode.className = "book-detail-value";
+    valueNode.textContent = Array.isArray(value) ? value[0] || "—" : String(value || "—");
+    field.append(icon, strong, valueNode);
     metadata.append(field);
   });
   content.append(metadata);
@@ -2376,25 +2385,8 @@ function renderBookPage(book) {
     else showToast("Add this book to your library before liking it.");
   });
   actions.append(add, like);
-  if (ownedBook && !ownedBook.disposition && state.shelves.length) {
-    const shelfSelect = document.createElement("select");
-    shelfSelect.className = "page-shelf-select";
-    shelfSelect.setAttribute("aria-label", "Choose a shelf");
-    shelfSelect.add(new Option("Choose a shelf", ""));
-    state.shelves.forEach((shelf) => {
-      shelfSelect.add(new Option(shelf.name, shelf.id));
-    });
-    const addToShelf = document.createElement("button");
-    addToShelf.type = "button";
-    addToShelf.className = "secondary-btn";
-    addToShelf.textContent = "Add to shelf";
-    addToShelf.addEventListener("click", () => {
-      const shelf = state.shelves.find((item) => item.id === shelfSelect.value);
-      if (shelf) addBookToShelf(ownedBook, shelf);
-      else showToast("Choose a shelf first.");
-    });
-    actions.append(shelfSelect, addToShelf);
-  }
+  if (ownedBook && !ownedBook.disposition) actions.append(createBookShelfMenu(ownedBook));
+  actions.append(createBookMoreMenu(book, ownedBook));
   content.append(actions);
   if (ownedBook && !ownedBook.disposition) {
     const readingActions = document.createElement("div");
@@ -2447,14 +2439,48 @@ function renderBookPage(book) {
       isCurrentlyReading ? "" : "reading"
     ));
     readingActions.append(currentlyReading);
-    if (isCurrentlyReading) readingActions.append(createCurrentlyReadingControls(ownedBook));
+    if (isCurrentlyReading) {
+      const continueButton = document.createElement("button");
+      continueButton.type = "button";
+      continueButton.className = "action-btn book-continue-reading";
+      continueButton.textContent = "▶  Continue reading";
+      continueButton.addEventListener("click", () => {
+        if (book.preview_url) {
+          window.open(book.preview_url, "_blank", "noopener,noreferrer");
+          return;
+        }
+        const pageInput = readingActions.querySelector(".current-page-input");
+        if (!pageInput) return;
+        pageInput.scrollIntoView({ block: "center", behavior: "smooth" });
+        pageInput.focus({ preventScroll: true });
+        pageInput.select();
+      });
+      readingActions.append(continueButton, createCurrentlyReadingControls(ownedBook));
+    }
     content.append(readingActions);
   }
   layout.append(cover, intro, content);
   page.append(breadcrumb, layout);
-  page.append(createBookEditionPicker(book));
-  const similar = discoveryBooks.filter((item) => item.genre === book.genre && getBookKey(item) !== getBookKey(book));
-  if (similar.length) page.append(createCardRow("More like this", similar.slice(0, 6).map((item) => ({ type: "book", book: item }))));
+  const below = document.createElement("div");
+  below.className = "book-profile-below";
+  const editions = createBookEditionPicker(book);
+  const audiobook = createBookAudiobookPanel(book);
+  const recommendations = document.createElement("div");
+  recommendations.className = "book-profile-recommendations";
+  const moreByAuthor = createProfileRecommendationSection(
+    `More by ${book.author || "this author"}`,
+    "Looking for more books by this author…"
+  );
+  const readersEnjoyed = createProfileRecommendationSection(
+    "Readers also enjoyed",
+    "Finding similar books…"
+  );
+  recommendations.append(moreByAuthor.section, readersEnjoyed.section);
+  below.append(editions, audiobook, recommendations);
+  page.append(below);
+  loadBookProfileCatalog(book, { page, rating, description, readMore, editions });
+  loadBookProfileAudiobook(book, audiobook);
+  loadBookProfileRecommendations(book, moreByAuthor, readersEnjoyed);
 }
 
 function createBookEditionPicker(book) {
@@ -2473,88 +2499,47 @@ function createBookEditionPicker(book) {
   const loadButton = document.createElement("button");
   loadButton.type = "button";
   loadButton.className = "secondary-btn edition-picker-button";
-  loadButton.textContent = "View editions";
+  loadButton.textContent = "Refresh editions";
   header.append(copy, loadButton);
   const status = document.createElement("p");
   status.className = "edition-picker-status";
   status.setAttribute("role", "status");
   const choices = document.createElement("div");
   choices.className = "edition-cover-choices";
+  status.textContent = "Finding available editions…";
   section.append(header, status, choices);
 
-  loadButton.addEventListener("click", async () => {
-    loadButton.disabled = true;
-    status.textContent = "Finding editions…";
-    choices.replaceChildren();
-    try {
-      const editions = await getOpenLibraryEditionsForBook(book);
-      if (!editions.length) {
-        status.textContent = `No ${getOpenLibraryLanguageName(getDefaultBookLanguage())} editions with covers were found.`;
-        return;
-      }
-      status.textContent = `Choose from ${editions.length} edition${editions.length === 1 ? "" : "s"} and available cover${editions.length === 1 ? "" : "s"}.`;
-      editions.forEach((edition) => {
-        const choice = document.createElement("button");
-        choice.type = "button";
-        choice.className = "edition-cover-choice";
-        choice.setAttribute("aria-pressed", String(
-          book.cover_url === edition.coverUrl && book.isbn === edition.isbn
-        ));
-        choice.append(createBookCover({
-          title: edition.title,
-          cover_url: edition.coverUrl,
-        }));
-        const copy = document.createElement("span");
-        copy.className = "edition-cover-copy";
-        const title = document.createElement("strong");
-        title.textContent = edition.title;
-        const metadata = document.createElement("span");
-        metadata.textContent = [
-          edition.publishDate,
-          edition.publisher,
-          edition.isbn && `ISBN ${edition.isbn}`,
-        ].filter(Boolean).join(" · ") || `${getOpenLibraryLanguageName(getDefaultBookLanguage())} edition`;
-        copy.append(title, metadata);
-        choice.append(copy);
-        choice.addEventListener("click", async () => {
-          choice.disabled = true;
-          const fields = {
-            title: edition.title || book.title,
-            isbn: edition.isbn || book.isbn || "",
-            cover_url: edition.coverUrl,
-            ...(edition.pageCount ? { page_count: edition.pageCount } : {}),
-          };
-          const ownedBook = state.books.find((item) =>
-            (book.id && item.id === book.id) || getBookKey(item) === getBookKey(book)
-          );
-          if (ownedBook && !await updateBookFields(ownedBook, fields)) {
-            choice.disabled = false;
-            return;
-          }
-          Object.assign(book, fields);
-          if (ownedBook && ownedBook !== book) {
-            Object.assign(ownedBook, fields);
-            delete ownedBook.cover_i;
-          }
-          delete book.cover_i;
-          updateBookPageDetails(book);
-          choices.querySelectorAll(".edition-cover-choice").forEach((button) => {
-            button.setAttribute("aria-pressed", String(button === choice));
-          });
-          section.remove();
-          choice.disabled = false;
-          showToast(ownedBook ? "Edition updated" : "Edition selected");
-        });
-        choices.append(choice);
-      });
-    } catch (error) {
-      console.error(error);
-      status.textContent = "Could not load editions. Check your connection and try again.";
-    } finally {
-      loadButton.disabled = false;
-    }
-  });
+  loadButton.addEventListener("click", () => loadBookProfileEditions(book, section));
+  section.dataset.status = "loading";
   return section;
+}
+
+function createBookAudiobookPanel(book) {
+  const section = document.createElement("section");
+  section.className = "book-audiobook-panel";
+  const heading = document.createElement("h2");
+  heading.textContent = "Listen to the audiobook";
+  const status = document.createElement("p");
+  status.className = "audiobook-status";
+  status.setAttribute("role", "status");
+  status.textContent = "Checking for audiobook editions…";
+  section.append(heading, status);
+  return section;
+}
+
+function createProfileRecommendationSection(title, message) {
+  const wrapper = document.createElement("section");
+  wrapper.className = "book-profile-recommendation";
+  const header = document.createElement("div");
+  header.className = "book-profile-recommendation-heading";
+  const heading = document.createElement("h2");
+  heading.textContent = title;
+  const status = document.createElement("p");
+  status.className = "book-recommendation-status";
+  status.textContent = message;
+  header.append(heading);
+  wrapper.append(header, status);
+  return { section: wrapper, status };
 }
 
 function updateBookPageDetails(book) {
@@ -2567,19 +2552,750 @@ function updateBookPageDetails(book) {
   const existingCover = page.querySelector(".book-detail-cover");
   if (existingCover) existingCover.replaceWith(createBookCover(book, "book-detail-cover"));
   const values = {
+    Genre: book.genre || "—",
     ISBN: book.isbn || "—",
+    "Publication date": formatCatalogDate(book.publish_date || book.first_publish_year),
     Pages: book.page_count || book.pages || "—",
   };
   page.querySelectorAll(".book-detail-field").forEach((field) => {
     const label = field.querySelector("strong")?.textContent.trim();
     if (!label || !(label in values)) return;
-    field.replaceChildren(field.querySelector("strong"), document.createTextNode(` ${values[label]}`));
+    const value = field.querySelector(".book-detail-value");
+    if (value) value.textContent = values[label];
+    else field.replaceChildren(field.querySelector("strong"), document.createTextNode(` ${values[label]}`));
   });
+}
+
+function normalizeBookIsbn(value) {
+  return (Array.isArray(value) ? value[0] : value || "").toString().replace(/[^0-9Xx]/g, "");
+}
+
+function renderBookGenreTags(container, genres) {
+  container.replaceChildren();
+  const uniqueGenres = [...new Set(genres.filter(Boolean))].slice(0, 4);
+  if (!uniqueGenres.length) {
+    const missing = document.createElement("span");
+    missing.textContent = "—";
+    container.append(missing);
+    return;
+  }
+  uniqueGenres.forEach((genre) => {
+    const tag = document.createElement("span");
+    tag.className = "book-profile-genre";
+    tag.textContent = genre;
+    container.append(tag);
+  });
+}
+
+function createBookShelfMenu(book) {
+  const menu = document.createElement("details");
+  menu.className = "book-shelf-menu";
+  const summary = document.createElement("summary");
+  summary.className = "secondary-btn";
+  summary.textContent = "＋  Add to shelf";
+  const panel = document.createElement("div");
+  panel.className = "book-more-menu-panel";
+  if (state.shelves.length) {
+    state.shelves.forEach((shelf) => {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.textContent = shelf.name;
+      option.disabled = getBookShelfNames(book).includes(shelf.name);
+      option.addEventListener("click", () => {
+        menu.open = false;
+        addBookToShelf(book, shelf);
+      });
+      panel.append(option);
+    });
+  } else {
+    const empty = document.createElement("p");
+    empty.textContent = "Create a shelf before adding this book.";
+    const create = document.createElement("button");
+    create.type = "button";
+    create.textContent = "Create a shelf";
+    create.addEventListener("click", () => {
+      menu.open = false;
+      openShelfDrawer();
+    });
+    panel.append(empty, create);
+  }
+  menu.append(summary, panel);
+  return menu;
+}
+
+function createBookMoreMenu(book, ownedBook) {
+  const menu = document.createElement("details");
+  menu.className = "book-more-menu";
+  const summary = document.createElement("summary");
+  summary.textContent = "•••";
+  summary.setAttribute("aria-label", "More book actions");
+  const panel = document.createElement("div");
+  panel.className = "book-more-menu-panel";
+  if (ownedBook && !ownedBook.disposition) {
+    const finish = document.createElement("button");
+    finish.type = "button";
+    finish.textContent = "Finished reading";
+    finish.addEventListener("click", () => markBookAsRead(ownedBook));
+    panel.append(finish);
+    if (ownedBook.reading_status === "reading") {
+      const removeReading = document.createElement("button");
+      removeReading.type = "button";
+      removeReading.textContent = "Remove from Currently Reading";
+      removeReading.addEventListener("click", () => setReadingStatus(ownedBook, ""));
+      panel.append(removeReading);
+    }
+  }
+  if (ownedBook) {
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "danger-action";
+    remove.textContent = "Remove from library";
+    remove.addEventListener("click", () => removeBookFromLibrary(ownedBook));
+    panel.append(remove);
+  } else {
+    const add = document.createElement("button");
+    add.type = "button";
+    add.textContent = "Add to my library";
+    add.addEventListener("click", () => markBookAsOwned(book));
+    panel.append(add);
+  }
+  menu.append(summary, panel);
+  return menu;
+}
+
+function getBookProfileDescription(book) {
+  if (typeof book.description === "string") return book.description.trim();
+  if (typeof book.description?.value === "string") return book.description.value.trim();
+  return "";
+}
+
+function formatCatalogDate(value) {
+  if (!value) return "—";
+  if (/^\d{4}$/.test(String(value))) return String(value);
+  const isoDate = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const date = isoDate
+    ? new Date(Number(isoDate[1]), Number(isoDate[2]) - 1, Number(isoDate[3]))
+    : new Date(value);
+  return Number.isNaN(date.getTime())
+    ? String(value)
+    : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function bookProfileIsActive(book, page) {
+  return state.view === "book" && state.currentBook === book && page.isConnected;
+}
+
+function getBookProfileQuery(book, isbnOnly = false) {
+  const isbn = normalizeBookIsbn(book.isbn);
+  if (isbnOnly && isbn) return `isbn:${isbn}`;
+  return [
+    book.title && `intitle:${JSON.stringify(book.title)}`,
+    book.author && `inauthor:${JSON.stringify(book.author)}`,
+  ].filter(Boolean).join(" ");
+}
+
+async function fetchGoogleBookVolumes(query) {
+  const params = new URLSearchParams({ q: query, maxResults: "20", printType: "books" });
+  const response = await fetch(`https://www.googleapis.com/books/v1/volumes?${params}`);
+  if (!response.ok) throw new Error(`Google Books responded with ${response.status}`);
+  const payload = await response.json();
+  return Array.isArray(payload.items) ? payload.items : [];
+}
+
+async function fetchBookProfileVolumes(book) {
+  const queries = [getBookProfileQuery(book, true), getBookProfileQuery(book)]
+    .filter((query, index, all) => query && all.indexOf(query) === index);
+  const results = await Promise.allSettled(queries.map(fetchGoogleBookVolumes));
+  const volumes = [];
+  results.forEach((result) => {
+    if (result.status === "fulfilled") volumes.push(...result.value);
+    else console.error("Could not load Google Books catalog results", result.reason);
+  });
+  if (!results.some((result) => result.status === "fulfilled")) {
+    throw new Error("Google Books catalog lookup failed.");
+  }
+  const title = normalizeBookText(book.title);
+  const author = normalizeBookText(book.author);
+  const isbn = normalizeBookIsbn(book.isbn);
+  const uniqueVolumes = [...new Map(volumes.map((volume) => [volume.id, volume])).values()];
+  return uniqueVolumes.filter((volume) => {
+    const info = volume.volumeInfo || {};
+    const titleMatch = normalizeBookText(info.title).includes(title)
+      || title.includes(normalizeBookText(info.title));
+    const authorMatch = !author || (info.authors || []).some((name) =>
+      normalizeBookText(name).includes(author) || author.includes(normalizeBookText(name))
+    );
+    const isbnMatch = isbn && (info.industryIdentifiers || []).some((identifier) =>
+      normalizeBookIsbn(identifier.identifier) === isbn
+    );
+    return Boolean(isbnMatch || (title && titleMatch && authorMatch));
+  });
+}
+
+function normalizeBookText(value) {
+  return (value || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+async function fetchOpenLibraryBookDetails(book) {
+  const params = new URLSearchParams({
+    q: [book.title, book.author].filter(Boolean).join(" "),
+    fields: "key,title,author_name,ratings_average,ratings_count,first_publish_year,number_of_pages_median,first_sentence",
+    limit: "10",
+  });
+  const response = await fetch(`https://openlibrary.org/search.json?${params}`);
+  if (!response.ok) throw new Error(`Open Library search responded with ${response.status}`);
+  const payload = await response.json();
+  const title = normalizeBookText(book.title);
+  const author = normalizeBookText(book.author);
+  const match = (payload.docs || []).find((doc) =>
+    normalizeBookText(doc.title) === title
+    && (!author || (doc.author_name || []).some((name) => normalizeBookText(name).includes(author)))
+    && /^\/works\/[^/]+$/.test(doc.key || "")
+  );
+  if (!match) throw new Error("No matching Open Library work was found.");
+
+  const [workResult, ratingsResult] = await Promise.allSettled([
+    fetch(`https://openlibrary.org${match.key}.json`).then(async (workResponse) => {
+      if (!workResponse.ok) throw new Error(`Open Library work responded with ${workResponse.status}`);
+      return workResponse.json();
+    }),
+    fetch(`https://openlibrary.org${match.key}/ratings.json`).then(async (ratingsResponse) => {
+      if (!ratingsResponse.ok) throw new Error(`Open Library ratings responded with ${ratingsResponse.status}`);
+      return ratingsResponse.json();
+    }),
+  ]);
+  if (workResult.status === "rejected") console.error("Could not load Open Library work details", workResult.reason);
+  if (ratingsResult.status === "rejected") console.error("Could not load Open Library ratings", ratingsResult.reason);
+
+  const work = workResult.status === "fulfilled" ? workResult.value : {};
+  const description = typeof work.description === "string"
+    ? work.description
+    : work.description?.value || (Array.isArray(match.first_sentence) ? match.first_sentence[0] : "");
+  const ratingSummary = ratingsResult.status === "fulfilled" ? ratingsResult.value.summary : null;
+  const categories = (Array.isArray(work.subjects) ? work.subjects : [])
+    .filter((subject) => !subject.includes(":"))
+    .sort((first, second) =>
+      Number(second.toLowerCase() === "fiction") - Number(first.toLowerCase() === "fiction")
+    );
+  return {
+    title: match.title || book.title,
+    description,
+    categories,
+    average_rating: Number(ratingSummary?.average ?? match.ratings_average) || 0,
+    ratings_count: Number(ratingSummary?.count ?? match.ratings_count) || 0,
+    publish_date: match.first_publish_year ? String(match.first_publish_year) : "",
+    page_count: Number(match.number_of_pages_median) || null,
+  };
+}
+
+function getBestGoogleBookVolume(book, volumes) {
+  const title = normalizeBookText(book.title);
+  const author = normalizeBookText(book.author);
+  const isbn = normalizeBookIsbn(book.isbn);
+  return volumes.slice().sort((first, second) => {
+    const score = (volume) => {
+      const info = volume.volumeInfo || {};
+      const titleMatch = normalizeBookText(info.title) === title;
+      const authorMatch = (info.authors || []).some((name) => normalizeBookText(name) === author);
+      const isbnMatch = (info.industryIdentifiers || []).some((identifier) =>
+        normalizeBookIsbn(identifier.identifier) === isbn && isbn
+      );
+      return Number(isbnMatch) * 8 + Number(titleMatch) * 4 + Number(authorMatch) * 3
+        + Number(Boolean(info.averageRating)) + Number(Boolean(info.description));
+    };
+    return score(second) - score(first);
+  })[0] || null;
+}
+
+function getGoogleBookDetails(volume) {
+  const info = volume?.volumeInfo || {};
+  const identifiers = info.industryIdentifiers || [];
+  const isbn = identifiers.find((identifier) => identifier.type === "ISBN_13")?.identifier
+    || identifiers.find((identifier) => identifier.type === "ISBN_10")?.identifier
+    || "";
+  const image = info.imageLinks?.thumbnail || info.imageLinks?.smallThumbnail || "";
+  return {
+    title: info.title || "",
+    author: (info.authors || []).join(", "),
+    isbn,
+    cover_url: image.replace(/^http:/, "https:"),
+    page_count: Number(info.pageCount) || null,
+    publish_date: formatCatalogDate(info.publishedDate),
+    publisher: info.publisher || "",
+    categories: Array.isArray(info.categories) ? info.categories : [],
+    description: info.description
+      ? new DOMParser().parseFromString(info.description, "text/html").body.textContent.trim()
+      : "",
+    average_rating: Number(info.averageRating) || 0,
+    ratings_count: Number(info.ratingsCount) || 0,
+    preview_url: info.previewLink || "",
+    info_url: info.infoLink || "",
+    format: volume.saleInfo?.isEbook ? "eBook" : info.physical_format || "Print edition",
+    price: volume.saleInfo?.listPrice?.amount ?? null,
+    currency: volume.saleInfo?.listPrice?.currencyCode || "",
+  };
+}
+
+function renderBookRating(container, details, book) {
+  container.replaceChildren();
+  const average = details?.average_rating || 0;
+  const count = details?.ratings_count || 0;
+  if (average && count) {
+    const stars = document.createElement("span");
+    stars.className = "book-rating-stars";
+    const filledStars = Math.min(5, Math.max(0, Math.round(average)));
+    stars.textContent = `${"★".repeat(filledStars)}${"☆".repeat(5 - filledStars)}`;
+    stars.setAttribute("role", "img");
+    stars.setAttribute("aria-label", `${average.toFixed(1)} out of 5 stars`);
+    const score = document.createElement("span");
+    score.textContent = `${average.toFixed(1)} (${count.toLocaleString()} ratings)`;
+    container.append(stars, score);
+  } else {
+    const unavailable = document.createElement("span");
+    unavailable.className = "book-rating-unavailable";
+    unavailable.textContent = "Ratings unavailable";
+    container.append(unavailable);
+  }
+  const reviews = document.createElement("a");
+  reviews.href = `https://www.goodreads.com/search?q=${encodeURIComponent(`${book.title || ""} ${book.author || ""}`.trim())}`;
+  reviews.target = "_blank";
+  reviews.rel = "noopener noreferrer";
+  reviews.textContent = "See reviews →";
+  container.append(reviews);
+}
+
+function renderBookProfileDescription(container, button, text) {
+  const clean = text.trim();
+  container.textContent = clean || "A description is not available from the catalog yet.";
+  container.classList.remove("is-expanded");
+  button.hidden = clean.length <= 260;
+  button.textContent = "Read more";
+  button.setAttribute("aria-expanded", "false");
+}
+
+function renderBookProfileEditions(book, section, volumes) {
+  const status = section.querySelector(".edition-picker-status");
+  const choices = section.querySelector(".edition-cover-choices");
+  choices.replaceChildren();
+  const editions = volumes.map((volume) => ({ volume, details: getGoogleBookDetails(volume) }))
+    .filter(({ details }) => details.cover_url || details.isbn)
+    .slice(0, 8);
+  if (!editions.length) {
+    status.textContent = "No editions with covers are available in the catalog.";
+    section.dataset.status = "empty";
+    return;
+  }
+  status.textContent = `${editions.length} available edition${editions.length === 1 ? "" : "s"}. Select one to update your book.`;
+  section.dataset.status = "loaded";
+  editions.forEach(({ volume, details }) => {
+    const choice = document.createElement("button");
+    choice.type = "button";
+    choice.className = "edition-cover-choice";
+    const selected = Boolean(details.isbn && normalizeBookIsbn(book.isbn) === normalizeBookIsbn(details.isbn))
+      || (!details.isbn && details.cover_url && book.cover_url === details.cover_url);
+    choice.setAttribute("aria-pressed", String(selected));
+    choice.setAttribute("aria-label", `Select ${details.format} edition of ${details.title || book.title}`);
+    choice.append(createBookCover({
+      title: details.title || book.title,
+      cover_url: details.cover_url || (details.isbn
+        ? `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(details.isbn)}-M.jpg?default=false`
+        : ""),
+    }, "edition-cover-choice-cover"));
+    const copy = document.createElement("span");
+    copy.className = "edition-cover-copy";
+    const format = document.createElement("span");
+    format.className = "edition-format";
+    format.textContent = details.format;
+    const title = document.createElement("strong");
+    title.textContent = details.title || book.title || "Untitled";
+    const metadata = document.createElement("span");
+    metadata.textContent = [
+      details.author || book.author || "",
+      details.publisher,
+      details.publish_date,
+      details.page_count && `${details.page_count} pages`,
+      details.isbn && `ISBN ${details.isbn}`,
+    ].filter(Boolean).join(" · ");
+    const price = document.createElement("span");
+    price.className = "edition-price";
+    price.textContent = details.price === null
+      ? "Price not listed"
+      : new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: details.currency || "USD",
+      }).format(details.price);
+    const selectedLabel = document.createElement("span");
+    selectedLabel.className = "edition-select-label";
+    selectedLabel.textContent = selected ? "✓ Selected" : "Select edition";
+    copy.append(format, title, metadata, price, selectedLabel);
+    choice.append(copy);
+    choice.addEventListener("click", async () => {
+      choice.disabled = true;
+      const fields = {
+        title: details.title || book.title,
+        isbn: details.isbn || normalizeBookIsbn(book.isbn),
+        cover_url: details.cover_url || book.cover_url || "",
+        ...(details.page_count ? { page_count: details.page_count } : {}),
+      };
+      const ownedBook = state.books.find((item) =>
+        (book.id && item.id === book.id) || getBookKey(item) === getBookKey(book)
+      );
+      if (ownedBook && !await updateBookFields(ownedBook, fields)) {
+        choice.disabled = false;
+        return;
+      }
+      Object.assign(book, fields);
+      if (ownedBook && ownedBook !== book) {
+        Object.assign(ownedBook, fields);
+        delete ownedBook.cover_i;
+      }
+      delete book.cover_i;
+      updateBookPageDetails(book);
+      renderBookProfileEditions(book, section, volumes);
+      showToast(ownedBook ? "Edition updated" : "Edition selected");
+    });
+    choices.append(choice);
+  });
+}
+
+async function loadBookProfileEditions(book, section, knownVolumes = null) {
+  const status = section.querySelector(".edition-picker-status");
+  const button = section.querySelector(".edition-picker-button");
+  const choices = section.querySelector(".edition-cover-choices");
+  button.disabled = true;
+  status.textContent = "Finding available editions…";
+  section.dataset.status = "loading";
+  try {
+    let volumes = knownVolumes;
+    if (!volumes?.length) volumes = await fetchBookProfileVolumes(book);
+    if (!volumes.length) throw new Error("No catalog editions were returned.");
+    renderBookProfileEditions(book, section, volumes);
+    loadBookProfilePrintFormats(book, section, volumes);
+  } catch (error) {
+    console.error("Could not load book editions", error);
+    try {
+      const editions = await getOpenLibraryEditionsForBook(book);
+      if (editions.length) {
+        const fallbackVolumes = editions.map((edition) => ({
+          id: `${edition.isbn}:${edition.coverUrl}`,
+          volumeInfo: {
+            title: edition.title,
+            authors: [book.author || "Unknown author"],
+            industryIdentifiers: edition.isbn ? [{ type: "ISBN_13", identifier: edition.isbn }] : [],
+            imageLinks: { thumbnail: edition.coverUrl },
+            pageCount: edition.pageCount || undefined,
+            publishedDate: edition.publishDate || "",
+            publisher: edition.publisher || "",
+            printType: "BOOK",
+          },
+          saleInfo: {},
+        }));
+        renderBookProfileEditions(book, section, fallbackVolumes);
+      } else {
+        status.textContent = "Could not find editions. Try refreshing, or check your connection.";
+        section.dataset.status = "error";
+      }
+    } catch (fallbackError) {
+      console.error("Could not load Open Library edition fallback", fallbackError);
+      status.textContent = "Could not find editions. Try refreshing, or check your connection.";
+      section.dataset.status = "error";
+    }
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function loadBookProfileCatalog(book, { page, rating, description, readMore, editions }) {
+  try {
+    const volumes = await fetchBookProfileVolumes(book);
+    if (!bookProfileIsActive(book, page)) return;
+    if (!volumes.length) throw new Error("No catalog volumes were returned.");
+    const primary = getGoogleBookDetails(getBestGoogleBookVolume(book, volumes));
+    if (!primary.title) throw new Error("No matching book details were found.");
+    if (primary.preview_url) book.preview_url = primary.preview_url;
+    renderBookRating(rating, primary, book);
+    if (!getBookProfileDescription(book)) {
+      renderBookProfileDescription(description, readMore, primary.description);
+    }
+    renderBookProfileEditions(book, editions, volumes);
+    const genreField = page.querySelector(".book-detail-content .book-detail-field:first-child .book-detail-value");
+    if (genreField && primary.categories.length) {
+      genreField.replaceChildren();
+      renderBookGenreTags(genreField, primary.categories);
+      const introGenres = page.querySelector(".book-profile-genres");
+      if (introGenres) renderBookGenreTags(introGenres, primary.categories);
+    }
+    const publishedField = [...page.querySelectorAll(".book-detail-field")]
+      .find((field) => field.querySelector("strong")?.textContent === "Publication date");
+    if (publishedField && primary.publish_date) {
+      const value = publishedField.querySelector(".book-detail-value");
+      if (value) value.textContent = primary.publish_date;
+    }
+  } catch (error) {
+    console.error("Could not load book catalog details", error);
+    if (!bookProfileIsActive(book, page)) return;
+    try {
+      const fallback = await fetchOpenLibraryBookDetails(book);
+      if (!bookProfileIsActive(book, page)) return;
+      renderBookRating(rating, fallback, book);
+      if (!getBookProfileDescription(book)) {
+        renderBookProfileDescription(description, readMore, fallback.description);
+      }
+      const genreField = page.querySelector(".book-detail-content .book-detail-field:first-child .book-detail-value");
+      if (genreField && fallback.categories.length) {
+        renderBookGenreTags(genreField, fallback.categories);
+        const introGenres = page.querySelector(".book-profile-genres");
+        if (introGenres) renderBookGenreTags(introGenres, fallback.categories);
+      }
+      const publishedField = [...page.querySelectorAll(".book-detail-field")]
+        .find((field) => field.querySelector("strong")?.textContent === "Publication date");
+      if (publishedField && fallback.publish_date) {
+        const value = publishedField.querySelector(".book-detail-value");
+        if (value) value.textContent = fallback.publish_date;
+      }
+      const pagesField = [...page.querySelectorAll(".book-detail-field")]
+        .find((field) => field.querySelector("strong")?.textContent === "Pages");
+      if (pagesField && fallback.page_count) {
+        const value = pagesField.querySelector(".book-detail-value");
+        if (value) value.textContent = String(fallback.page_count);
+      }
+    } catch (fallbackError) {
+      console.error("Could not load Open Library book details", fallbackError);
+      if (!bookProfileIsActive(book, page)) return;
+      renderBookRating(rating, null, book);
+      const catalogError = document.createElement("span");
+      catalogError.className = "book-catalog-error";
+      catalogError.textContent = "Catalog details could not be loaded.";
+      rating.prepend(catalogError);
+      if (!getBookProfileDescription(book)) {
+        renderBookProfileDescription(description, readMore, "");
+      }
+    }
+    await loadBookProfileEditions(book, editions);
+  }
+}
+
+async function loadBookProfilePrintFormats(book, section, googleVolumes) {
+  try {
+    const openLibraryEditions = await getOpenLibraryEditionsForBook(book);
+    if (state.view !== "book" || state.currentBook !== book || !section.isConnected || !openLibraryEditions.length) return;
+    const openLibraryVolumes = openLibraryEditions.map((edition) => ({
+      id: `ol:${edition.isbn}:${edition.coverUrl}`,
+      volumeInfo: {
+        title: edition.title,
+        authors: [book.author || "Unknown author"],
+        industryIdentifiers: edition.isbn
+          ? [{ type: "ISBN_13", identifier: edition.isbn }]
+          : [],
+        imageLinks: { thumbnail: edition.coverUrl },
+        pageCount: edition.pageCount || undefined,
+        publishedDate: edition.publishDate || "",
+        publisher: edition.publisher || "",
+        physical_format: edition.format || "",
+      },
+      saleInfo: {},
+    }));
+    const merged = [...googleVolumes];
+    openLibraryVolumes.forEach((volume) => {
+      const details = getGoogleBookDetails(volume);
+      const matching = merged.find((candidate) => {
+        const candidateDetails = getGoogleBookDetails(candidate);
+        return details.isbn && candidateDetails.isbn === details.isbn;
+      });
+      if (matching) {
+        matching.volumeInfo.physical_format = details.format;
+        if (details.cover_url) matching.volumeInfo.imageLinks = { thumbnail: details.cover_url };
+        return;
+      }
+      merged.push(volume);
+    });
+    renderBookProfileEditions(book, section, merged);
+  } catch (error) {
+    console.error("Could not load print format details", error);
+    if (section.isConnected && section.dataset.status === "loaded") {
+      const status = section.querySelector(".edition-picker-status");
+      status.textContent = `${status.textContent} Print formats could not be verified.`;
+    }
+  }
+}
+
+async function loadBookProfileAudiobook(book, section) {
+  const status = section.querySelector(".audiobook-status");
+  const query = [book.title, book.author].filter(Boolean).join(" ");
+  const params = new URLSearchParams({
+    term: query,
+    media: "audiobook",
+    entity: "audiobook",
+    limit: "10",
+  });
+  try {
+    const response = await fetch(`https://itunes.apple.com/search?${params}`);
+    if (!response.ok) throw new Error(`Apple Books responded with ${response.status}`);
+    const payload = await response.json();
+    if (!section.isConnected || state.currentBook !== book) return;
+    const results = Array.isArray(payload.results) ? payload.results : [];
+    const title = normalizeBookText(book.title);
+    const matchingResults = results.filter((item) =>
+      normalizeBookText(item.collectionName || item.trackName).includes(title)
+    );
+    const authorName = normalizeBookText(book.author);
+    const result = matchingResults.find((item) =>
+      normalizeBookText(item.artistName).includes(authorName)
+    ) || matchingResults[0];
+    if (!result) {
+      status.textContent = "No audiobook listing was found. Search Audible for available audio editions.";
+      status.classList.add("is-empty");
+      status.append(createBookExternalLink(
+        "Find audiobook",
+        `https://www.audible.com/search?${new URLSearchParams({ keywords: query })}`,
+        "book-audiobook-find"
+      ));
+      return;
+    }
+    const details = document.createElement("div");
+    details.className = "audiobook-details";
+    const artwork = document.createElement("img");
+    artwork.className = "audiobook-cover";
+    artwork.src = (result.artworkUrl100 || "").replace("100x100", "300x300");
+    artwork.alt = `${result.collectionName || book.title} audiobook artwork`;
+    artwork.loading = "lazy";
+    const copy = document.createElement("div");
+    copy.className = "audiobook-copy";
+    const titleNode = document.createElement("strong");
+    titleNode.textContent = result.collectionName || result.trackName || book.title;
+    const byline = document.createElement("span");
+    byline.textContent = `By ${result.artistName || book.author || "Unknown author"}`;
+    const duration = document.createElement("span");
+    const durationHours = Number(result.trackTimeMillis) > 0
+      ? `${Math.floor(result.trackTimeMillis / 3600000)}h ${Math.round(result.trackTimeMillis % 3600000 / 60000)}m`
+      : "";
+    duration.textContent = durationHours || "Audiobook";
+    copy.append(titleNode, byline, duration);
+    details.append(artwork, copy);
+    const links = document.createElement("div");
+    links.className = "audiobook-links";
+    if (result.previewUrl) {
+      const sample = document.createElement("button");
+      sample.type = "button";
+      sample.className = "secondary-btn audiobook-sample-button";
+      sample.textContent = "▶  Sample";
+      const audio = document.createElement("audio");
+      audio.controls = true;
+      audio.preload = "none";
+      audio.src = result.previewUrl;
+      audio.hidden = true;
+      audio.setAttribute("aria-label", `Audiobook sample for ${book.title}`);
+      sample.addEventListener("click", async () => {
+        audio.hidden = false;
+        try {
+          await audio.play();
+        } catch (error) {
+          console.error("Could not play audiobook sample", error);
+          showToast("Could not play the sample. Use the audio controls to try again.");
+        }
+      });
+      links.append(sample, audio);
+    }
+    if (result.collectionViewUrl) {
+      links.append(createBookExternalLink("Find audiobook", result.collectionViewUrl, "book-audiobook-find"));
+    } else {
+      links.append(createBookExternalLink(
+        "Find audiobook",
+        `https://www.audible.com/search?${new URLSearchParams({ keywords: query })}`,
+        "book-audiobook-find"
+      ));
+    }
+    section.replaceChildren(section.querySelector("h2"), details, links);
+  } catch (error) {
+    console.error("Could not load audiobook listings", error);
+    if (!section.isConnected || state.currentBook !== book) return;
+    status.textContent = "Audiobook listings are temporarily unavailable.";
+    status.classList.add("is-error");
+    status.append(createBookExternalLink(
+      "Search for an audiobook",
+      `https://www.audible.com/search?${new URLSearchParams({ keywords: query })}`,
+      "book-audiobook-find"
+    ));
+  }
+}
+
+function createBookExternalLink(label, url, className = "") {
+  const link = document.createElement("a");
+  link.className = className;
+  link.href = url;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = label;
+  return link;
+}
+
+function mapGoogleVolumeToBook(volume) {
+  const details = getGoogleBookDetails(volume);
+  return {
+    title: details.title || "Untitled",
+    author: details.author || "Unknown author",
+    isbn: details.isbn,
+    cover_url: details.cover_url,
+    page_count: details.page_count,
+    pages: details.page_count,
+    genre: details.categories[0] || "",
+    description: details.description,
+  };
+}
+
+async function loadBookProfileRecommendations(book, moreByAuthor, readersEnjoyed) {
+  const queryForAuthor = book.author ? `inauthor:${JSON.stringify(book.author)}` : "";
+  const genre = book.genre || book.subjects?.[0] || "";
+  const queryForGenre = genre
+    ? `subject:${JSON.stringify(genre)}`
+    : `intitle:${JSON.stringify(book.title || "")}`;
+  const requests = await Promise.allSettled([
+    queryForAuthor ? fetchGoogleBookVolumes(queryForAuthor) : Promise.resolve([]),
+    fetchGoogleBookVolumes(queryForGenre),
+  ]);
+  if (state.view !== "book" || state.currentBook !== book) return;
+  const mapResults = (result) => result.status === "fulfilled"
+    ? result.value.map(mapGoogleVolumeToBook).filter((item) =>
+      item.title !== "Untitled" && !isSameBookWork(item, book)
+    ).filter((item, index, all) =>
+      all.findIndex((candidate) => getBookKey(candidate) === getBookKey(item)) === index
+    )
+    : [];
+  const authorName = normalizeBookText(book.author);
+  const authorBooks = mapResults(requests[0]).filter((item) =>
+    normalizeBookText(item.author).includes(authorName)
+  ).slice(0, 8);
+  const relatedBooks = mapResults(requests[1]).slice(0, 8);
+  if (requests[0].status === "rejected") console.error("Could not load author recommendations", requests[0].reason);
+  if (requests[1].status === "rejected") console.error("Could not load related-book recommendations", requests[1].reason);
+  renderProfileRecommendationResults(moreByAuthor, authorBooks, requests[0].status === "rejected"
+    ? "Could not load author recommendations. Check your connection and try again."
+    : "No other books by this author were found.");
+  renderProfileRecommendationResults(readersEnjoyed, relatedBooks, requests[1].status === "rejected"
+    ? "Could not load recommendations. Check your connection and try again."
+    : "No similar books were found in the catalog.");
+}
+
+function renderProfileRecommendationResults(target, books, emptyMessage) {
+  const section = target.section;
+  const status = target.status;
+  status.remove();
+  const cards = books.map((book) => ({ type: "book", book }));
+  if (!cards.length) {
+    const message = document.createElement("p");
+    message.className = "book-recommendation-status";
+    message.textContent = emptyMessage;
+    section.append(message);
+    return;
+  }
+  const row = createCardRow(section.querySelector("h2").textContent, cards);
+  row.querySelector(".section-heading-row")?.remove();
+  section.append(row);
 }
 
 async function getOpenLibraryEditionsForBook(book) {
   let workKeys = [];
-  const isbn = (book.isbn || "").replace(/[^0-9Xx]/g, "");
+  const isbn = normalizeBookIsbn(book.isbn);
   if (isbn) {
     const response = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(isbn)}&format=json&jscmd=data`);
     if (!response.ok) throw new Error(`Open Library ISBN lookup responded with ${response.status}`);
@@ -2630,6 +3346,7 @@ async function getOpenLibraryEditionsForBook(book) {
         publisher: edition.publishers?.[0] || "",
         publishDate: edition.publish_date || "",
         pageCount: Number(edition.number_of_pages) || null,
+        format: edition.physical_format || "",
       }));
   });
   return choices.filter((edition, index, all) =>
