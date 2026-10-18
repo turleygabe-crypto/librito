@@ -3016,8 +3016,16 @@ function renderBookProfileEditions(book, section, volumes) {
   const status = section.querySelector(".edition-picker-status");
   const choices = section.querySelector(".edition-cover-choices");
   choices.replaceChildren();
+  const seenEditionIsbns = new Set();
   const editions = volumes.map((volume) => ({ volume, details: getGoogleBookDetails(volume) }))
     .filter(({ details }) => details.cover_url || details.isbn)
+    .filter(({ details }) => {
+      const isbnKey = getBookEditionProgressKey(details);
+      if (!isbnKey) return true;
+      if (seenEditionIsbns.has(isbnKey)) return false;
+      seenEditionIsbns.add(isbnKey);
+      return true;
+    })
     .slice(0, 8);
   if (!editions.length) {
     status.textContent = "No editions with covers are available in the catalog.";
@@ -3379,11 +3387,8 @@ function openBookEditionDetails(book, details, section, volumes, returnFocus) {
       delete book.pages;
       delete book.cover_i;
       if (!state.session) localStorage.setItem(storageKey, JSON.stringify(state.books));
-      updateBookPageDetails(book, { clearMissingPageCount: true });
-      renderBookProfileEditions(book, section, volumes);
-      const selectedChoice = section.querySelector('.edition-cover-choice[aria-pressed="true"]');
       closeBookEditionDialog(false);
-      selectedChoice?.focus();
+      renderBookPage(book);
       showToast(ownedBook ? "Edition updated" : "Edition selected");
     });
     actions.append(useEdition);
@@ -3616,7 +3621,8 @@ async function loadBookProfilePrintFormats(book, section, googleVolumes) {
       const details = getGoogleBookDetails(volume);
       const matching = merged.find((candidate) => {
         const candidateDetails = getGoogleBookDetails(candidate);
-        return details.isbn && candidateDetails.isbn === details.isbn;
+        return getBookEditionProgressKey(details)
+          && getBookEditionProgressKey(candidateDetails) === getBookEditionProgressKey(details);
       });
       if (matching) {
         matching.volumeInfo.physical_format = details.format;
@@ -3743,6 +3749,25 @@ function createBookExternalLink(label, url, className = "") {
   link.rel = "noopener noreferrer";
   link.textContent = label;
   return link;
+}
+
+function createRetailerFallback(searchTerm) {
+  const encoded = encodeURIComponent(searchTerm);
+  const section = document.createElement("div");
+  section.className = "retailer-fallback";
+  const intro = document.createElement("p");
+  intro.className = "page-description";
+  intro.textContent = "Not in the Open Library catalog? Try searching these retailers:";
+  const list = document.createElement("div");
+  list.className = "author-result-list";
+  [
+    ["Amazon", `https://www.amazon.com/s?k=${encoded}&i=stripbooks`],
+    ["Bookshop.org", `https://bookshop.org/search?keywords=${encoded}`],
+    ["Barnes & Noble", `https://www.barnesandnoble.com/s/${encoded}`],
+    ["ThriftBooks", `https://www.thriftbooks.com/browse/?b.search=${encoded}`],
+  ].forEach(([name, url]) => list.append(createBookExternalLink(name, url, "author-result")));
+  section.append(intro, list);
+  return section;
 }
 
 function mapGoogleVolumeToBook(volume) {
@@ -3957,16 +3982,23 @@ function showSearchPage(query = "") {
     const status = document.createElement("p");
     status.className = "page-description search-loading";
     status.setAttribute("role", "status");
-    status.textContent = "Searching the book catalog…";
+    const flipper = document.createElement("span");
+    flipper.className = "book-flipper";
+    flipper.setAttribute("aria-hidden", "true");
+    flipper.innerHTML = '<span class="book-flipper-cover"></span><span class="book-flipper-page"></span><span class="book-flipper-page"></span><span class="book-flipper-page"></span>';
+    const label = document.createElement("span");
+    label.textContent = "Searching the book catalog…";
+    status.append(flipper, label);
     page.append(status);
   }
   const terms = normalizeSearchText(query).toLowerCase().split(/\s+/).filter(Boolean);
   const shelves = state.shelves.filter((shelf) => terms.every((term) => shelf.name.toLowerCase().includes(term)));
   if (!matches.length && !shelves.length) {
+    if (state.searchLoading) return;
     const empty = document.createElement("p");
     empty.className = "row-empty-state";
-    empty.textContent = "No matches yet. Try a different title, author, or genre.";
-    page.append(empty);
+    empty.textContent = "No matches found. Try a different title, author, or genre.";
+    page.append(empty, createRetailerFallback(query));
     return;
   }
   const books = document.createElement("section");
@@ -4081,11 +4113,12 @@ async function runNaturalSearch(query, { updateHistory = true } = {}) {
     const fetchWorks = async (searchOffset) => {
       const params = new URLSearchParams({
         q: `${catalogQuery} language:${getDefaultBookLanguage()}`,
-        fields: "key,title,author_name,isbn,cover_i,subject,number_of_pages_median",
+        fields: `key,title,author_name,isbn,cover_i,subject,number_of_pages_median,${OPEN_LIBRARY_EDITION_FIELDS}`,
+        lang: getDefaultBookLanguage(),
         limit: "24",
         offset: String(searchOffset),
       });
-      const response = await fetch(`https://openlibrary.org/search.json?${params}`);
+      const response = await fetch(`https://openlibrary.org/search.json?${params}`, { signal: AbortSignal.timeout(20000) });
       if (!response.ok) throw new Error(`Open Library search failed with ${response.status}`);
       const data = await response.json();
       return Array.isArray(data.docs) ? data.docs : [];
@@ -4112,16 +4145,16 @@ async function runNaturalSearch(query, { updateHistory = true } = {}) {
     } else {
       const editionResults = await Promise.allSettled(works.map(async (work) => {
         if (!work.key) return null;
-        const edition = await getMatchingOpenLibraryEdition(work.key, getDefaultBookLanguage());
+        const edition = getEmbeddedOpenLibraryEdition(work, getDefaultBookLanguage());
         if (!edition) return null;
-        const isbnList = [...(edition.isbn_13 || []), ...(edition.isbn_10 || [])];
+        const isbnList = edition.isbn;
         return {
           title: edition.title || work.title || "Untitled",
           author: work.author_name?.[0] || "Unknown author",
           author_name: work.author_name || [],
           isbn: isbnList[0] || "",
           isbnList,
-          cover_i: edition.covers?.[0],
+          cover_i: edition.cover_i || work.cover_i,
           subjects: work.subject || [],
           genre: work.subject?.[0] || "",
           pages: work.number_of_pages_median,
@@ -4487,6 +4520,21 @@ function getOpenLibraryLanguageName(code) {
   return openLibraryLanguages.find(([languageCode]) => languageCode === code)?.[1] || code;
 }
 
+const OPEN_LIBRARY_EDITION_FIELDS = "editions,editions.key,editions.title,editions.language,editions.isbn,editions.cover_i,editions.publish_date";
+
+function getEmbeddedOpenLibraryEdition(work, selectedLanguage) {
+  const edition = work.editions?.docs?.[0];
+  if (!edition) return null;
+  if (selectedLanguage && edition.language && !edition.language.includes(selectedLanguage)) return null;
+  return {
+    title: edition.title,
+    isbn: edition.isbn || [],
+    cover_i: edition.cover_i,
+    language: edition.language || [],
+    publish_date: edition.publish_date?.[0],
+  };
+}
+
 async function getMatchingOpenLibraryEdition(workKey, selectedLanguage) {
   const response = await fetch(`https://openlibrary.org${workKey}/editions.json?limit=100`);
   if (!response.ok) throw new Error(`Open Library editions responded with ${response.status}`);
@@ -4602,8 +4650,9 @@ async function lookupBooksByTitleOrAuthor() {
   const params = new URLSearchParams({
     q: selectedLanguage ? `${searchTerms} language:${selectedLanguage}` : searchTerms,
     limit: "10",
-    fields: "key,title,author_name,first_publish_year,first_sentence,subject",
+    fields: `key,title,author_name,first_publish_year,first_sentence,subject,${OPEN_LIBRARY_EDITION_FIELDS}`,
   });
+  if (selectedLanguage) params.set("lang", selectedLanguage);
   scanStatus.textContent = "Searching books…";
   titleSearchResults = [];
   selectedTitleResult = null;
@@ -4611,19 +4660,20 @@ async function lookupBooksByTitleOrAuthor() {
   renderSelectedBookConfirmation();
 
   try {
-    const response = await fetch(`https://openlibrary.org/search.json?${params}`);
+    const response = await fetch(`https://openlibrary.org/search.json?${params}`, { signal: AbortSignal.timeout(20000) });
     if (!response.ok) throw new Error(`Open Library responded with ${response.status}`);
     const payload = await response.json();
     const works = Array.isArray(payload.docs) ? payload.docs : [];
     const editionResults = await Promise.allSettled(works.map(async (work) => {
       if (!work.key) return null;
-      const edition = await getMatchingOpenLibraryEdition(work.key, selectedLanguage);
+      const edition = getEmbeddedOpenLibraryEdition(work, selectedLanguage);
       if (!edition) return null;
+      const { editions, ...workDetails } = work;
       return {
-        ...work,
+        ...workDetails,
         title: edition.title || work.title,
-        isbn: [...(edition.isbn_13 || []), ...(edition.isbn_10 || [])],
-        cover_i: edition.covers?.[0],
+        isbn: edition.isbn,
+        cover_i: edition.cover_i || work.cover_i,
         language: edition.language,
         first_publish_year: edition.publish_date || work.first_publish_year,
       };
@@ -4641,6 +4691,7 @@ async function lookupBooksByTitleOrAuthor() {
       scanStatus.textContent = editionLookupFailures
         ? "Could not verify the language of matching editions. Try again or enter the details manually."
         : `No matching editions found in ${selectedLanguage ? getOpenLibraryLanguageName(selectedLanguage) : "any language"}. You can enter the details manually.`;
+      titleLookupResults.append(createRetailerFallback(searchTerms));
       return;
     }
 
@@ -4660,12 +4711,13 @@ async function lookupBookByIsbn(isbn) {
     return;
   }
 
+  scanStatus.parentElement.querySelector(".retailer-fallback")?.remove();
   scanStatus.textContent = `Looking up ${normalized}…`;
   try {
     let bookData = null;
 
     try {
-      const response = await fetch(`/api/scan?isbn=${encodeURIComponent(normalized)}`);
+      const response = await fetch(`/api/scan?isbn=${encodeURIComponent(normalized)}`, { signal: AbortSignal.timeout(10000) });
       if (response.ok) {
         const payload = await response.json();
         bookData = payload.data;
@@ -4675,7 +4727,7 @@ async function lookupBookByIsbn(isbn) {
     }
 
     if (!bookData) {
-      const openLibraryResponse = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(normalized)}&format=json&jscmd=data`);
+      const openLibraryResponse = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(normalized)}&format=json&jscmd=data`, { signal: AbortSignal.timeout(15000) });
       if (!openLibraryResponse.ok) throw new Error("Lookup failed");
       const openLibraryPayload = await openLibraryResponse.json();
       bookData = openLibraryPayload[`ISBN:${normalized}`] || null;
@@ -4683,6 +4735,8 @@ async function lookupBookByIsbn(isbn) {
 
     if (!bookData) {
       scanStatus.textContent = "No metadata found for that ISBN. You can enter the details manually.";
+      scanStatus.parentElement.querySelector(".retailer-fallback")?.remove();
+      scanStatus.after(createRetailerFallback(normalized));
       return;
     }
 

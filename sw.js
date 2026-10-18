@@ -1,4 +1,4 @@
-const CACHE_NAME = "librito-cache-v6";
+const CACHE_NAME = "librito-cache-v7";
 const ASSETS = ["/", "/index.html", "/styles.css", "/app.js", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
