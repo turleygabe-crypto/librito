@@ -3830,7 +3830,9 @@ body {
 .book-audiobook-panel {
   display: grid;
   align-content: start;
-  gap: 0.9rem;
+  align-self: start;
+  gap: 0.65rem;
+  padding: 0.85rem;
 }
 
 .audiobook-status {
@@ -3848,13 +3850,13 @@ body {
 
 .audiobook-details {
   display: grid;
-  grid-template-columns: 5.4rem minmax(0, 1fr);
+  grid-template-columns: 4.5rem minmax(0, 1fr);
   align-items: center;
-  gap: 0.8rem;
+  gap: 0.65rem;
 }
 
 .audiobook-cover {
-  width: 5.4rem;
+  width: 4.5rem;
   aspect-ratio: 1;
   border-radius: 0.3rem;
   object-fit: cover;
@@ -3863,20 +3865,20 @@ body {
 
 .audiobook-copy {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.2rem;
   color: #756b62;
-  font-size: 0.82rem;
+  font-size: 0.76rem;
 }
 
 .audiobook-copy strong {
   color: #302720;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 0.98rem;
+  font-size: 0.9rem;
 }
 
 .audiobook-links {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.4rem;
 }
 
 .audiobook-links audio {
@@ -3891,10 +3893,10 @@ body {
 .audiobook-sample-button,
 .book-audiobook-find {
   display: flex;
-  min-height: 2.65rem;
+  min-height: 2.25rem;
   align-items: center;
   justify-content: center;
-  padding: 0.55rem 0.9rem;
+  padding: 0.45rem 0.8rem;
   border: 1px solid #dbc8b6;
   border-radius: 999px;
   background: transparent;
