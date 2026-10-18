@@ -2962,8 +2962,8 @@ function getGoogleBookDetails(volume) {
     preview_url: info.previewLink || "",
     info_url: info.infoLink || "",
     format: volume.saleInfo?.isEbook ? "eBook" : info.physical_format || "Print edition",
-    price: volume.saleInfo?.listPrice?.amount ?? null,
-    currency: volume.saleInfo?.listPrice?.currencyCode || "",
+    price: volume.saleInfo?.retailPrice?.amount ?? volume.saleInfo?.listPrice?.amount ?? null,
+    currency: volume.saleInfo?.retailPrice?.currencyCode || volume.saleInfo?.listPrice?.currencyCode || "",
   };
 }
 
@@ -3427,13 +3427,23 @@ function openEditionShopping(book, details, returnFocus) {
   const catalogPrice = document.createElement("p");
   catalogPrice.className = "edition-catalog-price";
   catalogPrice.textContent = details.price === null
-    ? "Catalog price unavailable. Check each retailer for current pricing."
+    ? "Google Books price unavailable. Check each retailer for current pricing."
     : `Catalog price: ${new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: details.currency || "USD",
     }).format(details.price)} (Google Books; retailer prices may differ).`;
-  const searchTerm = details.isbn || `${details.title || book.title} ${details.author || book.author}`.trim();
+  const isbn = normalizeBookIsbn(details.isbn);
+  const searchTerm = isbn || [
+    details.title || book.title,
+    details.author || book.author,
+    details.format,
+    details.publisher,
+    details.publish_date,
+  ].filter(Boolean).join(" ");
   const encodedSearch = encodeURIComponent(searchTerm);
+  const searchDescription = isbn
+    ? `Search ISBN ${isbn}`
+    : "Search by title and author; confirm the edition";
   const retailers = [
     ["Amazon", "Shop new and used editions", `https://www.amazon.com/s?k=${encodedSearch}&i=stripbooks`],
     ["Bookshop.org", "Support independent bookstores", `https://bookshop.org/search?keywords=${encodedSearch}`],
@@ -3446,10 +3456,15 @@ function openEditionShopping(book, details, returnFocus) {
   retailers.forEach(([name, description, url]) => {
     const link = createBookExternalLink(name, url, "edition-retailer-link");
     const note = document.createElement("span");
-    note.textContent = description;
+    note.textContent = `${description} · ${searchDescription}`;
     const price = document.createElement("span");
     price.className = "edition-retailer-price";
-    price.textContent = "Check retailer for price";
+    price.textContent = details.price === null
+      ? "Price unavailable · check retailer"
+      : `Google Books: ${new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: details.currency || "USD",
+      }).format(details.price)} · check retailer`;
     link.replaceChildren();
     const linkCopy = document.createElement("span");
     const retailer = document.createElement("strong");
@@ -3460,7 +3475,9 @@ function openEditionShopping(book, details, returnFocus) {
   });
   const disclosure = document.createElement("p");
   disclosure.className = "edition-shopping-disclosure";
-  disclosure.textContent = "Retailer prices, formats, shipping, and availability can change. These links are not affiliate links.";
+  disclosure.textContent = isbn
+    ? "Retailer searches use this edition's ISBN, but search results can include other editions. Confirm the ISBN and format on the retailer's page. Google Books prices are references, not retailer quotes; retailer prices, shipping, and availability can change. These links are not affiliate links."
+    : "This edition has no ISBN, so retailer searches may show other editions. Confirm the cover and format on the retailer's page. Google Books prices are references, not retailer quotes; retailer prices, shipping, and availability can change. These links are not affiliate links.";
   content.append(summary, identifier, catalogPrice, list, disclosure);
   openBookEditionDialog("Shop for this edition", content, returnFocus);
 }
