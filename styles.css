@@ -4054,6 +4054,72 @@ body {
   z-index: 30;
 }
 
+.app-dialog-overlay {
+  z-index: 40;
+}
+
+.app-dialog-card {
+  width: min(27rem, 100%);
+  padding: 1.25rem;
+  border: 1px solid #e6d7c8;
+  background: #fffaf3;
+  color: #302720;
+}
+
+.app-dialog-card .dialog-head {
+  align-items: flex-start;
+}
+
+.app-dialog-title {
+  margin: 0;
+  color: #302720;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.35rem;
+}
+
+.app-dialog-message {
+  margin: 0.5rem 0 1rem;
+  color: #51463d;
+  line-height: 1.5;
+}
+
+.app-dialog-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.app-dialog-input {
+  min-width: 0;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #dbc8b6;
+  border-radius: 0.55rem;
+  background: #fffdf9;
+  color: #302720;
+  font: inherit;
+}
+
+.app-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.app-dialog-actions .action-btn {
+  background: #b64d2c;
+  color: #fffaf5;
+}
+
+.app-dialog-actions .action-btn.danger-action {
+  background: #a13728;
+}
+
+.app-dialog-actions .secondary-btn {
+  border: 1px solid #dbc8b6;
+  background: transparent;
+  color: #51463d;
+}
+
 .edition-dialog-card {
   width: min(42rem, 100%);
   max-height: min(90vh, 52rem);

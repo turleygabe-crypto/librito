@@ -281,6 +281,9 @@ let authReturnFocus = null;
 let bookProfileReturnFocus = null;
 let editionDialogOverlay = null;
 let editionDialogReturnFocus = null;
+let appDialogOverlay = null;
+let appDialogResolver = null;
+let appDialogReturnFocus = null;
 const oauthRedirectKey = "librito-oauth-redirect";
 let authPrompted = sessionStorage.getItem(oauthRedirectKey) === "true";
 let authMode = "signin";
@@ -496,8 +499,9 @@ async function readBookAgain(book) {
 
 async function setBookDisposition(book, disposition) {
   const action = disposition === "sold" ? "sold" : "donated";
-  const confirmed = window.confirm(
-    `Mark “${book.title}” as ${action}? It will stay in Completed Books and be hidden from your active library.`
+  const confirmed = await showAppConfirm(
+    `Mark “${book.title}” as ${action}? It will stay in Completed Books and be hidden from your active library.`,
+    { title: `Mark book as ${action}`, confirmLabel: `Mark as ${action}` }
   );
   if (!confirmed) return;
   const updated = await updateBookFields(book, { disposition });
@@ -599,7 +603,11 @@ async function removeBookFromShelf(book, shelfName) {
 }
 
 async function removeBookFromLibrary(book) {
-  const confirmed = window.confirm(`Remove “${book.title}” from your library?`);
+  const confirmed = await showAppConfirm(`Remove “${book.title}” from your library?`, {
+    title: "Remove book",
+    confirmLabel: "Remove book",
+    danger: true,
+  });
   if (!confirmed) return;
   if (state.supabase && state.session) {
     const { error } = await state.supabase.from("books")
@@ -1864,7 +1872,11 @@ function showShelfPage(shelfName) {
     rename.className = "secondary-btn";
     rename.textContent = "Rename shelf";
     rename.addEventListener("click", async () => {
-      const nextName = window.prompt("Rename shelf", shelf.name)?.trim();
+      const nextName = (await showAppPrompt("Rename shelf", {
+        title: "Rename shelf",
+        value: shelf.name,
+        placeholder: "Shelf name",
+      }))?.trim();
       if (!nextName || nextName === shelf.name) return;
       await renameShelf(shelf, nextName);
     });
@@ -1873,7 +1885,12 @@ function showShelfPage(shelfName) {
     remove.className = "secondary-btn";
     remove.textContent = "Delete shelf";
     remove.addEventListener("click", async () => {
-      if (window.confirm(`Delete “${shelf.name}”? Books will stay in your library.`)) await deleteShelf(shelf);
+      const confirmed = await showAppConfirm(`Delete “${shelf.name}”? Books will stay in your library.`, {
+        title: "Delete shelf",
+        confirmLabel: "Delete shelf",
+        danger: true,
+      });
+      if (confirmed) await deleteShelf(shelf);
     });
     toolbar.append(rename, remove);
   }
@@ -2993,6 +3010,117 @@ function ensureEditionDialog() {
   return overlay;
 }
 
+function ensureAppDialog() {
+  if (appDialogOverlay) return appDialogOverlay;
+  const overlay = document.createElement("div");
+  overlay.className = "dialog-overlay hidden app-dialog-overlay";
+  const dialog = document.createElement("section");
+  dialog.className = "dialog-card app-dialog-card";
+  dialog.setAttribute("role", "dialog");
+  dialog.setAttribute("aria-modal", "true");
+  const header = document.createElement("div");
+  header.className = "dialog-head";
+  const title = document.createElement("h2");
+  title.className = "app-dialog-title";
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "icon-btn";
+  close.setAttribute("aria-label", "Cancel");
+  close.textContent = "✕";
+  close.addEventListener("click", () => settleAppDialog(null));
+  header.append(title, close);
+  const message = document.createElement("p");
+  message.className = "app-dialog-message";
+  const form = document.createElement("form");
+  form.className = "app-dialog-form";
+  const input = document.createElement("input");
+  input.className = "app-dialog-input";
+  input.type = "text";
+  input.autocomplete = "off";
+  input.hidden = true;
+  form.append(input);
+  const actions = document.createElement("div");
+  actions.className = "app-dialog-actions";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "secondary-btn";
+  cancel.textContent = "Cancel";
+  cancel.addEventListener("click", () => settleAppDialog(null));
+  const confirm = document.createElement("button");
+  confirm.type = "submit";
+  confirm.className = "action-btn";
+  actions.append(cancel, confirm);
+  form.append(actions);
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    settleAppDialog(input.hidden ? true : input.value);
+  });
+  dialog.append(header, message, form);
+  overlay.append(dialog);
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) settleAppDialog(null);
+  });
+  document.body.append(overlay);
+  appDialogOverlay = overlay;
+  return overlay;
+}
+
+function settleAppDialog(result) {
+  if (!appDialogOverlay) return;
+  const resolver = appDialogResolver;
+  const returnFocus = appDialogReturnFocus;
+  appDialogResolver = null;
+  appDialogReturnFocus = null;
+  appDialogOverlay.classList.add("hidden");
+  appDialogOverlay.querySelector(".app-dialog-form").reset();
+  if (returnFocus instanceof HTMLElement && returnFocus.isConnected) returnFocus.focus();
+  resolver?.(result);
+}
+
+function showAppDialog({
+  title,
+  message,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  danger = false,
+  input = null,
+}) {
+  if (appDialogResolver) settleAppDialog(null);
+  const overlay = ensureAppDialog();
+  const dialog = overlay.querySelector("[role='dialog']");
+  const heading = overlay.querySelector(".app-dialog-title");
+  const messageNode = overlay.querySelector(".app-dialog-message");
+  const form = overlay.querySelector(".app-dialog-form");
+  const inputNode = overlay.querySelector(".app-dialog-input");
+  const cancel = form.querySelector(".secondary-btn");
+  const confirm = form.querySelector(".action-btn");
+  heading.textContent = title;
+  messageNode.textContent = message;
+  dialog.setAttribute("aria-labelledby", `appDialogTitle`);
+  heading.id = "appDialogTitle";
+  cancel.textContent = cancelLabel;
+  confirm.textContent = confirmLabel;
+  confirm.classList.toggle("danger-action", danger);
+  inputNode.hidden = !input;
+  inputNode.value = input?.value || "";
+  inputNode.placeholder = input?.placeholder || "";
+  appDialogReturnFocus = document.activeElement;
+  overlay.classList.remove("hidden");
+  (input ? inputNode : confirm).focus();
+  return new Promise((resolve) => {
+    appDialogResolver = resolve;
+  });
+}
+
+async function showAppConfirm(message, options = {}) {
+  return (await showAppDialog({ message, ...options })) === true;
+}
+
+async function showAppPrompt(message, options = {}) {
+  const result = await showAppDialog({ message, ...options, input: options });
+  return typeof result === "string" ? result : null;
+}
+
 function openBookEditionDialog(titleText, content, returnFocus) {
   const overlay = ensureEditionDialog();
   const heading = overlay.querySelector(".edition-dialog-title");
@@ -3081,7 +3209,11 @@ function openBookEditionDetails(book, details, section, volumes, returnFocus) {
   useEdition.textContent = "Use this edition";
   useEdition.addEventListener("click", async () => {
     const format = details.format || "book";
-    if (!window.confirm(`Use this ${format.toLowerCase()} edition of “${details.title || book.title}”?`)) return;
+    const confirmed = await showAppConfirm(
+      `Use this ${format.toLowerCase()} edition of “${details.title || book.title}”?`,
+      { title: "Use this edition", confirmLabel: "Use edition" }
+    );
+    if (!confirmed) return;
     useEdition.disabled = true;
     const fields = {
       title: details.title || book.title,
@@ -4855,7 +4987,8 @@ document.querySelectorAll(".nav-pill").forEach((item) => {
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
-    if (editionDialogOverlay && !editionDialogOverlay.classList.contains("hidden")) closeBookEditionDialog();
+    if (appDialogOverlay && !appDialogOverlay.classList.contains("hidden")) settleAppDialog(null);
+    else if (editionDialogOverlay && !editionDialogOverlay.classList.contains("hidden")) closeBookEditionDialog();
     else if (!shelfDrawerOverlay.classList.contains("hidden")) closeShelfDrawer();
     else if (!authOverlay.classList.contains("hidden")) closeAuthModal();
     else if (!dialogOverlay.classList.contains("hidden")) closeDialog();
