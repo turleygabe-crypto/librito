@@ -3696,6 +3696,7 @@ body {
 
 .edition-picker {
   grid-column: 1 / -1;
+  grid-row: 1;
   display: grid;
   align-content: start;
   gap: 0.8rem;
@@ -3831,6 +3832,7 @@ body {
 .book-audiobook-panel {
   display: grid;
   grid-column: 2;
+  grid-row: 2;
   width: 100%;
   justify-self: stretch;
   align-content: start;
@@ -3920,6 +3922,7 @@ body {
 .book-profile-recommendations {
   display: grid;
   grid-column: 1;
+  grid-row: 2;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.9rem;
 }
@@ -3996,6 +3999,12 @@ body {
 @media (max-width: 800px) {
   .book-profile-below {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .book-audiobook-panel,
+  .book-profile-recommendations {
+    grid-column: 1;
+    grid-row: auto;
   }
 
   .book-profile-recommendations {
