@@ -4317,41 +4317,62 @@ body {
 
 .search-loading {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 18px;
+  padding: 28px 0;
 }
 
 .book-flipper {
   position: relative;
   flex: none;
-  width: 44px;
-  height: 34px;
-  perspective: 300px;
+  width: 150px;
+  height: 108px;
+  perspective: 700px;
 }
 
 .book-flipper-cover {
   position: absolute;
   inset: 0;
-  border-radius: 3px 5px 5px 3px;
-  background: #8b3f24;
-  box-shadow: inset 0 0 0 2px #6d2f1a;
+  border-radius: 6px 10px 10px 6px;
+  background:
+    linear-gradient(90deg, transparent 49%, rgba(0, 0, 0, 0.35) 50%, transparent 52%),
+    linear-gradient(135deg, #a3482a, #7a301b);
+  box-shadow: inset 0 0 0 3px #5e2615, 0 8px 14px rgba(40, 20, 10, 0.3);
 }
+
+.book-flipper-cover::before,
+.book-flipper-cover::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  width: calc(50% - 10px);
+  border-radius: 3px;
+  background: repeating-linear-gradient(#fffaf0 0 9px, #e8dcc4 9px 10px);
+}
+
+.book-flipper-cover::before { left: 7px; }
+.book-flipper-cover::after { right: 7px; }
 
 .book-flipper-page {
   position: absolute;
-  top: 3px;
-  left: 22px;
-  width: 19px;
-  height: 28px;
+  top: 8px;
+  left: 75px;
+  width: 67px;
+  height: 92px;
   border-radius: 0 3px 3px 0;
-  background: #fffaf0;
+  background:
+    repeating-linear-gradient(transparent 0 8px, rgba(139, 94, 60, 0.35) 8px 9px) 8px 10px / 46px 70px no-repeat,
+    linear-gradient(90deg, #efe4cc, #fffaf0 30%);
   border: 1px solid #e3d6bd;
   transform-origin: left center;
-  animation: book-flip 1.5s infinite ease-in-out;
+  backface-visibility: hidden;
+  animation: book-flip 1.6s infinite ease-in-out;
 }
 
-.book-flipper-page:nth-child(3) { animation-delay: 0.25s; }
-.book-flipper-page:nth-child(4) { animation-delay: 0.5s; }
+.book-flipper-page:nth-child(3) { animation-delay: 0.3s; }
+.book-flipper-page:nth-child(4) { animation-delay: 0.6s; }
 
 @keyframes book-flip {
   0% { transform: rotateY(0deg); opacity: 1; }
