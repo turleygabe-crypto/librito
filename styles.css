@@ -2142,6 +2142,10 @@ body {
   gap: 0.75rem;
 }
 
+.nav-pill[hidden] {
+  display: none;
+}
+
 .nav-pill::before {
   width: 1.15rem;
   color: #e7cbb7;

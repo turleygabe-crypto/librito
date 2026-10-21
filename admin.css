@@ -1,0 +1,15 @@
+body { margin: 0; font-family: system-ui, sans-serif; background: #f5f1eb; color: #3b2a1e; }
+.admin-wrap { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+header.admin-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 16px 0; }
+.kpi, .panel { background: #fffaf3; border: 1px solid #e3d5c3; border-radius: 12px; padding: 14px; }
+.kpi b { display: block; font-size: 1.8rem; }
+.kpi span { font-size: .85rem; color: #7a6350; }
+.panel { margin-bottom: 12px; }
+.bars { display: flex; align-items: flex-end; gap: 2px; height: 90px; }
+.bars i { flex: 1; background: #8b5e3c; min-height: 2px; border-radius: 2px 2px 0 0; }
+table { width: 100%; border-collapse: collapse; }
+td { padding: 4px 0; border-bottom: 1px solid #eee2d2; }
+td:last-child { text-align: right; }
+input, button, select { font: inherit; padding: 8px; margin: 4px 0; }
+button { background: #8b5e3c; color: #fff; border: 0; border-radius: 8px; cursor: pointer; }

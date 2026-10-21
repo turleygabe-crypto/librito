@@ -825,6 +825,17 @@ function updateAuthButton() {
   const accountName = state.session?.user?.email || "Account";
   document.querySelector(".account-menu-label").textContent = accountName;
   document.querySelector(".account-avatar").textContent = accountName.slice(0, 1).toUpperCase();
+  updateAdminLink();
+}
+
+async function updateAdminLink() {
+  const link = document.getElementById("adminLink");
+  if (!link) return;
+  link.hidden = true;
+  if (!state.supabase || !state.session) return;
+  const userId = state.session.user.id;
+  const { data } = await state.supabase.rpc("is_admin");
+  if (data === true && state.session?.user.id === userId) link.hidden = false;
 }
 
 function getDefaultBookLanguage() {
