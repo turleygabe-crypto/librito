@@ -76,7 +76,7 @@ function donut(map) {
     <ul class="legend">${entries.map(([k, c], i) => `<li><i style="background:${COLORS[i % COLORS.length]}"></i>${esc(k)} · ${esc(c)} (${Math.round((c / total) * 100)}%)</li>`).join("")}</ul></div>`;
 }
 
-const activityList = (items) => items.length
+const activityList = (items = []) => items.length
   ? `<ul class="list">${items.map((a) => `<li><span>${esc(a.label)}<span class="sub">${esc(a.who || "unknown")}</span></span><span class="sub">${esc(ago(a.at))}</span></li>`).join("")}</ul>`
   : "<p class='s'>No activity yet.</p>";
 
@@ -188,17 +188,26 @@ function shell(content) {
 }
 
 async function show() {
+  try {
+    await showPage();
+  } catch (error) {
+    console.error(error);
+    root.innerHTML = `<div class="center"><h1>Something went wrong</h1><p class="err">${esc(error.message)}</p><p class="s">If this mentions a missing field, run the latest admin migration in Supabase.</p><a href="/">Back to Librito</a></div>`;
+  }
+}
+
+async function showPage() {
   if (view.page === "users") {
     if (!view.users) {
       const { data, error } = await supabase.rpc("admin_users");
-      if (error) return notFound();
+      if (error) throw new Error(`Could not load users: ${error.message}`);
       view.users = data;
     }
     return shell(usersPage());
   }
   if (!view.stats) {
     const { data, error } = await supabase.rpc("admin_stats", { days: view.days });
-    if (error) return notFound();
+    if (error) throw new Error(`Could not load stats: ${error.message}`);
     view.stats = data;
   }
   const pages = { overview, books: booksPage, shelves: shelvesPage, engagement: engagementPage };
@@ -215,4 +224,7 @@ async function init() {
   show();
 }
 
-init();
+init().catch((error) => {
+  console.error(error);
+  root.innerHTML = `<div class="center"><h1>Something went wrong</h1><p class="err">${esc(error.message)}</p></div>`;
+});
