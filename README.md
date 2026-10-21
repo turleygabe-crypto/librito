@@ -24,7 +24,7 @@ python3 -m http.server 3000
 Then open http://127.0.0.1:3000/.
 
 ## Admin dashboard
-`/admin.html` is an unlinked, noindex report page (users, activity, books, shelves). Access is enforced in Supabase: run [the admin migration](supabase/migrations/20261021190000_admin_dashboard.sql), then grant yourself access in SQL Editor with `insert into public.admins (user_id) select id from auth.users where email = 'you@example.com';`. Non-admins only see "Not found" and the `admin_stats` RPC rejects them. "Active" users are those with a recent `last_sign_in_at`.
+`/admin.html` is an unlinked, noindex report page (users, activity, books, shelves). Access is enforced in Supabase: run [the admin migration](supabase/migrations/20261021190000_admin_dashboard.sql) and [the v2 reports migration](supabase/migrations/20261021200000_admin_dashboard_v2.sql), then grant yourself access in SQL Editor with `insert into public.admins (user_id) select id from auth.users where email = 'you@example.com';`. Non-admins only see "Not found" and the `admin_stats` RPC rejects them. "Active" users are those with a recent `last_sign_in_at`.
 
 ## Supabase setup
 1. Create a new Supabase project.
