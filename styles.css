@@ -441,6 +441,25 @@ h1, h2, h3, h4, p { margin-top: 0; }
   line-height: 1.4;
 }
 
+.account-menu-link {
+  display: block;
+  margin-bottom: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.6rem;
+  color: #f7e8de;
+  text-decoration: none;
+  background: #43271e;
+  text-align: center;
+}
+
+.account-menu-link:hover {
+  background: #5a352a;
+}
+
+.account-menu-link[hidden] {
+  display: none;
+}
+
 .account-menu-panel .action-btn {
   width: 100%;
 }
