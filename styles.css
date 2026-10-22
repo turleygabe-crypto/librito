@@ -4706,7 +4706,7 @@ body {
   object-fit: contain;
 }
 
-/* Barnes & Noble style: full cover at its natural proportions, bottom-aligned, no frame */
+/* Keep full covers centered within the card without a frame. */
 .card-open-button .book-cover-art.has-cover {
   background: transparent !important;
   box-shadow: none;
@@ -4715,7 +4715,7 @@ body {
 
 .card-open-button .book-cover-art.has-cover img {
   object-fit: contain;
-  object-position: center bottom;
+  object-position: center;
   filter: drop-shadow(0 2px 5px rgba(40, 28, 20, 0.35));
 }
 
