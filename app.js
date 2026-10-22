@@ -1908,6 +1908,25 @@ function getGenreBooks(genre, libraryBooks, recommendations = []) {
   });
 }
 
+const genreCoverCache = new Map();
+const genreCoverIndex = new Map();
+const genreCoverInterval = 7000;
+
+function loadGenreCovers(genre) {
+  const key = genre.toLowerCase();
+  let entry = genreCoverCache.get(key);
+  if (!entry) {
+    entry = { books: [], promise: null };
+    genreCoverCache.set(key, entry);
+    entry.promise = fetchOpenLibraryRecommendations({ genre })
+      .then((books) => {
+        entry.books = books.filter((book) => book.cover_i);
+      })
+      .catch((error) => console.error(`Could not load ${genre} covers`, error));
+  }
+  return entry.promise;
+}
+
 function createGenreCard(genre) {
   const card = document.createElement("article");
   card.className = "media-card genre-card";
@@ -1920,27 +1939,58 @@ function createGenreCard(genre) {
   label.textContent = genre.title;
   button.append(label);
   button.setAttribute("aria-label", `Browse ${genre.title}, ${genre.count} books`);
-  const books = genre.books || [];
-  if (books.length) {
-    const art = document.createElement("span");
-    art.className = "genre-tile-cover";
-    art.setAttribute("aria-hidden", "true");
-    button.prepend(art);
-    const order = books.slice().sort(() => Math.random() - 0.5);
-    let index = 0;
-    const show = () => art.replaceChildren(createBookCover(order[index]));
-    show();
-    if (order.length > 1) {
-      const timer = window.setInterval(() => {
-        if (!button.isConnected) {
-          window.clearInterval(timer);
-          return;
-        }
-        index = (index + 1) % order.length;
-        show();
-      }, 5000);
+  const art = document.createElement("span");
+  art.className = "genre-tile-cover";
+  art.setAttribute("aria-hidden", "true");
+  art.hidden = true;
+  button.prepend(art);
+  const genreKey = genre.title.toLowerCase();
+  let order = [];
+  let shownKey = "";
+  const refresh = () => {
+    const seen = new Set();
+    const pool = [...(genre.books || []), ...(genreCoverCache.get(genreKey)?.books || [])]
+      .filter((book) => {
+        const key = getBookKey(book);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    order = order.filter((book) => seen.has(getBookKey(book)));
+    const known = new Set(order.map(getBookKey));
+    order.push(...shuffleBooks(pool.filter((book) => !known.has(getBookKey(book)))));
+    return order.length;
+  };
+  const show = () => {
+    const book = order[genreCoverIndex.get(genreKey) % order.length];
+    const key = getBookKey(book);
+    if (key === shownKey) return;
+    shownKey = key;
+    art.hidden = false;
+    art.replaceChildren(createBookCover(book));
+  };
+  const step = () => {
+    if (!button.isConnected) return;
+    if (refresh()) {
+      genreCoverIndex.set(genreKey, (genreCoverIndex.get(genreKey) || 0) + 1);
+      show();
     }
-  }
+    window.setTimeout(step, genreCoverInterval + Math.random() * 2000);
+  };
+  const start = () => {
+    if (refresh()) {
+      genreCoverIndex.set(genreKey, genreCoverIndex.get(genreKey) || 0);
+      show();
+    }
+    // Stagger tiles so they never rotate in unison.
+    window.setTimeout(step, 1500 + Math.random() * genreCoverInterval);
+  };
+  start();
+  loadGenreCovers(genre.title).then(() => {
+    if (!button.isConnected || !refresh()) return;
+    genreCoverIndex.set(genreKey, genreCoverIndex.get(genreKey) || 0);
+    show();
+  });
   button.addEventListener("click", () => runNaturalSearch(genre.title));
   card.append(button);
   return card;
