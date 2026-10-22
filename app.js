@@ -1805,7 +1805,7 @@ function wireCardPopover(menu, summary, panel) {
   menu.addEventListener("toggle", () => {
     menu.closest(".media-card")?.classList.toggle("card-menu-open", menu.open);
     if (menu.open) {
-      document.querySelectorAll(".card-add-menu[open], .card-menu[open]").forEach((otherMenu) => {
+      document.querySelectorAll(".card-add-menu[open], .card-menu[open], .book-shelf-menu[open]").forEach((otherMenu) => {
         if (otherMenu !== menu) otherMenu.open = false;
       });
       panel.hidden = false;
@@ -2811,32 +2811,29 @@ function createBookShelfMenu(book) {
   summary.className = "secondary-btn";
   summary.textContent = "＋  Add to shelf";
   const panel = document.createElement("div");
-  panel.className = "book-more-menu-panel";
-  if (state.shelves.length) {
-    state.shelves.forEach((shelf) => {
-      const option = document.createElement("button");
-      option.type = "button";
-      option.textContent = shelf.name;
-      option.disabled = getBookShelfNames(book).includes(shelf.name);
-      option.addEventListener("click", () => {
-        menu.open = false;
-        addBookToShelf(book, shelf);
-      });
-      panel.append(option);
-    });
-  } else {
-    const empty = document.createElement("p");
-    empty.textContent = "Create a shelf before adding this book.";
-    const create = document.createElement("button");
-    create.type = "button";
-    create.textContent = "Create a shelf";
-    create.addEventListener("click", () => {
+  panel.className = "card-add-actions";
+  const shelfNames = getBookShelfNames(book);
+  state.shelves.forEach((shelf) => {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.textContent = shelfNames.includes(shelf.name) ? `✓ ${shelf.name}` : shelf.name;
+    option.disabled = shelfNames.includes(shelf.name);
+    option.addEventListener("click", () => {
       menu.open = false;
-      openShelfDrawer();
+      addBookToShelf(book, shelf);
     });
-    panel.append(empty, create);
-  }
+    panel.append(option);
+  });
+  const create = document.createElement("button");
+  create.type = "button";
+  create.textContent = "＋ New shelf";
+  create.addEventListener("click", () => {
+    menu.open = false;
+    openShelfDrawer();
+  });
+  panel.append(create);
   menu.append(summary, panel);
+  wireCardPopover(menu, summary, panel);
   return menu;
 }
 
@@ -5502,9 +5499,9 @@ window.addEventListener("scroll", trackRecommendationScroll, { capture: true, pa
 document.addEventListener("click", (event) => {
   const target = event.target;
   const activeMenu = target instanceof Element
-    ? target.closest(".card-add-menu, .card-menu")
+    ? target.closest(".card-add-menu, .card-menu, .book-shelf-menu")
     : null;
-  document.querySelectorAll(".card-add-menu[open], .card-menu[open]").forEach((menu) => {
+  document.querySelectorAll(".card-add-menu[open], .card-menu[open], .book-shelf-menu[open]").forEach((menu) => {
     if (menu !== activeMenu) menu.open = false;
   });
 });
