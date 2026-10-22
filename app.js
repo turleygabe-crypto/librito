@@ -1117,7 +1117,8 @@ function renderBooks() {
   const genreTiles = [...new Set([...genres, "Fiction", "Nonfiction", "Mystery", "Fantasy", "Essays"])]
     .map((genre, index) => ({
       title: genre,
-      count: libraryBooks.filter((book) => book.genre === genre).length,
+      count: libraryBooks.filter((book) => bookMatchesGenre(book, genre)).length,
+      books: getGenreBooks(genre, libraryBooks, recommendations),
       color: ["#8050a8", "#bf613f", "#3f7772", "#536c9e"][index % 4],
     }));
 
@@ -1891,6 +1892,22 @@ function showSuggestedShelfPage(key) {
   );
 }
 
+function bookMatchesGenre(book, genre) {
+  const target = genre.trim().toLowerCase();
+  return String(book.genre || "").split(/[,;/]/).some((part) => part.trim().toLowerCase() === target);
+}
+
+function getGenreBooks(genre, libraryBooks, recommendations = []) {
+  const seen = new Set();
+  return [...libraryBooks, ...recommendations.map(({ book }) => book)].filter((book) => {
+    if (!bookMatchesGenre(book, genre)) return false;
+    const key = getBookKey(book);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function createGenreCard(genre) {
   const card = document.createElement("article");
   card.className = "media-card genre-card";
@@ -1898,8 +1915,32 @@ function createGenreCard(genre) {
   button.type = "button";
   button.className = "genre-tile";
   button.style.setProperty("--genre-color", genre.color);
-  button.textContent = genre.title;
+  const label = document.createElement("span");
+  label.className = "genre-tile-label";
+  label.textContent = genre.title;
+  button.append(label);
   button.setAttribute("aria-label", `Browse ${genre.title}, ${genre.count} books`);
+  const books = genre.books || [];
+  if (books.length) {
+    const art = document.createElement("span");
+    art.className = "genre-tile-cover";
+    art.setAttribute("aria-hidden", "true");
+    button.prepend(art);
+    const order = books.slice().sort(() => Math.random() - 0.5);
+    let index = 0;
+    const show = () => art.replaceChildren(createBookCover(order[index]));
+    show();
+    if (order.length > 1) {
+      const timer = window.setInterval(() => {
+        if (!button.isConnected) {
+          window.clearInterval(timer);
+          return;
+        }
+        index = (index + 1) % order.length;
+        show();
+      }, 5000);
+    }
+  }
   button.addEventListener("click", () => runNaturalSearch(genre.title));
   card.append(button);
   return card;
@@ -4368,7 +4409,8 @@ function showSearchPage(query = "") {
     const genres = [...new Set([...libraryBooks.map((book) => book.genre).filter(Boolean), "Fiction", "Nonfiction", "Mystery", "Fantasy", "Essays"])];
     const tiles = genres.map((genre, index) => ({
       title: genre,
-      count: libraryBooks.filter((book) => book.genre === genre).length,
+      count: libraryBooks.filter((book) => bookMatchesGenre(book, genre)).length,
+      books: getGenreBooks(genre, libraryBooks, getBookRecommendations(libraryBooks)),
       color: ["#8050a8", "#bf613f", "#3f7772", "#536c9e"][index % 4],
     }));
     page.append(createCardRow("Explore genres", tiles.map((genre) => ({ type: "genre", ...genre }))));
