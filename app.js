@@ -1912,6 +1912,35 @@ const genreCoverCache = new Map();
 const genreCoverIndex = new Map();
 const genreCoverInterval = 7000;
 
+// Resolves with a cover element only once its image has really loaded, or null if it can't.
+function preloadBookCover(book, timeoutMs = 8000) {
+  return new Promise((resolve) => {
+    const cover = createBookCover(book);
+    const image = cover.querySelector("img");
+    if (!image) {
+      resolve(null);
+      return;
+    }
+    let done = false;
+    const finish = (result) => {
+      if (done) return;
+      done = true;
+      window.clearTimeout(timer);
+      resolve(result);
+    };
+    const timer = window.setTimeout(() => finish(null), timeoutMs);
+    image.loading = "eager";
+    image.addEventListener("load", () => {
+      if (image.naturalWidth > 1) finish(cover);
+      else finish(null);
+    });
+    image.addEventListener("error", () => {
+      if (!image.isConnected) finish(null);
+    });
+    if (image.complete && image.naturalWidth > 1) finish(cover);
+  });
+}
+
 function loadGenreCovers(genre) {
   const key = genre.toLowerCase();
   let entry = genreCoverCache.get(key);
@@ -1961,13 +1990,29 @@ function createGenreCard(genre) {
     order.push(...shuffleBooks(pool.filter((book) => !known.has(getBookKey(book)))));
     return order.length;
   };
-  const show = () => {
-    const book = order[genreCoverIndex.get(genreKey) % order.length];
-    const key = getBookKey(book);
-    if (key === shownKey) return;
-    shownKey = key;
-    art.hidden = false;
-    art.replaceChildren(createBookCover(book));
+  let showing = false;
+  const show = async () => {
+    if (showing) return;
+    showing = true;
+    for (let attempt = 0; attempt < Math.min(order.length, 5); attempt += 1) {
+      const index = genreCoverIndex.get(genreKey) || 0;
+      const book = order[index % order.length];
+      const key = getBookKey(book);
+      if (key === shownKey) {
+        genreCoverIndex.set(genreKey, index + 1);
+        continue;
+      }
+      const cover = await preloadBookCover(book);
+      if (!button.isConnected) break;
+      if (cover) {
+        shownKey = key;
+        art.hidden = false;
+        art.replaceChildren(cover);
+        break;
+      }
+      genreCoverIndex.set(genreKey, index + 1);
+    }
+    showing = false;
   };
   const step = () => {
     if (!button.isConnected) return;
