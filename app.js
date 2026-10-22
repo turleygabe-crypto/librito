@@ -4239,7 +4239,9 @@ async function loadBookProfileRecommendations(book, moreByAuthor, readersEnjoyed
       const specificSubjects = subjects.filter((subject) =>
         !broadSubjects.has(normalizeBookText(subject)) && !subject.includes(":")
       );
-      const recommendationSubjects = specificSubjects.length ? specificSubjects : subjects;
+      const recommendationSubjects = specificSubjects.length
+        ? specificSubjects
+        : subjects.length ? subjects : ["Fiction"];
       const subjectResults = await Promise.allSettled(
         [...new Set(recommendationSubjects)].slice(0, 3)
           .map((genre) => fetchOpenLibraryRecommendations({ genre }))
