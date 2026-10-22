@@ -194,6 +194,7 @@ const state = {
   catalogLoading: false,
   catalogError: "",
   recommendationPool: [],
+  library: { query: "", sort: "title-asc", pageSize: 25, page: 1 },
   shelfSort: { key: "added", direction: "desc" },
 };
 
@@ -357,6 +358,9 @@ function restoreRouteFromLocation() {
   switch (path) {
     case "/shelves":
       showShelvesPage();
+      break;
+    case "/library":
+      showLibraryPage();
       break;
     case "/shelf":
       showShelfPage(params.get("name") || "");
@@ -1921,7 +1925,14 @@ function showPage(view) {
 }
 
 function updateActiveNavigation(label) {
-  document.querySelectorAll(".nav-pill").forEach((item) => {
+  const libraryNav = document.getElementById("libraryNavBtn");
+  if (libraryNav) libraryNav.classList.toggle("active", label.toLowerCase() === "your library");
+  document.getElementById("libraryNavBtn").addEventListener("click", () => {
+  if (window.matchMedia("(max-width: 899px)").matches) setLibraryDrawerOpen(false);
+  navigateTo("library");
+});
+
+document.querySelectorAll(".nav-pill").forEach((item) => {
     const active = item.textContent.trim().toLowerCase() === label.toLowerCase();
     item.classList.toggle("active", active);
     if (active) item.setAttribute("aria-current", "page");
@@ -2301,6 +2312,126 @@ function showShelvesPage() {
     })),
   ];
   page.append(createCardRow("Collections", tiles));
+}
+
+const librarySortOptions = {
+  "title-asc": ["Title (A–Z)", (a, b) => compareText(a.title, b.title)],
+  "title-desc": ["Title (Z–A)", (a, b) => compareText(b.title, a.title)],
+  "author-asc": ["Author (A–Z)", (a, b) => compareText(a.author, b.author) || compareText(a.title, b.title)],
+  "added-desc": ["Recently added", (a, b) => String(b.added || "").localeCompare(String(a.added || "")) || compareText(a.title, b.title)],
+  "added-asc": ["Oldest added", (a, b) => String(a.added || "").localeCompare(String(b.added || "")) || compareText(a.title, b.title)],
+};
+
+function compareText(a, b) {
+  return String(a || "").localeCompare(String(b || ""), undefined, { sensitivity: "base", numeric: true });
+}
+
+function showLibraryPage() {
+  updateActiveNavigation("Your Library");
+  const page = showPage("library");
+  const prefs = state.library;
+  const header = createPageHeader("Your Library", "Your Library", "Every book you've added, all in one place.");
+
+  const toolbar = document.createElement("div");
+  toolbar.className = "page-toolbar library-toolbar";
+  const search = document.createElement("input");
+  search.type = "search";
+  search.className = "library-search";
+  search.placeholder = "Search title, author, or genre…";
+  search.setAttribute("aria-label", "Search your library");
+  search.value = prefs.query;
+  const sort = document.createElement("select");
+  sort.setAttribute("aria-label", "Sort books");
+  Object.entries(librarySortOptions).forEach(([value, [label]]) => {
+    sort.append(new Option(label, value, false, value === prefs.sort));
+  });
+  const size = document.createElement("select");
+  size.setAttribute("aria-label", "Books per page");
+  [10, 25, 50, 100].forEach((n) => size.append(new Option(`${n} per page`, String(n), false, n === prefs.pageSize)));
+  const wrap = (label, control) => {
+    const field = document.createElement("label");
+    field.className = "library-control";
+    const text = document.createElement("span");
+    text.textContent = label;
+    field.append(text, control);
+    return field;
+  };
+  toolbar.append(search, wrap("Sort", sort), wrap("Show", size));
+
+  const results = document.createElement("div");
+  results.className = "library-results";
+  page.append(header, toolbar, results);
+
+  const renderResults = () => {
+    const query = prefs.query.trim().toLowerCase();
+    const books = getLibraryBooks()
+      .filter((book) => !query || [book.title, book.author, book.genre].some((v) => String(v || "").toLowerCase().includes(query)))
+      .sort(librarySortOptions[prefs.sort][1]);
+    const pages = Math.max(1, Math.ceil(books.length / prefs.pageSize));
+    prefs.page = Math.min(Math.max(1, prefs.page), pages);
+    const start = (prefs.page - 1) * prefs.pageSize;
+    const visible = books.slice(start, start + prefs.pageSize);
+    results.replaceChildren();
+
+    const summary = document.createElement("p");
+    summary.className = "library-summary";
+    summary.textContent = books.length
+      ? `Showing ${start + 1}–${start + visible.length} of ${books.length} ${books.length === 1 ? "book" : "books"}`
+      : "";
+    results.append(summary);
+
+    if (!books.length) {
+      const empty = document.createElement("p");
+      empty.className = "row-empty-state";
+      empty.textContent = query ? "No books match your search." : "Books you add will appear here.";
+      results.append(empty);
+      return;
+    }
+    const grid = document.createElement("div");
+    grid.className = "library-grid";
+    visible.forEach((book) => grid.append(createBookCard(book)));
+    results.append(grid);
+
+    if (pages > 1) {
+      const nav = document.createElement("nav");
+      nav.className = "library-pagination";
+      nav.setAttribute("aria-label", "Library pages");
+      const go = (label, target, disabled) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "secondary-btn";
+        button.textContent = label;
+        button.disabled = disabled;
+        button.addEventListener("click", () => {
+          prefs.page = target;
+          renderResults();
+          page.scrollIntoView({ block: "start" });
+        });
+        return button;
+      };
+      const status = document.createElement("span");
+      status.textContent = `Page ${prefs.page} of ${pages}`;
+      nav.append(go("‹ Previous", prefs.page - 1, prefs.page === 1), status, go("Next ›", prefs.page + 1, prefs.page === pages));
+      results.append(nav);
+    }
+  };
+
+  search.addEventListener("input", () => {
+    prefs.query = search.value;
+    prefs.page = 1;
+    renderResults();
+  });
+  sort.addEventListener("change", () => {
+    prefs.sort = sort.value;
+    prefs.page = 1;
+    renderResults();
+  });
+  size.addEventListener("change", () => {
+    prefs.pageSize = Number(size.value);
+    prefs.page = 1;
+    renderResults();
+  });
+  renderResults();
 }
 
 function createBookTable(books) {
@@ -4635,6 +4766,7 @@ function render() {
   }
   else if (state.view === "shelf") showShelfPage(state.currentShelf);
   else if (state.view === "shelves") showShelvesPage();
+  else if (state.view === "library") showLibraryPage();
   else if (state.view === "suggested-shelf") restoreRouteFromLocation();
   else if (state.view === "search") showSearchPage(state.searchQuery);
   else if (state.view === "stats") showStatsPage();

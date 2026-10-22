@@ -50,7 +50,7 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .section-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
 .text-btn { border: 0; background: transparent; color: var(--muted); font-weight: 700; }
 .recommended-shelves { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.75rem; }
-.recommendation-card { position: relative; aspect-ratio: 1; overflow: hidden; padding: 0.8rem; border: 0; border-radius: 0.55rem; color: #111; text-align: left; }
+.recommendation-card { position: relative; aspect-ratio: 2 / 3; overflow: hidden; padding: 0.8rem; border: 0; border-radius: 0.55rem; color: #111; text-align: left; }
 .lavender-card { background: #ce91f4; }
 .coral-card { background: #ff9a73; }
 .recommendation-label { position: absolute; top: 0.75rem; right: 0.75rem; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.18em; }
@@ -982,7 +982,7 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .shelf-card-art,
 .genre-tile {
   width: 100%;
-  aspect-ratio: 1;
+  aspect-ratio: 2 / 3;
   border-radius: 0.45rem;
 }
 
@@ -1180,7 +1180,7 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .shelf-card-art .book-cover-art {
   width: 100%;
   height: 100%;
-  aspect-ratio: 1;
+  aspect-ratio: 2 / 3;
   border-radius: 0;
 }
 
@@ -2446,7 +2446,7 @@ body {
 }
 
 .card-open-button .book-cover-art {
-  aspect-ratio: 1;
+  aspect-ratio: 2 / 3;
   border-radius: 0.25rem;
   box-shadow: 0 2px 7px rgba(55, 37, 23, 0.2);
 }
@@ -4632,4 +4632,102 @@ body {
   .global-search-language {
     max-width: 5.5rem;
   }
+}
+
+.library-heading-btn {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.library-heading-btn:hover,
+.library-heading-btn.active {
+  color: #f0a56f;
+}
+
+.library-toolbar {
+  align-items: flex-end;
+  margin: 1rem 0;
+}
+
+.library-search {
+  flex: 1 1 16rem;
+  min-width: 0;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid rgba(139, 94, 60, 0.25);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.library-control {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+}
+
+.library-control select {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid rgba(139, 94, 60, 0.25);
+  border-radius: 0.6rem;
+  background: #fff;
+  color: var(--ink);
+}
+
+.library-summary {
+  margin: 0 0 0.6rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 0.9rem;
+}
+
+.library-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.library-pagination button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.card-open-button .book-cover-art img {
+  object-fit: contain;
+}
+
+/* Barnes & Noble style: full cover at its natural proportions, bottom-aligned, no frame */
+.card-open-button .book-cover-art.has-cover {
+  background: transparent !important;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.card-open-button .book-cover-art.has-cover img {
+  object-fit: contain;
+  object-position: center bottom;
+  filter: drop-shadow(0 2px 5px rgba(40, 28, 20, 0.35));
+}
+
+.card-open-button .book-cover-art.has-cover .book-cover-initials,
+.card-open-button .book-cover-art.has-cover .book-cover-placeholder {
+  display: none;
+}
+
+.card-open-button .book-cover-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-weight: 500;
 }
