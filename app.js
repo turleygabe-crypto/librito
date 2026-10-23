@@ -927,12 +927,12 @@ function renderShelves() {
   shelfList.replaceChildren();
   const likedBooks = libraryBooks.filter((book) => book.liked);
   const currentlyReadingBooks = libraryBooks.filter((book) => book.reading_status === "reading");
-  shelfList.append(createShelfNavigationItem("Liked Books", String(likedBooks.length), "liked", likedBooks[0]));
+  shelfList.append(createShelfNavigationItem("Liked Books", String(likedBooks.length), "liked", likedBooks));
   shelfList.append(createShelfNavigationItem(
     "Currently Reading",
     String(currentlyReadingBooks.length),
     "#496c5d",
-    currentlyReadingBooks[0]
+    currentlyReadingBooks
   ));
   startReadingCoverCycle(currentlyReadingBooks);
   const completedBooks = state.books.filter((book) => book.reading_status === "completed");
@@ -940,10 +940,10 @@ function renderShelves() {
     "Completed Books",
     String(completedBooks.length),
     "#8b5e3c",
-    completedBooks[0]
+    completedBooks
   ));
   shelvesToRender.forEach((shelf) => {
-    shelfList.append(createShelfNavigationItem(shelf.name, String(shelf.books.length), shelf.color, shelf.books[0]));
+    shelfList.append(createShelfNavigationItem(shelf.name, String(shelf.books.length), shelf.color, shelf.books));
   });
   if (!shelvesToRender.length && libraryBooks.length === 0) {
     const empty = document.createElement("p");
@@ -968,7 +968,8 @@ function setLibraryDrawerOpen(open) {
   else if (window.matchMedia("(max-width: 899px)").matches) libraryToggleBtn.focus();
 }
 
-function createShelfNavigationItem(name, count, color, book = null) {
+function createShelfNavigationItem(name, count, color, books = []) {
+  const book = books[0] || null;
   const item = document.createElement("button");
   item.className = "shelf-item";
   item.type = "button";
@@ -979,11 +980,15 @@ function createShelfNavigationItem(name, count, color, book = null) {
 
   const thumbnail = document.createElement("span");
   thumbnail.className = "shelf-thumbnail";
-  if (name === "Currently Reading" && book) {
-    thumbnail.dataset.readingShelfCover = "true";
-    thumbnail.append(createBookCover(book, "shelf-thumb-art"));
-  } else if (book) {
-    thumbnail.append(createBookCover(book, "shelf-thumb-art"));
+  if (book) {
+    thumbnail.classList.add("cover-cycle-host");
+    startCoverCycle(thumbnail, {
+      key: `shelf:${name}`,
+      getBooks: () => books,
+      className: "shelf-thumb-art",
+      initial: books[Math.min(coverCycleIndex.get(`shelf:${name}`) || 0, books.length - 1) % books.length] || book,
+      interval: 12000,
+    });
   } else if (color === "liked") {
     thumbnail.classList.add("liked-thumbnail");
     thumbnail.textContent = "♥";
@@ -1106,7 +1111,10 @@ function renderBooks() {
   if (!state.loading) ensureHomeRecommendations(libraryBooks);
   const orderedBooks = libraryBooks.slice().sort((a, b) =>
     new Date(b.added || b.added_on || 0) - new Date(a.added || a.added_on || 0));
-  const recommendations = getBookRecommendations(libraryBooks);
+  // Books without cover art sort last so they only surface when a row is expanded.
+  const hasCoverArt = ({ book }) => Boolean(book.cover_i || book.cover_url);
+  const recommendations = getBookRecommendations(libraryBooks)
+    .sort((a, b) => Number(hasCoverArt(b)) - Number(hasCoverArt(a)));
   const pickedRecommendations = recommendations.slice(0, 8);
   const pickedKeys = new Set(pickedRecommendations.map(({ book }) => getBookKey(book)));
   const shelfRecommendations = recommendations.filter(({ book }) => !pickedKeys.has(getBookKey(book)));
@@ -1589,7 +1597,7 @@ function createCardRow(title, cards, {
   const showAll = document.createElement("button");
   showAll.type = "button";
   showAll.className = "text-btn show-all-btn";
-  showAll.textContent = "Show all";
+  showAll.textContent = "See all";
   showAll.setAttribute("aria-expanded", "false");
   heading.append(headingTitle, showAll);
 
@@ -1635,9 +1643,35 @@ function createCardRow(title, cards, {
   showAll.addEventListener("click", () => {
     const expanded = row.classList.toggle("expanded");
     showAll.setAttribute("aria-expanded", String(expanded));
-    showAll.textContent = expanded ? "Show less" : "Show all";
+    showAll.textContent = expanded ? "Show less" : "See all";
   });
-  section.append(heading, row);
+  const wrap = document.createElement("div");
+  wrap.className = "card-row-wrap";
+  const makeArrow = (direction) => {
+    const arrow = document.createElement("button");
+    arrow.type = "button";
+    arrow.className = `row-arrow row-arrow-${direction < 0 ? "prev" : "next"}`;
+    arrow.setAttribute("aria-label", `${direction < 0 ? "Previous" : "Next"} ${title}`);
+    arrow.textContent = direction < 0 ? "‹" : "›";
+    arrow.addEventListener("click", () => {
+      row.scrollBy({ left: direction * row.clientWidth * 0.85, behavior: "smooth" });
+    });
+    return arrow;
+  };
+  const prev = makeArrow(-1);
+  const next = makeArrow(1);
+  const updateArrows = () => {
+    const scrollable = !row.classList.contains("expanded") && row.scrollWidth > row.clientWidth + 4;
+    prev.hidden = !scrollable || row.scrollLeft < 4;
+    next.hidden = !scrollable || row.scrollLeft + row.clientWidth >= row.scrollWidth - 4;
+  };
+  row.addEventListener("scroll", updateArrows, { passive: true });
+  showAll.addEventListener("click", updateArrows);
+  window.addEventListener("resize", updateArrows);
+  window.requestAnimationFrame(updateArrows);
+  window.setTimeout(updateArrows, 600);
+  wrap.append(row, prev, next);
+  section.append(heading, wrap);
   return section;
 }
 
@@ -1842,6 +1876,9 @@ function createShelfCard(shelf, { compact = false } = {}) {
   if (name === "Currently Reading" && shelf.book) {
     cover.dataset.readingShelfCardCover = "true";
     cover.append(createBookCover(shelf.book));
+  } else if (isSuggestion && shelf.books?.length) {
+    cover.classList.add("cover-cycle-host");
+    startCoverCycle(cover, { key: `suggested-shelf:${shelf.key}`, getBooks: () => shelf.books });
   } else if (shelf.book) cover.append(createBookCover(shelf.book));
   else cover.textContent = name.slice(0, 1).toUpperCase();
   const title = document.createElement("strong");
@@ -1909,13 +1946,15 @@ function getGenreBooks(genre, libraryBooks, recommendations = []) {
 }
 
 const genreCoverCache = new Map();
-const genreCoverIndex = new Map();
-const genreCoverInterval = 7000;
+const coverCycleIndex = new Map();
+const coverCycleLastChange = new Map();
+const coverCycleInterval = 14000;
+const coverFadeMs = 1200;
 
 // Resolves with a cover element only once its image has really loaded, or null if it can't.
-function preloadBookCover(book, timeoutMs = 8000) {
+function preloadBookCover(book, className = "", timeoutMs = 8000) {
   return new Promise((resolve) => {
-    const cover = createBookCover(book);
+    const cover = createBookCover(book, className);
     const image = cover.querySelector("img");
     if (!image) {
       resolve(null);
@@ -1930,15 +1969,84 @@ function preloadBookCover(book, timeoutMs = 8000) {
     };
     const timer = window.setTimeout(() => finish(null), timeoutMs);
     image.loading = "eager";
-    image.addEventListener("load", () => {
-      if (image.naturalWidth > 1) finish(cover);
-      else finish(null);
-    });
+    // Reject tracking pixels and wide "no image available" placeholders.
+    const isRealCover = () => image.naturalWidth >= 60 && image.naturalHeight / image.naturalWidth >= 1.15;
+    image.addEventListener("load", () => finish(isRealCover() ? cover : null));
     image.addEventListener("error", () => {
       if (!image.isConnected) finish(null);
     });
-    if (image.complete && image.naturalWidth > 1) finish(cover);
+    if (image.complete && image.naturalWidth > 0) finish(isRealCover() ? cover : null);
   });
+}
+
+// Slowly crossfades through the books returned by getBooks inside container.
+function startCoverCycle(container, { key, getBooks, className = "", interval = coverCycleInterval, initial = null }) {
+  let order = [];
+  let shownKey = "";
+  let showing = false;
+  const refresh = () => {
+    const seen = new Set();
+    const pool = getBooks().filter((book) => {
+      const bookKey = getBookKey(book);
+      if (seen.has(bookKey)) return false;
+      seen.add(bookKey);
+      return true;
+    });
+    order = order.filter((book) => seen.has(getBookKey(book)));
+    const known = new Set(order.map(getBookKey));
+    order.push(...shuffleBooks(pool.filter((book) => !known.has(getBookKey(book)))));
+    return order.length;
+  };
+  const swapIn = (cover) => {
+    const previous = [...container.children];
+    cover.classList.add("cover-cycle-layer");
+    cover.style.opacity = "0";
+    container.append(cover);
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      cover.style.opacity = "1";
+    }));
+    window.setTimeout(() => previous.forEach((layer) => layer.remove()), coverFadeMs + 100);
+  };
+  const show = async () => {
+    if (showing || !refresh()) return;
+    showing = true;
+    for (let attempt = 0; attempt < Math.min(order.length, 5); attempt += 1) {
+      const index = coverCycleIndex.get(key) || 0;
+      const book = order[index % order.length];
+      if (getBookKey(book) === shownKey) {
+        coverCycleIndex.set(key, index + 1);
+        continue;
+      }
+      const cover = await preloadBookCover(book, className);
+      if (!container.isConnected) break;
+      if (cover) {
+        shownKey = getBookKey(book);
+        coverCycleLastChange.set(key, Date.now());
+        if (container.children.length) swapIn(cover);
+        else container.append(cover);
+        break;
+      }
+      coverCycleIndex.set(key, index + 1);
+    }
+    showing = false;
+  };
+  const step = () => {
+    if (!container.isConnected) return;
+    if (refresh()) {
+      coverCycleIndex.set(key, (coverCycleIndex.get(key) || 0) + 1);
+      show();
+    }
+    window.setTimeout(step, interval + Math.random() * interval * 0.4);
+  };
+  if (initial) {
+    shownKey = getBookKey(initial);
+    container.append(createBookCover(initial, className));
+  }
+  show();
+  // Stagger rotations and keep the cadence across re-renders.
+  const elapsed = Date.now() - (coverCycleLastChange.get(key) || 0);
+  window.setTimeout(step, Math.max(2000, interval - elapsed) + Math.random() * interval * 0.5);
+  return { refresh: show };
 }
 
 function loadGenreCovers(genre) {
@@ -1971,71 +2079,13 @@ function createGenreCard(genre) {
   const art = document.createElement("span");
   art.className = "genre-tile-cover";
   art.setAttribute("aria-hidden", "true");
-  art.hidden = true;
   button.prepend(art);
   const genreKey = genre.title.toLowerCase();
-  let order = [];
-  let shownKey = "";
-  const refresh = () => {
-    const seen = new Set();
-    const pool = [...(genre.books || []), ...(genreCoverCache.get(genreKey)?.books || [])]
-      .filter((book) => {
-        const key = getBookKey(book);
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-    order = order.filter((book) => seen.has(getBookKey(book)));
-    const known = new Set(order.map(getBookKey));
-    order.push(...shuffleBooks(pool.filter((book) => !known.has(getBookKey(book)))));
-    return order.length;
-  };
-  let showing = false;
-  const show = async () => {
-    if (showing) return;
-    showing = true;
-    for (let attempt = 0; attempt < Math.min(order.length, 5); attempt += 1) {
-      const index = genreCoverIndex.get(genreKey) || 0;
-      const book = order[index % order.length];
-      const key = getBookKey(book);
-      if (key === shownKey) {
-        genreCoverIndex.set(genreKey, index + 1);
-        continue;
-      }
-      const cover = await preloadBookCover(book);
-      if (!button.isConnected) break;
-      if (cover) {
-        shownKey = key;
-        art.hidden = false;
-        art.replaceChildren(cover);
-        break;
-      }
-      genreCoverIndex.set(genreKey, index + 1);
-    }
-    showing = false;
-  };
-  const step = () => {
-    if (!button.isConnected) return;
-    if (refresh()) {
-      genreCoverIndex.set(genreKey, (genreCoverIndex.get(genreKey) || 0) + 1);
-      show();
-    }
-    window.setTimeout(step, genreCoverInterval + Math.random() * 2000);
-  };
-  const start = () => {
-    if (refresh()) {
-      genreCoverIndex.set(genreKey, genreCoverIndex.get(genreKey) || 0);
-      show();
-    }
-    // Stagger tiles so they never rotate in unison.
-    window.setTimeout(step, 1500 + Math.random() * genreCoverInterval);
-  };
-  start();
-  loadGenreCovers(genre.title).then(() => {
-    if (!button.isConnected || !refresh()) return;
-    genreCoverIndex.set(genreKey, genreCoverIndex.get(genreKey) || 0);
-    show();
+  const cycle = startCoverCycle(art, {
+    key: `genre:${genreKey}`,
+    getBooks: () => [...(genre.books || []), ...(genreCoverCache.get(genreKey)?.books || [])],
   });
+  loadGenreCovers(genre.title).then(cycle.refresh);
   button.addEventListener("click", () => runNaturalSearch(genre.title));
   card.append(button);
   return card;
@@ -6159,7 +6209,6 @@ bookForm.addEventListener("submit", async (event) => {
 });
 
 initializeBookLanguageOptions();
-scheduleRecommendationRotation();
 state.books = loadBooks();
 state.loading = false;
 updateAuthButton();
