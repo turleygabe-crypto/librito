@@ -931,7 +931,7 @@ h1, h2, h3, h4, p { margin-top: 0; }
 
 .card-row {
   display: grid;
-  grid-auto-columns: minmax(8.5rem, 10.5rem);
+  grid-auto-columns: 12.5rem;
   grid-auto-flow: column;
   grid-template-rows: auto;
   gap: 0.9rem;
@@ -4778,7 +4778,7 @@ body {
 
 .row-arrow {
   position: absolute;
-  top: 6.5rem;
+  top: 9rem;
   z-index: 2;
   display: grid;
   width: 2.2rem;

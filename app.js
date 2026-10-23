@@ -273,6 +273,13 @@ let readingCoverCycleIndex = 0;
 let readingCoverCycleKey = "";
 let recommendationRotationTimer = null;
 let lastRecommendationScrollAt = 0;
+const allGenres = [
+  "Fiction", "Nonfiction", "Mystery", "Fantasy", "Essays", "Science Fiction", "Romance", "Thriller",
+  "Historical Fiction", "Horror", "Biography", "Memoir", "History", "Science", "Philosophy", "Poetry",
+  "Self-Help", "Business", "Young Adult", "Children's", "Classics", "Graphic Novels", "Cooking", "Travel",
+  "Art", "Religion", "Psychology", "Humor",
+];
+const homeRowBookCount = 24;
 const recommendationRotationInterval = 3 * 60 * 1000;
 const recommendationScrollPause = 2000;
 let selectedBook = null;
@@ -1109,20 +1116,21 @@ function renderBooks() {
 
   const libraryBooks = getLibraryBooks();
   if (!state.loading) ensureHomeRecommendations(libraryBooks);
+  ensureGenreCatalogs();
   const orderedBooks = libraryBooks.slice().sort((a, b) =>
     new Date(b.added || b.added_on || 0) - new Date(a.added || a.added_on || 0));
   // Books without cover art sort last so they only surface when a row is expanded.
   const hasCoverArt = ({ book }) => Boolean(book.cover_i || book.cover_url);
   const recommendations = getBookRecommendations(libraryBooks)
     .sort((a, b) => Number(hasCoverArt(b)) - Number(hasCoverArt(a)));
-  const pickedRecommendations = recommendations.slice(0, 8);
+  const pickedRecommendations = recommendations.slice(0, homeRowBookCount);
   const pickedKeys = new Set(pickedRecommendations.map(({ book }) => getBookKey(book)));
   const shelfRecommendations = recommendations.filter(({ book }) => !pickedKeys.has(getBookKey(book)));
   const moreByOwnedAuthors = shelfRecommendations.filter(({ book }) =>
     libraryBooks.some((owned) => owned.author && owned.author.toLowerCase() === book.author.toLowerCase()));
   const currentlyReadingBooks = libraryBooks.filter((book) => book.reading_status === "reading");
   const genres = [...new Set(libraryBooks.map((book) => book.genre).filter(Boolean))];
-  const genreTiles = [...new Set([...genres, "Fiction", "Nonfiction", "Mystery", "Fantasy", "Essays"])]
+  const genreTiles = [...new Set([...genres, ...allGenres])]
     .map((genre, index) => ({
       title: genre,
       count: libraryBooks.filter((book) => bookMatchesGenre(book, genre)).length,
@@ -1142,6 +1150,20 @@ function renderBooks() {
       section.dataset.recommendationSection = "true";
       return section;
     }],
+    ["Recently added", () => createCardRow("Recently added", orderedBooks.slice(0, homeRowBookCount)
+      .map((book) => ({ type: "book", book })), {
+        emptyMessage: state.loading
+          ? "Loading your library…"
+          : state.loadError || "Add your first book to start building your library.",
+        emptyActionLabel: state.loading ? "" : "＋ Add your first book",
+        emptyAction: state.loading ? null : openDialog,
+      })],
+    ["More by authors you own", () => createCardRow("More by authors you own", moreByOwnedAuthors.slice(0, homeRowBookCount)
+      .map(({ book }) => ({ type: "book", book })), {
+        emptyMessage: state.catalogLoading
+          ? "Finding books by authors in your library…"
+          : state.catalogError || "No more books by your authors found in the catalog yet.",
+      })],
     ["Shelves for your taste", () => createCardRow("Shelves for your taste",
       buildSuggestedShelves(genres, shelfRecommendations, moreByOwnedAuthors), {
         emptyMessage: state.loading || state.catalogLoading
@@ -1151,20 +1173,6 @@ function renderBooks() {
           : libraryBooks.length
             ? "No suggested shelves for your library just yet."
             : "Add books to your library to get personalized suggestions.",
-      })],
-    ["Recently added", () => createCardRow("Recently added", orderedBooks.slice(0, 10)
-      .map((book) => ({ type: "book", book })), {
-        emptyMessage: state.loading
-          ? "Loading your library…"
-          : state.loadError || "Add your first book to start building your library.",
-        emptyActionLabel: state.loading ? "" : "＋ Add your first book",
-        emptyAction: state.loading ? null : openDialog,
-      })],
-    ["More by authors you own", () => createCardRow("More by authors you own", moreByOwnedAuthors.slice(0, 8)
-      .map(({ book }) => ({ type: "book", book })), {
-        emptyMessage: state.catalogLoading
-          ? "Finding books by authors in your library…"
-          : state.catalogError || "No more books by your authors found in the catalog yet.",
       })],
     ["Browse by genre", () => createCardRow("Browse by genre", genreTiles.map((genre) => ({ type: "genre", ...genre })))],
   ];
@@ -1551,20 +1559,34 @@ function buildSuggestedShelves(genres, recommendations, authorRecommendations = 
       books: authorRecommendations.map(({ book }) => book),
     });
   }
-  [...new Map(genres.map((genre) => [genre.toLowerCase(), genre])).values()].forEach((genre, index) => {
-    const books = recommendations
-      .filter(({ book }) => (book.genre || "").toLowerCase() === genre.toLowerCase())
-      .map(({ book }) => book);
+  const ownedGenres = new Set(genres.map((genre) => genre.toLowerCase()));
+  const libraryBooks = getLibraryBooks();
+  const allShelfGenres = [...new Map([...genres, ...allGenres].map((genre) => [genre.toLowerCase(), genre])).values()];
+  allShelfGenres.forEach((genre, index) => {
+    const seen = new Set();
+    const books = [
+      ...recommendations.map(({ book }) => book).filter((book) => bookMatchesGenre(book, genre)),
+      ...(genreCoverCache.get(genre.toLowerCase())?.books || []),
+    ].filter((book) => {
+      const key = getBookKey(book);
+      if (seen.has(key) || libraryBooks.some((owned) => isSameBookWork(owned, book))) return false;
+      seen.add(key);
+      return true;
+    }).sort((a, b) => Number(Boolean(b.cover_i || b.cover_url)) - Number(Boolean(a.cover_i || a.cover_url)));
     if (books.length) {
+      const owned = ownedGenres.has(genre.toLowerCase());
       suggestions.push({
         key: `genre:${genre.toLowerCase()}`,
         name: `More ${genre} to explore`,
-        subtitle: `Because you enjoy ${genre}`,
-        color: ["#bd6749", "#496c5d", "#4c7083", "#536c9e"][index % 4],
+        subtitle: owned ? `Because you enjoy ${genre}` : `Explore ${genre}`,
+        color: ["#bd6749", "#496c5d", "#4c7083", "#536c9e", "#8050a8"][index % 5],
+        owned,
         books,
       });
     }
   });
+  // Genres the reader already owns come first.
+  suggestions.sort((a, b) => Number(Boolean(b.owned)) - Number(Boolean(a.owned)));
   if (!suggestions.length && recommendations.length) {
     suggestions.push({
       key: "more-to-explore",
@@ -1901,10 +1923,11 @@ function createShelfCard(shelf, { compact = false } = {}) {
 
 function showSuggestedShelfPage(key) {
   const libraryBooks = getLibraryBooks();
+  ensureGenreCatalogs();
   if (!state.loading) ensureHomeRecommendations(libraryBooks);
   const recommendations = getBookRecommendations(libraryBooks);
   const genres = [...new Set(libraryBooks.map((book) => book.genre).filter(Boolean))];
-  const pickedKeys = new Set(recommendations.slice(0, 8).map(({ book }) => getBookKey(book)));
+  const pickedKeys = new Set(recommendations.slice(0, homeRowBookCount).map(({ book }) => getBookKey(book)));
   const shelfRecommendations = recommendations.filter(({ book }) => !pickedKeys.has(getBookKey(book)));
   const authorRecommendations = recommendations.filter(({ book }) =>
     !pickedKeys.has(getBookKey(book))
@@ -2047,6 +2070,23 @@ function startCoverCycle(container, { key, getBooks, className = "", interval = 
   const elapsed = Date.now() - (coverCycleLastChange.get(key) || 0);
   window.setTimeout(step, Math.max(2000, interval - elapsed) + Math.random() * interval * 0.5);
   return { refresh: show };
+}
+
+let genreCatalogRenderTimer = null;
+
+function ensureGenreCatalogs() {
+  const pending = allGenres.filter((genre) => !genreCoverCache.has(genre.toLowerCase()));
+  if (!pending.length) return;
+  pending.forEach((genre) => loadGenreCovers(genre).then(() => {
+    window.clearTimeout(genreCatalogRenderTimer);
+    genreCatalogRenderTimer = window.setTimeout(() => {
+      if (state.view === "home") renderBooks();
+      else if (state.view === "suggested-shelf") {
+        const [path, query] = window.location.hash.slice(1).split("?");
+        if (path === "/suggested-shelf") showSuggestedShelfPage(new URLSearchParams(query).get("key") || "");
+      }
+    }, 800);
+  }));
 }
 
 function loadGenreCovers(genre) {
@@ -4551,7 +4591,7 @@ function showSearchPage(query = "") {
     state.searchMessage = "";
     state.searchLoading = false;
     const libraryBooks = getLibraryBooks();
-    const genres = [...new Set([...libraryBooks.map((book) => book.genre).filter(Boolean), "Fiction", "Nonfiction", "Mystery", "Fantasy", "Essays"])];
+    const genres = [...new Set([...libraryBooks.map((book) => book.genre).filter(Boolean), ...allGenres])];
     const tiles = genres.map((genre, index) => ({
       title: genre,
       count: libraryBooks.filter((book) => bookMatchesGenre(book, genre)).length,
@@ -4688,7 +4728,7 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
 
   const parsed = parseNaturalSearch(state.searchQuery);
   const searchGenre = parsed.genre
-    || [...getLibraryBooks().map((book) => book.genre), "Fiction", "Nonfiction", "Mystery", "Fantasy", "Essays"]
+    || [...getLibraryBooks().map((book) => book.genre), ...allGenres]
       .find((genre) => genre?.toLowerCase() === state.searchQuery.toLowerCase())
     || "";
   state.searchLoading = true;
