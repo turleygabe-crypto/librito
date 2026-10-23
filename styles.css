@@ -4540,51 +4540,11 @@ body {
   text-align: center;
 }
 
-.search-book {
-  width: 240px;
-  max-width: 70%;
-  margin-bottom: 1.2rem;
-  overflow: visible;
-}
-
-.search-book-page {
-  transform-box: view-box;
-  transform-origin: 120px 98px;
-  animation: search-page-flip 1.6s infinite ease-in-out;
-}
-
-.search-book-spark {
-  animation: search-spark 2s infinite ease-in-out;
-}
-
-.search-loading h2 {
-  margin: 0 0 0.7rem;
-  color: #2a1b14;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 1.7rem;
-}
-
-.search-loading p {
-  margin: 0;
+.search-loading-copy {
+  margin: 0.4rem 0 0;
   color: #8a7f76;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 1.05rem;
-}
-
-@keyframes search-page-flip {
-  0% { transform: scaleX(1) rotate(0deg); }
-  50% { transform: scaleX(-0.15) rotate(0deg); }
-  100% { transform: scaleX(-1) rotate(0deg); }
-}
-
-@keyframes search-spark {
-  0%, 100% { opacity: 0.35; }
-  50% { opacity: 1; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .search-book-page,
-  .search-book-spark { animation-duration: 6s; }
 }
 
 .global-search-language {
@@ -4835,11 +4795,151 @@ body {
   color: #fff;
 }
 
-.genre-browse-status {
+.book-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 2.5rem 1rem 1.5rem;
   text-align: center;
 }
 
-.genre-load-more {
+.book-loader-stage {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 9.5rem;
+  padding-top: 2.8rem;
+}
+
+.book-loader-slot {
   display: block;
-  margin: 1rem auto 2rem;
+  width: 5.2rem;
+  aspect-ratio: 2 / 3;
+  transform-origin: 50% 100%;
+  animation: book-loader-bounce 1.6s linear infinite;
+}
+
+.book-loader-slot .book-loader-art {
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: 0.3rem;
+  box-shadow: 0 6px 14px rgba(40, 20, 10, 0.35);
+}
+
+.book-loader-slot .book-cover-placeholder {
+  padding: 0.2rem;
+  font-size: 0.6rem;
+}
+
+.book-loader-slot .book-cover-initials {
+  font-size: 1.8rem;
+}
+
+.book-loader-message {
+  margin: 0;
+  color: #8a7f76;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1rem;
+}
+
+.book-loader-compact {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  justify-content: center;
+  width: 100%;
+  padding: 0.5rem 1rem;
+}
+
+.book-loader-compact .book-loader-stage {
+  height: 7rem;
+  padding-top: 2rem;
+}
+
+.book-loader-compact .book-loader-slot {
+  width: 3.6rem;
+}
+
+/* Two bounces per iteration. */
+@keyframes book-loader-bounce {
+  0%, 50%, 100% { transform: translateY(0) scale(1.05, 0.93); animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1); }
+  25%, 75% { transform: translateY(-1.8rem) scale(1, 1.03); animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .book-loader-slot { animation: none; }
+}
+
+.genre-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+}
+
+.genre-size-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.genre-size-control select {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid rgba(60, 40, 30, 0.3);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.genre-summary {
+  min-height: 1.2rem;
+  margin: 0 0 0.8rem;
+  color: #8a7f76;
+  font-size: 0.85rem;
+}
+
+.genre-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: 1.5rem 0 2.5rem;
+}
+
+.genre-pager-btn {
+  min-width: 2.3rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid rgba(60, 40, 30, 0.3);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.genre-pager-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.genre-pager-btn.active {
+  border-color: transparent;
+  background: #a9421c;
+  color: #fff;
+}
+
+.genre-pager-gap {
+  color: #8a7f76;
+}
+
+.genre-error {
+  display: grid;
+  justify-items: center;
+  gap: 0.8rem;
+  padding: 2rem 0;
 }

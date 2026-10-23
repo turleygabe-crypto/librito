@@ -376,7 +376,7 @@ function restoreRouteFromLocation() {
       showSuggestedShelfPage(params.get("key") || "");
       break;
     case "/genre":
-      showGenrePage(params.get("name") || "", params.get("sort") || "");
+      showGenrePage(params.get("name") || "", params.get("sort") || "", Math.max(1, Number(params.get("page")) || 1), Number(params.get("size")) || 0);
       break;
     case "/search":
       runNaturalSearch(params.get("q") || "", {
@@ -1146,6 +1146,7 @@ function renderBooks() {
     ["Picked for your library", () => {
       const section = createCardRow("Picked for your library", pickedRecommendations
         .map(({ book, reason }) => ({ type: "book", book, subtitle: reason, recommendation: true })), {
+          loading: state.catalogLoading,
           emptyMessage: state.catalogLoading
             ? "Finding books for your library…"
             : state.catalogError || "No new books to suggest right now.",
@@ -1155,6 +1156,7 @@ function renderBooks() {
     }],
     ["Recently added", () => createCardRow("Recently added", orderedBooks.slice(0, homeRowBookCount)
       .map((book) => ({ type: "book", book })), {
+        loading: state.loading,
         emptyMessage: state.loading
           ? "Loading your library…"
           : state.loadError || "Add your first book to start building your library.",
@@ -1163,13 +1165,15 @@ function renderBooks() {
       })],
     ["More by authors you own", () => createCardRow("More by authors you own", moreByOwnedAuthors.slice(0, homeRowBookCount)
       .map(({ book }) => ({ type: "book", book })), {
+        loading: state.catalogLoading,
         emptyMessage: state.catalogLoading
           ? "Finding books by authors in your library…"
           : state.catalogError || "No more books by your authors found in the catalog yet.",
       })],
     ["Shelves for your taste", () => createCardRow("Shelves for your taste",
       buildSuggestedShelves(genres, shelfRecommendations, moreByOwnedAuthors), {
-        emptyMessage: state.loading || state.catalogLoading
+        loading: state.loading || state.catalogLoading || genreCatalogPending > 0,
+        emptyMessage: state.loading || state.catalogLoading || genreCatalogPending > 0
           ? "Finding books for your shelves…"
           : state.catalogError
             ? "Could not load suggested shelves. Check your connection and try again."
@@ -1622,6 +1626,7 @@ function createCardRow(title, cards, {
   emptyMessage = "",
   emptyActionLabel = "",
   emptyAction = null,
+  loading = false,
 } = {}) {
   const section = document.createElement("section");
   section.className = "home-section card-row-section";
@@ -1647,7 +1652,9 @@ function createCardRow(title, cards, {
       row.scrollBy({ left: event.key === "ArrowRight" ? 240 : -240, behavior: "smooth" });
     }
   });
-  if (!cards.length && emptyMessage) {
+  if (!cards.length && loading) {
+    row.append(createBookLoader({ message: emptyMessage || "Loading…", compact: true }));
+  } else if (!cards.length && emptyMessage) {
     const empty = document.createElement("p");
     empty.className = "row-empty-state";
     empty.textContent = emptyMessage;
@@ -2140,23 +2147,29 @@ function drainOpenLibraryQueue() {
   }
 }
 
-function queueGenreFetch(genre) {
-  return fetchOpenLibraryRecommendations({ genre });
-}
-
 function loadGenreCovers(genre) {
   const key = genre.toLowerCase();
   let entry = genreCoverCache.get(key);
   if (!entry) {
     entry = { books: [], promise: null };
     genreCoverCache.set(key, entry);
-    entry.promise = queueGenreFetch(genre)
-      .then((books) => {
-        entry.books = books.filter((book) => book.cover_i);
+    const stored = readGenrePreview(genre);
+    if (stored) {
+      entry.books = stored.books.filter((book) => book.cover_i);
+      entry.promise = Promise.resolve();
+      return entry.promise;
+    }
+    genreCatalogPending += 1;
+    entry.promise = fetchGenreCatalogPage(genre, { background: true })
+      .then((result) => {
+        entry.books = result.books;
       })
       .catch((error) => {
         genreCoverCache.delete(key);
         console.error(`Could not load ${genre} covers`, error);
+      })
+      .finally(() => {
+        genreCatalogPending -= 1;
       });
   }
   return entry.promise;
@@ -2230,141 +2243,248 @@ const genreSortOptions = [
   ["new", "Newest", "new"],
   ["relevance", "Most relevant", ""],
 ];
+const genreSizeOptions = [25, 50, 75, 100];
+const genrePageSizeKey = "librito-genre-page-size";
+const genrePreviewStoreKey = "librito-genre-previews-v1";
+const genrePreviewTtl = 24 * 60 * 60 * 1000;
+const genrePageCache = new Map();
+let genreCatalogPending = 0;
 
-async function fetchGenrePage(genre, sort, offset, language) {
-  return runOpenLibraryTask(async () => {
+function getStoredGenrePageSize() {
+  const size = Number(localStorage.getItem(genrePageSizeKey));
+  return genreSizeOptions.includes(size) ? size : 25;
+}
+
+function readGenrePreviewStore() {
+  try {
+    return JSON.parse(localStorage.getItem(genrePreviewStoreKey) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+
+function writeGenrePreview(genre, result) {
+  try {
+    const store = readGenrePreviewStore();
+    store[genre.toLowerCase()] = { savedAt: Date.now(), total: result.total, books: result.books };
+    localStorage.setItem(genrePreviewStoreKey, JSON.stringify(store));
+  } catch (error) {
+    console.warn("Could not save genre previews", error);
+  }
+}
+
+function readGenrePreview(genre) {
+  const entry = readGenrePreviewStore()[genre.toLowerCase()];
+  return entry && Date.now() - entry.savedAt < genrePreviewTtl && Array.isArray(entry.books) ? entry : null;
+}
+
+// The single place that pulls a page of a genre's catalog. Home previews and genre pages share its cache.
+function fetchGenreCatalogPage(genre, { sort = "", page = 1, size = 25, background = false } = {}) {
+  const cacheKey = `${genre.toLowerCase()}|${sort}|${size}|${page}`;
+  if (genrePageCache.has(cacheKey)) return genrePageCache.get(cacheKey);
+  const load = async () => {
     const params = new URLSearchParams({
-      q: `subject:${JSON.stringify(genre)}${language ? ` language:${language}` : ""}`,
+      q: `subject:${JSON.stringify(genre)} language:${getDefaultBookLanguage()} cover_i:[1 TO *]`,
       fields: "key,title,author_name,isbn,cover_i,subject,number_of_pages_median,first_publish_year",
-      limit: "60",
-      offset: String(offset),
+      limit: String(size),
+      offset: String((page - 1) * size),
     });
     const apiSort = genreSortOptions.find(([value]) => value === sort)?.[2];
     if (apiSort) params.set("sort", apiSort);
     let lastError;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
-        const response = await fetch(`https://openlibrary.org/search.json?${params}`, { signal: AbortSignal.timeout(20000) });
+        const response = await fetch(`https://openlibrary.org/search.json?${params}`, { signal: AbortSignal.timeout(15000) });
         if (!response.ok) throw new Error(`Open Library genre search failed with ${response.status}`);
         const data = await response.json();
         const docs = Array.isArray(data.docs) ? data.docs : [];
+        const seen = new Set();
         return {
-          total: data.numFound || 0,
-          fetched: docs.length,
-          books: docs.flatMap((work) => work.title && work.author_name?.length && work.cover_i ? [{
-            title: work.title,
-            author: work.author_name[0],
-            genre,
-            subjects: Array.isArray(work.subject) ? work.subject : [],
-            isbn: Array.isArray(work.isbn) ? work.isbn[0] || "" : "",
-            cover_i: work.cover_i,
-            pages: work.number_of_pages_median,
-            page_count: work.number_of_pages_median,
-            first_publish_year: work.first_publish_year,
-          }] : []),
+          total: Number(data.numFound) || 0,
+          books: docs.flatMap((work) => {
+            if (!work.title || !work.author_name?.length || !work.cover_i) return [];
+            const book = {
+              title: work.title,
+              author: work.author_name[0],
+              genre,
+              subjects: Array.isArray(work.subject) ? work.subject : [],
+              isbn: Array.isArray(work.isbn) ? work.isbn[0] || "" : "",
+              cover_i: work.cover_i,
+              pages: work.number_of_pages_median,
+              page_count: work.number_of_pages_median,
+              first_publish_year: work.first_publish_year,
+            };
+            const key = getRecommendationKey(book);
+            if (seen.has(key)) return [];
+            seen.add(key);
+            return [book];
+          }),
         };
       } catch (error) {
         lastError = error;
-        await new Promise((resolve) => window.setTimeout(resolve, 1500 * (attempt + 1)));
+        await new Promise((resolve) => window.setTimeout(resolve, 1000 * (attempt + 1)));
       }
     }
     throw lastError;
+  };
+  // Background work (home previews) shares a small queue; a genre page the user opened never waits in it.
+  const promise = (background ? runOpenLibraryTask(load) : load()).then((result) => {
+    if (!sort && page === 1 && size === 25) writeGenrePreview(genre, result);
+    return result;
+  }, (error) => {
+    genrePageCache.delete(cacheKey);
+    throw error;
   });
+  genrePageCache.set(cacheKey, promise);
+  return promise;
+}
+
+function createGenrePager(page, totalPages, onGo) {
+  const nav = document.createElement("nav");
+  nav.className = "genre-pager";
+  nav.setAttribute("aria-label", "Genre pages");
+  const button = (label, target, { current = false, disabled = false, aria = "" } = {}) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = `genre-pager-btn${current ? " active" : ""}`;
+    item.textContent = label;
+    item.disabled = disabled;
+    if (aria) item.setAttribute("aria-label", aria);
+    if (current) item.setAttribute("aria-current", "page");
+    item.addEventListener("click", () => onGo(target));
+    return item;
+  };
+  nav.append(button("‹ Prev", page - 1, { disabled: page <= 1, aria: "Previous page" }));
+  const numbers = new Set([1, totalPages]);
+  for (let number = page - 2; number <= page + 2; number += 1) {
+    if (number >= 1 && number <= totalPages) numbers.add(number);
+  }
+  let previous = 0;
+  [...numbers].sort((first, second) => first - second).forEach((number) => {
+    if (number - previous > 1) {
+      const gap = document.createElement("span");
+      gap.className = "genre-pager-gap";
+      gap.textContent = "…";
+      nav.append(gap);
+    }
+    nav.append(button(String(number), number, { current: number === page, aria: `Page ${number}` }));
+    previous = number;
+  });
+  nav.append(button("Next ›", page + 1, { disabled: page >= totalPages, aria: "Next page" }));
+  return nav;
 }
 
 let genrePageToken = 0;
 
-function showGenrePage(genre, sort = "") {
+function showGenrePage(genre, sort = "", page = 1, requestedSize = 0) {
   const token = ++genrePageToken;
   updateActiveNavigation("Discover");
-  const page = showPage("genre");
+  const view = showPage("genre");
   state.view = "genre";
   const displayGenre = [...getLibraryBooks().map((book) => book.genre), ...allGenres]
     .find((name) => name?.toLowerCase() === genre.toLowerCase()) || genre;
   if (!displayGenre) {
-    page.append(createPageHeader("Browse by genre", "Genre not found"));
+    view.append(createPageHeader("Browse by genre", "Genre not found"));
     return;
   }
-  page.append(createPageHeader("Browse by genre", displayGenre, "Browse the catalog. Scroll for more."));
+  const size = genreSizeOptions.includes(requestedSize) ? requestedSize : getStoredGenrePageSize();
+  const go = (values) => navigateTo("genre", { name: displayGenre, sort, size: String(size), ...values });
 
+  view.append(createPageHeader("Browse by genre", displayGenre, "Browse everything in the catalog."));
+
+  const controls = document.createElement("div");
+  controls.className = "genre-controls";
   const tabs = document.createElement("div");
   tabs.className = "genre-sort-tabs";
   tabs.setAttribute("role", "tablist");
   genreSortOptions.forEach(([value, label]) => {
     const tab = document.createElement("button");
     tab.type = "button";
-    tab.className = "genre-sort-tab";
+    tab.className = `genre-sort-tab${value === sort ? " active" : ""}`;
     tab.setAttribute("role", "tab");
-    const active = value === sort;
-    tab.setAttribute("aria-selected", String(active));
-    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", String(value === sort));
     tab.textContent = label;
-    tab.addEventListener("click", () => navigateTo("genre", { name: displayGenre, sort: value }));
+    tab.addEventListener("click", () => go({ sort: value, page: "" }));
     tabs.append(tab);
   });
+  const sizeLabel = document.createElement("label");
+  sizeLabel.className = "genre-size-control";
+  sizeLabel.append("Books per page ");
+  const sizeSelect = document.createElement("select");
+  genreSizeOptions.forEach((option) => sizeSelect.add(new Option(String(option), String(option), false, option === size)));
+  sizeSelect.addEventListener("change", () => {
+    const nextSize = Number(sizeSelect.value);
+    localStorage.setItem(genrePageSizeKey, String(nextSize));
+    go({ size: String(nextSize), page: "" });
+  });
+  sizeLabel.append(sizeSelect);
+  controls.append(tabs, sizeLabel);
 
-  const grid = document.createElement("div");
-  grid.className = "card-row expanded genre-browse-grid";
-  const status = document.createElement("p");
-  status.className = "row-empty-state genre-browse-status";
-  const more = document.createElement("button");
-  more.type = "button";
-  more.className = "secondary-btn genre-load-more";
-  more.textContent = "Load more books";
-  more.hidden = true;
-  page.append(tabs, grid, status, more);
+  const summary = document.createElement("p");
+  summary.className = "genre-summary";
+  summary.setAttribute("aria-live", "polite");
+  const results = document.createElement("div");
+  results.className = "genre-results";
+  view.append(controls, summary, results);
+  results.append(createBookLoader({ message: `Loading ${displayGenre} books…` }));
 
-  const language = getDefaultBookLanguage();
-  const seen = new Set();
-  let offset = 0;
-  let total = Infinity;
-  let loading = false;
-  const loadMore = async () => {
-    if (loading || offset >= total) return;
-    loading = true;
-    more.hidden = true;
-    status.textContent = "Loading books…";
-    try {
-      let added = 0;
-      // Keep paging until something with a cover is found, so the grid never stalls on a sparse page.
-      for (let tries = 0; tries < 4 && !added && offset < total; tries += 1) {
-        const result = await fetchGenrePage(displayGenre, sort, offset, language);
-        if (token !== genrePageToken) return;
-        total = result.total;
-        offset += Math.max(result.fetched, 1);
-        const library = getLibraryBooks();
-        result.books.forEach((book) => {
-          const key = getRecommendationKey(book);
-          if (seen.has(key)) return;
-          seen.add(key);
-          grid.append(createBookCard(book, {
-            recommendation: !library.some((owned) => isSameBookWork(owned, book)),
-          }));
-          added += 1;
-        });
-        if (!result.fetched) total = 0;
-      }
-      status.textContent = offset >= total ? (grid.children.length ? "You've reached the end." : `No ${displayGenre} books found.`) : "";
-      more.hidden = offset >= total;
-    } catch (error) {
-      console.error(`Could not load ${displayGenre} books`, error);
-      status.textContent = "Could not load more books. Check your connection and try again.";
-      more.hidden = false;
-    } finally {
-      loading = false;
-    }
-  };
-  more.addEventListener("click", loadMore);
-  const observer = new IntersectionObserver((entries) => {
-    if (token !== genrePageToken || !grid.isConnected) {
-      observer.disconnect();
+  const render = (result) => {
+    const totalPages = Math.max(1, Math.ceil(result.total / size));
+    if (page > totalPages) {
+      go({ page: String(totalPages) });
       return;
     }
-    if (entries.some((entry) => entry.isIntersecting) && !more.hidden) loadMore();
-  }, { rootMargin: "800px" });
-  observer.observe(more);
-  more.hidden = false;
-  loadMore();
+    const first = (page - 1) * size + 1;
+    summary.textContent = result.total
+      ? `Showing ${first.toLocaleString()}–${Math.min(page * size, result.total).toLocaleString()} of ${result.total.toLocaleString()} books`
+      : "";
+    results.replaceChildren();
+    if (!result.books.length) {
+      const empty = document.createElement("p");
+      empty.className = "row-empty-state";
+      empty.textContent = `No ${displayGenre} books found.`;
+      results.append(empty);
+      return;
+    }
+    const library = getLibraryBooks();
+    const grid = document.createElement("div");
+    grid.className = "card-row expanded genre-browse-grid";
+    result.books.forEach((book) => grid.append(createBookCard(book, {
+      recommendation: !library.some((owned) => isSameBookWork(owned, book)),
+    })));
+    results.append(grid);
+    if (totalPages > 1) {
+      const pager = (target) => go({ page: target > 1 ? String(target) : "" });
+      results.append(createGenrePager(page, totalPages, pager));
+    }
+  };
+
+  const load = async () => {
+    try {
+      const result = await fetchGenreCatalogPage(displayGenre, { sort, page, size });
+      if (token !== genrePageToken) return;
+      render(result);
+      view.scrollIntoView({ block: "start" });
+    } catch (error) {
+      if (token !== genrePageToken) return;
+      console.error(`Could not load ${displayGenre} books`, error);
+      const failed = document.createElement("div");
+      failed.className = "genre-error";
+      const message = document.createElement("p");
+      message.textContent = "Could not load books. Check your connection and try again.";
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "secondary-btn";
+      retry.textContent = "Try again";
+      retry.addEventListener("click", () => {
+        results.replaceChildren(createBookLoader({ message: `Loading ${displayGenre} books…` }));
+        load();
+      });
+      failed.append(message, retry);
+      results.replaceChildren(failed);
+    }
+  };
+  load();
 }
 
 function createPageHeader(kicker, title, description = "") {
@@ -4543,37 +4663,61 @@ function createSearchHeader(query) {
   return header;
 }
 
+const loaderClassics = [
+  { title: "Pride and Prejudice", author: "Jane Austen", cover_i: 14348537 },
+  { title: "Moby-Dick", author: "Herman Melville", cover_i: 10544254 },
+  { title: "1984", author: "George Orwell", cover_i: 8745958 },
+  { title: "The Great Gatsby", author: "F. Scott Fitzgerald", cover_i: 10590366 },
+  { title: "To Kill a Mockingbird", author: "Harper Lee", cover_i: 14351077 },
+  { title: "Jane Eyre", author: "Charlotte Brontë", cover_i: 8235363 },
+  { title: "Frankenstein", author: "Mary Shelley", cover_i: 12356249 },
+  { title: "Dracula", author: "Bram Stoker", cover_i: 12216503 },
+  { title: "Wuthering Heights", author: "Emily Brontë", cover_i: 12818862 },
+  { title: "The Odyssey", author: "Homer", cover_i: 12474938 },
+  { title: "Little Women", author: "Louisa May Alcott", cover_i: 8775559 },
+];
+
+// Universal loading animation: one classic cover at a time bounces twice, then the next one takes over.
+function createBookLoader({ message = "Loading…", compact = false } = {}) {
+  const loader = document.createElement("div");
+  loader.className = `book-loader${compact ? " book-loader-compact" : ""}`;
+  loader.setAttribute("role", "status");
+  loader.setAttribute("aria-live", "polite");
+  const stage = document.createElement("div");
+  stage.className = "book-loader-stage";
+  stage.setAttribute("aria-hidden", "true");
+  const slot = document.createElement("span");
+  slot.className = "book-loader-slot";
+  stage.append(slot);
+  const text = document.createElement("p");
+  text.className = "book-loader-message";
+  text.textContent = message;
+  loader.append(stage, text);
+
+  const order = shuffleBooks(loaderClassics);
+  let index = 0;
+  const showNext = () => {
+    const cover = createBookCover(order[index % order.length], "book-loader-art");
+    index += 1;
+    slot.replaceChildren(cover);
+  };
+  showNext();
+  // Each animation iteration is two bounces; swap the book when it ends.
+  slot.addEventListener("animationiteration", () => {
+    if (!loader.isConnected) return;
+    showNext();
+  });
+  return loader;
+}
+
 function createSearchLoading() {
   const status = document.createElement("div");
   status.className = "search-loading";
-  status.setAttribute("role", "status");
-  status.innerHTML = `
-    <svg class="search-book" viewBox="0 0 240 190" aria-hidden="true">
-      <defs>
-        <linearGradient id="sbPage" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fbeed3"/><stop offset="1" stop-color="#efd9b4"/></linearGradient>
-        <linearGradient id="sbCover" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b8512f"/><stop offset="1" stop-color="#8a3319"/></linearGradient>
-        <radialGradient id="sbShadow"><stop offset="0" stop-color="#5a3a22" stop-opacity=".28"/><stop offset="1" stop-color="#5a3a22" stop-opacity="0"/></radialGradient>
-      </defs>
-      <ellipse cx="120" cy="170" rx="86" ry="10" fill="url(#sbShadow)"/>
-      <path d="M26 74 L120 108 L214 74 L214 150 L120 176 L26 150Z" fill="url(#sbCover)"/>
-      <path d="M34 66 L120 98 L120 166 L34 142Z" fill="url(#sbPage)" stroke="#d9bf92" stroke-width="1.5"/>
-      <path d="M206 66 L120 98 L120 166 L206 142Z" fill="url(#sbPage)" stroke="#d9bf92" stroke-width="1.5"/>
-      <g stroke="#b99a72" stroke-width="2" stroke-linecap="round" opacity=".75">
-        <path d="M46 84 L108 107M46 94 L108 117M46 104 L108 127M46 114 L108 137"/>
-        <path d="M194 84 L132 107M194 94 L132 117M194 104 L132 127M194 114 L132 137"/>
-      </g>
-      <g class="search-book-page">
-        <path d="M120 100 C118 70 124 40 138 22 C158 20 176 28 186 40 C176 62 170 84 168 104 C154 96 136 94 120 100Z" fill="url(#sbPage)" stroke="#d9bf92" stroke-width="1.5"/>
-        <g stroke="#b99a72" stroke-width="2" stroke-linecap="round" opacity=".75"><path d="M138 44 L168 42M138 56 L166 54M138 68 L164 66M138 80 L162 78"/></g>
-      </g>
-      <g class="search-book-spark" fill="#d9825a">
-        <path d="M32 40l3 7 7 3-7 3-3 7-3-7-7-3 7-3z"/>
-        <path d="M206 26l2.5 5.5 5.5 2.5-5.5 2.5-2.5 5.5-2.5-5.5-5.5-2.5 5.5-2.5z"/>
-        <path d="M222 92l2 4 4 2-4 2-2 4-2-4-4-2 4-2z"/>
-      </g>
-    </svg>
-    <h2>Searching the book catalog...</h2>
-    <p>We're looking through thousands of books to find your results.</p>`;
+  const loader = createBookLoader({ message: "Searching the book catalog…" });
+  const copy = document.createElement("p");
+  copy.className = "search-loading-copy";
+  copy.textContent = "We're looking through thousands of books to find your results.";
+  status.append(loader, copy);
   return status;
 }
 
