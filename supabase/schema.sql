@@ -204,3 +204,6 @@ join public.shelves
 where books.shelf is not null
   and books.user_id is not null
 on conflict (book_id, shelf_id) do nothing;
+
+alter table public.profiles enable row level security;
+-- See migrations/20261023140000_profiles_rls.sql for profiles policies.

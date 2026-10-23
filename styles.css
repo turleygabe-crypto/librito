@@ -207,10 +207,10 @@ h1, h2, h3, h4, p { margin-top: 0; }
   .featured-cover { font-size: 1.5rem; }
   .featured-copy { padding: 1.35rem 1rem; }
   .featured-copy h2 { font-size: 1.45rem; }
-  .recommended-shelves { grid-template-columns: repeat(auto-fill, minmax(8rem, 10rem)); gap: 0.75rem; }
+  .recommended-shelves { grid-template-columns: repeat(auto-fill, minmax(9.6rem, 12rem)); gap: 0.75rem; }
   .recommendation-card strong { font-size: 1.5rem; }
   .book-list { padding-top: 0.5rem; }
-  .preview-scroll-row { grid-auto-columns: 8rem; grid-auto-flow: column; grid-template-columns: none; gap: 0.75rem; overflow-x: auto; padding-bottom: 0.35rem; scrollbar-width: thin; }
+  .preview-scroll-row { grid-auto-columns: 9.6rem; grid-auto-flow: column; grid-template-columns: none; gap: 0.75rem; overflow-x: auto; padding-bottom: 0.35rem; scrollbar-width: thin; }
   .legacy-panel { display: block; grid-column: 1 / -1; padding: 1.25rem; border: 1px solid rgba(245,221,201,.1); border-radius: 1rem; background: rgba(42,24,18,.8); }
   .legacy-panel .panel-heading { margin-bottom: 1rem; color: #f7e6dc; }
   .shelf-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
@@ -931,7 +931,7 @@ h1, h2, h3, h4, p { margin-top: 0; }
 
 .card-row {
   display: grid;
-  grid-auto-columns: 12.5rem;
+  grid-auto-columns: 12.6rem;
   grid-auto-flow: column;
   grid-template-rows: auto;
   gap: 0.9rem;
@@ -945,7 +945,7 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .card-row.expanded {
   grid-auto-flow: row;
   grid-auto-columns: initial;
-  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(10.2rem, 1fr));
   overflow: visible;
 }
 
@@ -1397,7 +1397,7 @@ h1, h2, h3, h4, p { margin-top: 0; }
 
 .reading-home-row {
   min-width: 0;
-  grid-auto-columns: minmax(6.2rem, 7.2rem);
+  grid-auto-columns: minmax(7.4rem, 8.6rem);
 }
 
 .page-view {
@@ -2008,7 +2008,7 @@ h1, h2, h3, h4, p { margin-top: 0; }
 
 @media (max-width: 600px) {
   .card-row {
-    grid-auto-columns: minmax(8.25rem, 42vw);
+    grid-auto-columns: minmax(9.9rem, 50vw);
     gap: 0.55rem;
   }
 
@@ -2431,7 +2431,7 @@ body {
 }
 
 .card-row {
-  grid-auto-columns: minmax(8rem, 9.25rem);
+  grid-auto-columns: minmax(9.6rem, 11.1rem);
   gap: 0.75rem;
   padding: 0.2rem 0.1rem 0.55rem;
   scrollbar-width: none;
@@ -2700,7 +2700,7 @@ body {
   }
 
   .card-row {
-    grid-auto-columns: minmax(7.25rem, 42vw);
+    grid-auto-columns: minmax(8.7rem, 50vw);
   }
 
   .reading-feature-card {
@@ -4005,7 +4005,7 @@ body {
 }
 
 .book-profile-recommendation .card-row {
-  grid-auto-columns: minmax(6rem, 7rem);
+  grid-auto-columns: minmax(7.2rem, 8.4rem);
   gap: 0.45rem;
   padding: 0;
 }
@@ -4685,7 +4685,7 @@ body {
 
 .library-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(10.2rem, 1fr));
   gap: 0.9rem;
 }
 

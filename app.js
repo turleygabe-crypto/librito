@@ -1236,6 +1236,7 @@ function rotateRecommendationPool() {
   const uniqueBooks = new Map([...discoveryBooks, ...state.catalogBooks]
     .map((book) => [getRecommendationKey(book), book]));
   state.recommendationPool = shuffleBooks([...uniqueBooks.values()]);
+  addGenreBooksToRecommendationPool();
 }
 
 function scheduleRecommendationRotation(delay = recommendationRotationInterval) {
@@ -1335,7 +1336,7 @@ async function ensureHomeRecommendations(libraryBooks) {
   const uniqueAuthors = [...new Set(libraryBooks.map((book) => book.author?.trim()).filter(Boolean))];
   const queries = [
     ...shuffleBooks(uniqueGenres).slice(0, 5).map((genre) => ({ genre })),
-    ...shuffleBooks(uniqueAuthors).slice(0, 5).map((author) => ({ author })),
+    ...shuffleBooks(uniqueAuthors).slice(0, 8).map((author) => ({ author })),
   ];
   if (!queries.length) {
     state.catalogLibraryKey = libraryKey;
@@ -2074,12 +2075,26 @@ function startCoverCycle(container, { key, getBooks, className = "", interval = 
 
 let genreCatalogRenderTimer = null;
 
+// Appends (never reshuffles) so rows already on screen keep their order while the pool grows.
+function addGenreBooksToRecommendationPool() {
+  const known = new Set(state.recommendationPool.map(getRecommendationKey));
+  const fresh = [];
+  genreCoverCache.forEach((entry) => entry.books.forEach((book) => {
+    const key = getRecommendationKey(book);
+    if (known.has(key)) return;
+    known.add(key);
+    fresh.push(book);
+  }));
+  state.recommendationPool.push(...shuffleBooks(fresh));
+}
+
 function ensureGenreCatalogs() {
   const pending = allGenres.filter((genre) => !genreCoverCache.has(genre.toLowerCase()));
   if (!pending.length) return;
   pending.forEach((genre) => loadGenreCovers(genre).then(() => {
     window.clearTimeout(genreCatalogRenderTimer);
     genreCatalogRenderTimer = window.setTimeout(() => {
+      addGenreBooksToRecommendationPool();
       if (state.view === "home") renderBooks();
       else if (state.view === "suggested-shelf") {
         const [path, query] = window.location.hash.slice(1).split("?");
@@ -2089,17 +2104,50 @@ function ensureGenreCatalogs() {
   }));
 }
 
+const genreFetchQueue = [];
+let genreFetchActive = 0;
+
+// Open Library throttles bursts, so genre requests run a few at a time and retry on failure.
+function queueGenreFetch(genre, attempt = 0) {
+  return new Promise((resolve, reject) => {
+    genreFetchQueue.push({ genre, attempt, resolve, reject });
+    drainGenreFetchQueue();
+  });
+}
+
+function drainGenreFetchQueue() {
+  while (genreFetchActive < 3 && genreFetchQueue.length) {
+    const job = genreFetchQueue.shift();
+    genreFetchActive += 1;
+    fetchOpenLibraryRecommendations({ genre: job.genre })
+      .then(job.resolve, (error) => {
+        if (job.attempt < 2) {
+          window.setTimeout(() => queueGenreFetch(job.genre, job.attempt + 1).then(job.resolve, job.reject), 1500 * (job.attempt + 1));
+        } else {
+          job.reject(error);
+        }
+      })
+      .finally(() => {
+        genreFetchActive -= 1;
+        drainGenreFetchQueue();
+      });
+  }
+}
+
 function loadGenreCovers(genre) {
   const key = genre.toLowerCase();
   let entry = genreCoverCache.get(key);
   if (!entry) {
     entry = { books: [], promise: null };
     genreCoverCache.set(key, entry);
-    entry.promise = fetchOpenLibraryRecommendations({ genre })
+    entry.promise = queueGenreFetch(genre)
       .then((books) => {
         entry.books = books.filter((book) => book.cover_i);
       })
-      .catch((error) => console.error(`Could not load ${genre} covers`, error));
+      .catch((error) => {
+        genreCoverCache.delete(key);
+        console.error(`Could not load ${genre} covers`, error);
+      });
   }
   return entry.promise;
 }
