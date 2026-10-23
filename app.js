@@ -1307,18 +1307,27 @@ async function fetchOpenLibraryRecommendations({ genre = "", author = "" }) {
       first_publish_year: work.first_publish_year,
     }];
   });
-  const fetchWorks = async (offset) => {
+  const fetchWorks = (offset) => runOpenLibraryTask(async () => {
     const params = new URLSearchParams({
       q: `${query} language:${getDefaultBookLanguage()}`,
       fields: "key,title,author_name,isbn,cover_i,subject,number_of_pages_median,first_publish_year",
       limit: "40",
       offset: String(offset),
     });
-    const response = await fetch(`https://openlibrary.org/search.json?${params}`);
-    if (!response.ok) throw new Error(`Open Library recommendation search failed with ${response.status}`);
-    const data = await response.json();
-    return Array.isArray(data.docs) ? data.docs : [];
-  };
+    let lastError;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const response = await fetch(`https://openlibrary.org/search.json?${params}`, { signal: AbortSignal.timeout(15000) });
+        if (!response.ok) throw new Error(`Open Library recommendation search failed with ${response.status}`);
+        const data = await response.json();
+        return Array.isArray(data.docs) ? data.docs : [];
+      } catch (error) {
+        lastError = error;
+        await new Promise((resolve) => window.setTimeout(resolve, 1500 * (attempt + 1)));
+      }
+    }
+    throw lastError;
+  });
   const offset = Math.floor(Math.random() * 5) * 40;
   const matches = mapWorks(await fetchWorks(offset));
   return matches.length || !offset ? matches : mapWorks(await fetchWorks(0));
@@ -2104,34 +2113,32 @@ function ensureGenreCatalogs() {
   }));
 }
 
-const genreFetchQueue = [];
-let genreFetchActive = 0;
+const openLibraryQueue = [];
+let openLibraryActive = 0;
 
-// Open Library throttles bursts, so genre requests run a few at a time and retry on failure.
-function queueGenreFetch(genre, attempt = 0) {
+// Open Library throttles bursts, so every catalog request goes through a small shared queue.
+function runOpenLibraryTask(task) {
   return new Promise((resolve, reject) => {
-    genreFetchQueue.push({ genre, attempt, resolve, reject });
-    drainGenreFetchQueue();
+    openLibraryQueue.push({ task, resolve, reject });
+    drainOpenLibraryQueue();
   });
 }
 
-function drainGenreFetchQueue() {
-  while (genreFetchActive < 3 && genreFetchQueue.length) {
-    const job = genreFetchQueue.shift();
-    genreFetchActive += 1;
-    fetchOpenLibraryRecommendations({ genre: job.genre })
-      .then(job.resolve, (error) => {
-        if (job.attempt < 2) {
-          window.setTimeout(() => queueGenreFetch(job.genre, job.attempt + 1).then(job.resolve, job.reject), 1500 * (job.attempt + 1));
-        } else {
-          job.reject(error);
-        }
-      })
+function drainOpenLibraryQueue() {
+  while (openLibraryActive < 3 && openLibraryQueue.length) {
+    const job = openLibraryQueue.shift();
+    openLibraryActive += 1;
+    job.task()
+      .then(job.resolve, job.reject)
       .finally(() => {
-        genreFetchActive -= 1;
-        drainGenreFetchQueue();
+        openLibraryActive -= 1;
+        drainOpenLibraryQueue();
       });
   }
+}
+
+function queueGenreFetch(genre) {
+  return fetchOpenLibraryRecommendations({ genre });
 }
 
 function loadGenreCovers(genre) {
