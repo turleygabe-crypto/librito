@@ -4810,3 +4810,36 @@ body {
 .row-arrow-next {
   right: -0.6rem;
 }
+
+.genre-sort-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 1.2rem;
+}
+
+.genre-sort-tab {
+  padding: 0.45rem 0.95rem;
+  border: 1px solid rgba(60, 40, 30, 0.3);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.genre-sort-tab.active {
+  border-color: transparent;
+  background: #a9421c;
+  color: #fff;
+}
+
+.genre-browse-status {
+  text-align: center;
+}
+
+.genre-load-more {
+  display: block;
+  margin: 1rem auto 2rem;
+}

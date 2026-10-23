@@ -375,6 +375,9 @@ function restoreRouteFromLocation() {
     case "/suggested-shelf":
       showSuggestedShelfPage(params.get("key") || "");
       break;
+    case "/genre":
+      showGenrePage(params.get("name") || "", params.get("sort") || "");
+      break;
     case "/search":
       runNaturalSearch(params.get("q") || "", {
         updateHistory: false,
@@ -2181,7 +2184,7 @@ function createGenreCard(genre) {
     getBooks: () => [...(genre.books || []), ...(genreCoverCache.get(genreKey)?.books || [])],
   });
   loadGenreCovers(genre.title).then(cycle.refresh);
-  button.addEventListener("click", () => runNaturalSearch(genre.title));
+  button.addEventListener("click", () => navigateTo("genre", { name: genre.title }));
   card.append(button);
   return card;
 }
@@ -2219,6 +2222,149 @@ document.querySelectorAll(".nav-pill").forEach((item) => {
     if (active) item.setAttribute("aria-current", "page");
     else item.removeAttribute("aria-current");
   });
+}
+
+const genreSortOptions = [
+  ["", "Popular", "readinglog"],
+  ["rating", "Top rated", "rating"],
+  ["new", "Newest", "new"],
+  ["relevance", "Most relevant", ""],
+];
+
+async function fetchGenrePage(genre, sort, offset, language) {
+  return runOpenLibraryTask(async () => {
+    const params = new URLSearchParams({
+      q: `subject:${JSON.stringify(genre)}${language ? ` language:${language}` : ""}`,
+      fields: "key,title,author_name,isbn,cover_i,subject,number_of_pages_median,first_publish_year",
+      limit: "60",
+      offset: String(offset),
+    });
+    const apiSort = genreSortOptions.find(([value]) => value === sort)?.[2];
+    if (apiSort) params.set("sort", apiSort);
+    let lastError;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const response = await fetch(`https://openlibrary.org/search.json?${params}`, { signal: AbortSignal.timeout(20000) });
+        if (!response.ok) throw new Error(`Open Library genre search failed with ${response.status}`);
+        const data = await response.json();
+        const docs = Array.isArray(data.docs) ? data.docs : [];
+        return {
+          total: data.numFound || 0,
+          fetched: docs.length,
+          books: docs.flatMap((work) => work.title && work.author_name?.length && work.cover_i ? [{
+            title: work.title,
+            author: work.author_name[0],
+            genre,
+            subjects: Array.isArray(work.subject) ? work.subject : [],
+            isbn: Array.isArray(work.isbn) ? work.isbn[0] || "" : "",
+            cover_i: work.cover_i,
+            pages: work.number_of_pages_median,
+            page_count: work.number_of_pages_median,
+            first_publish_year: work.first_publish_year,
+          }] : []),
+        };
+      } catch (error) {
+        lastError = error;
+        await new Promise((resolve) => window.setTimeout(resolve, 1500 * (attempt + 1)));
+      }
+    }
+    throw lastError;
+  });
+}
+
+let genrePageToken = 0;
+
+function showGenrePage(genre, sort = "") {
+  const token = ++genrePageToken;
+  updateActiveNavigation("Discover");
+  const page = showPage("genre");
+  state.view = "genre";
+  const displayGenre = [...getLibraryBooks().map((book) => book.genre), ...allGenres]
+    .find((name) => name?.toLowerCase() === genre.toLowerCase()) || genre;
+  if (!displayGenre) {
+    page.append(createPageHeader("Browse by genre", "Genre not found"));
+    return;
+  }
+  page.append(createPageHeader("Browse by genre", displayGenre, "Browse the catalog. Scroll for more."));
+
+  const tabs = document.createElement("div");
+  tabs.className = "genre-sort-tabs";
+  tabs.setAttribute("role", "tablist");
+  genreSortOptions.forEach(([value, label]) => {
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.className = "genre-sort-tab";
+    tab.setAttribute("role", "tab");
+    const active = value === sort;
+    tab.setAttribute("aria-selected", String(active));
+    tab.classList.toggle("active", active);
+    tab.textContent = label;
+    tab.addEventListener("click", () => navigateTo("genre", { name: displayGenre, sort: value }));
+    tabs.append(tab);
+  });
+
+  const grid = document.createElement("div");
+  grid.className = "card-row expanded genre-browse-grid";
+  const status = document.createElement("p");
+  status.className = "row-empty-state genre-browse-status";
+  const more = document.createElement("button");
+  more.type = "button";
+  more.className = "secondary-btn genre-load-more";
+  more.textContent = "Load more books";
+  more.hidden = true;
+  page.append(tabs, grid, status, more);
+
+  const language = getDefaultBookLanguage();
+  const seen = new Set();
+  let offset = 0;
+  let total = Infinity;
+  let loading = false;
+  const loadMore = async () => {
+    if (loading || offset >= total) return;
+    loading = true;
+    more.hidden = true;
+    status.textContent = "Loading books…";
+    try {
+      let added = 0;
+      // Keep paging until something with a cover is found, so the grid never stalls on a sparse page.
+      for (let tries = 0; tries < 4 && !added && offset < total; tries += 1) {
+        const result = await fetchGenrePage(displayGenre, sort, offset, language);
+        if (token !== genrePageToken) return;
+        total = result.total;
+        offset += Math.max(result.fetched, 1);
+        const library = getLibraryBooks();
+        result.books.forEach((book) => {
+          const key = getRecommendationKey(book);
+          if (seen.has(key)) return;
+          seen.add(key);
+          grid.append(createBookCard(book, {
+            recommendation: !library.some((owned) => isSameBookWork(owned, book)),
+          }));
+          added += 1;
+        });
+        if (!result.fetched) total = 0;
+      }
+      status.textContent = offset >= total ? (grid.children.length ? "You've reached the end." : `No ${displayGenre} books found.`) : "";
+      more.hidden = offset >= total;
+    } catch (error) {
+      console.error(`Could not load ${displayGenre} books`, error);
+      status.textContent = "Could not load more books. Check your connection and try again.";
+      more.hidden = false;
+    } finally {
+      loading = false;
+    }
+  };
+  more.addEventListener("click", loadMore);
+  const observer = new IntersectionObserver((entries) => {
+    if (token !== genrePageToken || !grid.isConnected) {
+      observer.disconnect();
+      return;
+    }
+    if (entries.some((entry) => entry.isIntersecting) && !more.hidden) loadMore();
+  }, { rootMargin: "800px" });
+  observer.observe(more);
+  more.hidden = false;
+  loadMore();
 }
 
 function createPageHeader(kicker, title, description = "") {
