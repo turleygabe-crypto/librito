@@ -1,4 +1,4 @@
-const CACHE_NAME = "librito-cache-v20";
+const CACHE_NAME = "librito-cache-v21";
 const IMAGE_CACHE = "librito-covers-v1";
 const IMAGE_CACHE_LIMIT = 400;
 const ASSETS = ["/", "/index.html", "/styles.css", "/app.js", "/cookie-consent.js", "/manifest.webmanifest"];

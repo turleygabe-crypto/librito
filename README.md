@@ -71,6 +71,8 @@ Signed webhooks reconcile current Stripe subscription state rather than trusting
 
 Run `npm test` for API/authentication, signed-webhook, checkout, concurrency and PostgreSQL migration/permission tests. No real API keys are needed for these tests.
 
+If billing logs report PostgreSQL `42703` (missing column), check that the Stripe billing migration was applied to the Supabase project configured on the server. Earlier account-tier migrations do not create the billing tables or complimentary-access field. The upgrade page hides billing-management details for readers without a billing account; failed status requests show a friendly, centered retry message rather than raw server errors.
+
 Before launch, exercise the deployed sandbox with Stripe's documented test payment methods: monthly and annual purchases, 3DS, decline and retry, duplicate clicks, abandoned checkout, asynchronous payment success/failure, renewals (using test clocks), period-end cancellation, failed-payment exhaustion, portal changes, complimentary grants, and downgrades while over free-tier limits. Replay webhook deliveries and confirm only the correct user's tier changes. Check that secrets and server files are not publicly served.
 
 Refunds do not automatically cancel subscriptions, and disputes/fraud signals need an explicit business decision. The integration persists these events in `billing_events` with `requires_review = true`, reconciles subscription state, and emits a warning without payment details or credentials. Monitor Vercel logs and Stripe Dashboard notifications. Review the queue in Supabase SQL Editor:

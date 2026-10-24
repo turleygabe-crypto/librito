@@ -6690,8 +6690,12 @@ function showUpgradePage() {
   tagline.className = "upgrade-tagline";
   tagline.textContent = "More books. More shelves. A library that's truly yours.";
   const billingStatus = document.createElement("p");
-  billingStatus.className = "page-description";
+  billingStatus.className = "upgrade-billing-status";
   billingStatus.setAttribute("role", "status");
+  const billingPanel = document.createElement("section");
+  billingPanel.className = "upgrade-billing-panel";
+  billingPanel.setAttribute("aria-label", "Subscription management");
+  billingPanel.hidden = true;
   const manage = document.createElement("button");
   manage.type = "button";
   manage.className = "action-btn";
@@ -6702,7 +6706,7 @@ function showUpgradePage() {
   refresh.type = "button";
   refresh.className = "text-btn";
   refresh.textContent = "Refresh billing status";
-  refresh.hidden = !state.session;
+  refresh.hidden = true;
   async function loadBillingStatus() {
     refresh.disabled = true;
     try {
@@ -6714,6 +6718,8 @@ function showUpgradePage() {
       state.profile = profile;
       updateAuthButton();
       manage.hidden = !status.canManage;
+      billingPanel.hidden = !status.canManage && !profile.complimentary_book_lover && !checkout;
+      refresh.hidden = billingPanel.hidden;
       const premiumAccess = getAccountTier().premium;
       liteStatus.textContent = premiumAccess ? "Free plan" : "Your current plan";
       cta.disabled = premiumAccess || status.hasSubscription;
@@ -6725,23 +6731,34 @@ function showUpgradePage() {
           ? "Payment needs attention. Book Lover remains available during payment retries; update your payment method below."
           : profile.complimentary_book_lover
             ? "You have complimentary Book Lover access."
-            : status.status ? `Subscription: ${status.status.replaceAll("_", " ")}.`
-              : "No paid subscription yet.";
+            : status.status === "active" || status.status === "trialing"
+              ? "Your Book Lover subscription is active."
+              : status.hasSubscription ? "Your subscription needs attention. Open Manage billing to review it."
+                : status.canManage ? "Your subscription has ended. You can still view your billing history."
+                  : checkout === "success" ? "Your payment is being confirmed. Refresh your status shortly."
+                    : checkout === "canceled" ? "Checkout canceled. No plan change was made." : "";
     } catch (error) {
       console.error("Could not load billing status", error);
-      billingStatus.textContent = error.message;
+      billingPanel.hidden = false;
+      refresh.hidden = false;
+      billingStatus.textContent = "We couldn't load your subscription details. Please try again.";
     } finally {
       refresh.disabled = false;
     }
   }
   refresh.addEventListener("click", loadBillingStatus);
-  page.append(hero, toggle, plans, tagline, billingStatus, manage, refresh);
+  billingPanel.append(billingStatus, manage, refresh);
+  page.append(hero, toggle, plans, tagline, billingPanel);
   const checkout = new URLSearchParams(window.location.hash.split("?")[1] || "").get("checkout");
   if (checkout === "success") {
     const notice = document.createElement("p");
+    notice.className = "upgrade-billing-status";
     notice.textContent = "Thanks! Payment may still be processing. Access is enabled after Stripe confirms your subscription. Refresh billing status shortly.";
-    page.append(notice);
+    billingPanel.prepend(notice);
+    billingPanel.hidden = false;
+    refresh.hidden = !state.session;
   } else if (checkout === "canceled") {
+    billingPanel.hidden = false;
     billingStatus.textContent = "Checkout canceled. No plan change was made.";
   }
   if (state.session) loadBillingStatus();
