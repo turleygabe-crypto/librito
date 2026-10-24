@@ -1905,10 +1905,10 @@ function createBookCard(book, { compact = false, subtitle = "", recommendation =
     });
     const addToShelfFirst = document.createElement("button");
     addToShelfFirst.type = "button";
-    addToShelfFirst.textContent = "Add to Library & shelf";
+    addToShelfFirst.textContent = "Add to a shelf";
     addToShelfFirst.addEventListener("click", () => {
       addMenu.open = false;
-      markBookAsOwned(book, { focusShelf: true });
+      promptAddToShelf(book);
     });
     choices.append(addToLibrary, addToShelfFirst, purchase);
     addMenu.append(action, choices);
@@ -1929,10 +1929,115 @@ function createBookCard(book, { compact = false, subtitle = "", recommendation =
   return card;
 }
 
-function markBookAsOwned(book, { focusShelf = false } = {}) {
+function findOwnedBook(book) {
+  if (book.id && state.books.some((item) => item.id === book.id)) return state.books.find((item) => item.id === book.id);
+  return state.books.find((item) => getBookKey(item) === getBookKey(book));
+}
+
+async function addAnyBookToShelf(book, shelf) {
+  const owned = findOwnedBook(book);
+  if (owned) return addBookToShelf(owned, shelf);
+  if (!state.session || !state.supabase) {
+    showToast("Sign in to add books to shelves.");
+    openAuthModal();
+    return;
+  }
+  const isbn = Array.isArray(book.isbn) ? book.isbn[0] || "" : book.isbn || "";
+  const libraryBook = {
+    id: crypto.randomUUID(),
+    title: book.title || "Untitled",
+    author: Array.isArray(book.author_name) ? book.author_name.join(", ") : book.author || "Unknown author",
+    genre: book.genre || "",
+    isbn,
+    cover_url: book.cover_url
+      || (book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-L.jpg?default=false` : ""),
+    page_count: Number(book.page_count || book.pages || 0) || null,
+    cost: 0,
+    added: new Date().toISOString().slice(0, 10),
+    notes: "",
+    shelf: shelf.name,
+    shelves: [shelf.name],
+  };
+  if (await saveBookToSupabase(libraryBook)) showToast(`“${libraryBook.title}” added to ${shelf.name} ✓`);
+}
+
+function promptAddToShelf(book) {
+  if (!state.session) {
+    showToast("Sign in to add books to shelves.");
+    openAuthModal();
+    return;
+  }
+  const returnFocus = document.activeElement;
+  const overlay = document.createElement("div");
+  overlay.className = "dialog-overlay";
+  const card = document.createElement("div");
+  card.className = "dialog-card shelf-picker-card";
+  card.setAttribute("role", "dialog");
+  card.setAttribute("aria-modal", "true");
+  const close = () => {
+    overlay.remove();
+    if (returnFocus instanceof HTMLElement && returnFocus.isConnected) returnFocus.focus();
+  };
+  const head = document.createElement("div");
+  head.className = "dialog-head";
+  const title = document.createElement("h3");
+  title.textContent = `Add “${book.title}” to a shelf`;
+  const x = document.createElement("button");
+  x.type = "button";
+  x.className = "icon-btn";
+  x.setAttribute("aria-label", "Close");
+  x.textContent = "✕";
+  x.addEventListener("click", close);
+  head.append(title, x);
+  const list = document.createElement("div");
+  list.className = "shelf-picker-list";
+  const owned = findOwnedBook(book);
+  const current = owned ? getBookShelfNames(owned) : [];
+  state.shelves.forEach((shelf) => {
+    const on = current.includes(shelf.name);
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "shelf-picker-option";
+    option.disabled = on;
+    const dot = document.createElement("span");
+    dot.className = "shelf-dot";
+    dot.style.background = shelf.color || "#8b5e3c";
+    const label = document.createElement("span");
+    label.textContent = shelf.name;
+    const mark = document.createElement("span");
+    mark.className = "shelf-check";
+    mark.textContent = on ? "✓ Already here" : "";
+    option.append(dot, label, mark);
+    option.addEventListener("click", () => {
+      close();
+      addAnyBookToShelf(book, shelf);
+    });
+    list.append(option);
+  });
+  const create = document.createElement("button");
+  create.type = "button";
+  create.className = "shelf-picker-option shelf-create-option";
+  create.textContent = "＋ New shelf & add this book";
+  create.addEventListener("click", () => {
+    close();
+    openShelfDrawer(book);
+  });
+  list.append(create);
+  card.append(head, list);
+  overlay.append(card);
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) close();
+  });
+  overlay.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") close();
+  });
+  document.body.append(overlay);
+  (list.querySelector("button:not(:disabled)") || x).focus();
+}
+
+function markBookAsOwned(book) {
   openDialog();
   if (!state.session) return;
-  if (focusShelf) window.setTimeout(() => bookForm.elements.shelf?.focus(), 50);
   startManualEntry();
   bookForm.elements.title.value = book.title || "";
   bookForm.elements.author.value = Array.isArray(book.author_name)
@@ -1964,7 +2069,7 @@ function createBookCardMenu(book, ownedBook, recommendation) {
   addToShelf.addEventListener("click", () => {
     menu.open = false;
     if (ownedBook) openBookProfile(ownedBook);
-    else markBookAsOwned(book, { focusShelf: true });
+    else promptAddToShelf(book);
   });
   const markOwned = document.createElement("button");
   markOwned.type = "button";
@@ -3754,7 +3859,7 @@ function renderBookPage(book) {
     addShelf.type = "button";
     addShelf.className = "secondary-btn";
     addShelf.textContent = "＋ Add to shelf";
-    addShelf.addEventListener("click", () => markBookAsOwned(book, { focusShelf: true }));
+    addShelf.addEventListener("click", () => promptAddToShelf(book));
     actions.append(addShelf);
   }
   if (!isActiveLibraryBook) actions.append(moreMenu);
@@ -6951,7 +7056,7 @@ async function createShelfInSupabase() {
     if (shelfColorInput) shelfColorInput.value = "#8b5e3c";
     render();
     closeShelfDrawer();
-    if (bookToAdd) await addBookToShelf(bookToAdd, shelf);
+    if (bookToAdd) await addAnyBookToShelf(bookToAdd, shelf);
     else showToast(`Shelf “${name}” created`);
     return;
   }
@@ -6986,7 +7091,7 @@ async function createShelfInSupabase() {
   if (shelfColorInput) shelfColorInput.value = "#8b5e3c";
   render();
   closeShelfDrawer();
-  if (bookToAdd) await addBookToShelf(bookToAdd, data);
+  if (bookToAdd) await addAnyBookToShelf(bookToAdd, data);
   else showToast(`Shelf “${name}” created`);
 }
 

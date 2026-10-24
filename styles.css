@@ -5548,3 +5548,53 @@ body {
 .book-shelf-chip:hover {
   background: #fff3df;
 }
+
+.shelf-picker-card {
+  width: min(24rem, calc(100vw - 2rem));
+}
+
+.shelf-picker-list {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+
+.shelf-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid #dbc8b6;
+  border-radius: 0.7rem;
+  background: #fffdf9;
+  color: #3b2d24;
+  cursor: pointer;
+  text-align: left;
+}
+
+.shelf-picker-option:hover:not(:disabled) {
+  background: #fff3df;
+}
+
+.shelf-picker-option:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.shelf-picker-option .shelf-dot {
+  width: 0.75rem;
+  height: 0.75rem;
+  flex: none;
+  border-radius: 50%;
+}
+
+.shelf-picker-option .shelf-check {
+  margin-left: auto;
+  color: #2f5d36;
+  font-size: 0.75rem;
+}
+
+.shelf-picker-option.shelf-create-option {
+  color: #8b5e3c;
+  font-weight: 700;
+}
