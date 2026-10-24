@@ -3568,8 +3568,13 @@ function createBookEditionPicker(book) {
   const languageSelect = document.createElement("select");
   languageSelect.className = "edition-language-select";
   languageSelect.add(new Option("Choose a language", ""));
-  openLibraryLanguages.forEach(([code, name]) => languageSelect.add(new Option(name, code)));
-  languageSelect.add(new Option("All languages", "all"));
+  const allLanguagesGroup = document.createElement("optgroup");
+  allLanguagesGroup.label = "Any language";
+  allLanguagesGroup.append(new Option("All languages", "all"));
+  const specificLanguagesGroup = document.createElement("optgroup");
+  specificLanguagesGroup.label = "Specific language";
+  openLibraryLanguages.forEach(([code, name]) => specificLanguagesGroup.append(new Option(name, code)));
+  languageSelect.append(allLanguagesGroup, specificLanguagesGroup);
   languageLabel.append(languageSelect);
   const languageButton = document.createElement("button");
   languageButton.type = "button";

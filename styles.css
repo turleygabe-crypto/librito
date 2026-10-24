@@ -3812,6 +3812,35 @@ body {
   color: #302720;
   font: inherit;
   font-weight: 400;
+  appearance: none;
+  padding-right: 2.2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%2368584a' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.8rem center;
+  cursor: pointer;
+}
+
+.edition-language-select:focus-visible {
+  outline: 2px solid #c9a98a;
+  outline-offset: 2px;
+}
+
+.edition-language-select option,
+.edition-language-select optgroup {
+  background: #fffdf9;
+  color: #302720;
+  font-family: inherit;
+}
+
+.edition-language-select optgroup {
+  color: #8a735e;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.edition-language-select option {
+  font-weight: 400;
+  padding: 0.35rem 0.6rem;
 }
 
 .edition-picker-button:disabled {
