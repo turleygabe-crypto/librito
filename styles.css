@@ -5166,3 +5166,37 @@ body {
   justify-self: start;
 }
 .scan-loading-text { display: block; text-align: center; }
+
+.shelf-toolbar {
+  align-items: flex-start;
+  margin-bottom: 0.6rem;
+}
+
+.shelf-controls {
+  display: flex;
+  align-items: flex-start;
+}
+
+.shelf-controls .browse-bar {
+  width: fit-content;
+  max-width: min(30rem, 90vw);
+  margin: 0;
+  border-radius: 999px;
+}
+
+.shelf-controls .browse-bar-main {
+  justify-content: flex-start;
+  gap: 0.6rem;
+  padding: 0.3rem 0.45rem 0.3rem 0.9rem;
+}
+
+.shelf-controls .browse-bar:has(.browse-toggle[aria-expanded="true"]) {
+  border-radius: 12px;
+}
+
+.shelf-controls .browse-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.75rem 0.9rem;
+}

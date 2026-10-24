@@ -2880,6 +2880,11 @@ function showShelfPage(shelfName) {
     });
     toolbar.append(rename, remove);
   }
+  const shelfBrowser = shelfName !== "Currently Reading" && shelfName !== "Completed Books" && books.length
+    ? createShelfBrowser(books)
+    : null;
+  if (shelfBrowser) toolbar.append(shelfBrowser.controlsHost);
+  toolbar.classList.toggle("shelf-toolbar", Boolean(shelfBrowser));
   if (shelfName === "Currently Reading") {
     page.append(header, toolbar, createCurrentlyReadingList(books));
     return;
@@ -2888,7 +2893,7 @@ function showShelfPage(shelfName) {
     page.append(header, createCompletedBooksList(books));
     return;
   }
-  page.append(header, toolbar, books.length ? createShelfBrowser(books) : createBookTable(books));
+  page.append(header, toolbar, shelfBrowser || createBookTable(books));
 }
 
 const shelfSortOptions = [
@@ -2908,6 +2913,9 @@ function createShelfBrowser(books) {
   }
   const section = document.createElement("section");
   section.className = "search-result-group";
+  const controlsHost = document.createElement("div");
+  controlsHost.className = "shelf-controls";
+  section.controlsHost = controlsHost;
   const render = () => {
     const visible = applyBrowseControls(books, shelfBrowse.sort, shelfBrowse.filters);
     const size = getStoredSearchPageSize();
@@ -2949,7 +2957,8 @@ function createShelfBrowser(books) {
     const grid = document.createElement("div");
     grid.className = "card-row expanded genre-browse-grid";
     pageBooks.forEach((book) => grid.append(createBookCard(book)));
-    section.replaceChildren(controls, summary);
+    controlsHost.replaceChildren(controls);
+    section.replaceChildren(summary);
     if (pageBooks.length) section.append(bar(), grid);
     if (totalPages > 1) section.append(bar());
   };
