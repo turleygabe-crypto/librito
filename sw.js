@@ -1,4 +1,4 @@
-const CACHE_NAME = "librito-cache-v10";
+const CACHE_NAME = "librito-cache-v11";
 const IMAGE_CACHE = "librito-covers-v1";
 const IMAGE_CACHE_LIMIT = 400;
 const ASSETS = ["/", "/index.html", "/styles.css", "/app.js", "/cookie-consent.js", "/manifest.webmanifest"];
@@ -10,7 +10,7 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME && key !== IMAGE_CACHE).map((key) => caches.delete(key))))
+    caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME && key !== IMAGE_CACHE && key !== "librito-search-v1").map((key) => caches.delete(key))))
   );
   self.clients.claim();
 });

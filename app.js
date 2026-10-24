@@ -1325,9 +1325,7 @@ async function fetchOpenLibraryRecommendations({ genre = "", author = "" }) {
     let lastError;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        const response = await fetch(`https://openlibrary.org/search.json?${params}`, { signal: AbortSignal.timeout(12000) });
-        if (!response.ok) throw new Error(`Open Library recommendation search failed with ${response.status}`);
-        const data = await response.json();
+        const data = await fetchOpenLibrarySearch(params, 12000);
         return Array.isArray(data.docs) ? data.docs : [];
       } catch (error) {
         lastError = error;
@@ -2289,11 +2287,45 @@ document.querySelectorAll(".nav-pill").forEach((item) => {
   });
 }
 
+const searchCacheName = "librito-search-v1";
+const searchCacheFreshMs = 2 * 60 * 1000;
+const searchCacheMaxAgeMs = 7 * 24 * 60 * 60 * 1000;
+
+// Stale-while-revalidate for Open Library searches: cached results return instantly while a background request refreshes the cache.
+async function fetchOpenLibrarySearch(params, timeout = 15000) {
+  const url = `https://openlibrary.org/search.json?${params}`;
+  const cache = window.caches ? await caches.open(searchCacheName).catch(() => null) : null;
+  const refresh = async () => {
+    const response = await fetch(url, { signal: AbortSignal.timeout(timeout) });
+    if (!response.ok) throw new Error(`Open Library search failed with ${response.status}`);
+    const text = await response.text();
+    const data = JSON.parse(text);
+    if (cache) {
+      cache.put(url, new Response(text, { headers: { "x-cached-at": String(Date.now()) } })).catch(() => {});
+    }
+    return data;
+  };
+  const hit = cache ? await cache.match(url).catch(() => null) : null;
+  if (hit) {
+    const age = Date.now() - Number(hit.headers.get("x-cached-at") || 0);
+    if (age < searchCacheMaxAgeMs) {
+      try {
+        const cached = await hit.json();
+        if (age >= searchCacheFreshMs) refresh().catch(() => {});
+        return cached;
+      } catch {
+        // Fall through to a network request when the cached entry is unreadable.
+      }
+    }
+  }
+  return refresh();
+}
+
 const genreSortOptions = [
+  ["relevance", "Most relevant", ""],
+  ["new", "Newest", "new"],
   ["", "Popular", "readinglog"],
   ["rating", "Top rated", "rating"],
-  ["new", "Newest", "new"],
-  ["relevance", "Most relevant", ""],
 ];
 const genreSizeOptions = [25, 50, 75, 100];
 const genrePageSizeKey = "librito-genre-page-size";
@@ -2352,9 +2384,7 @@ function fetchGenreCatalogPage(genre, { sort = "", page = 1, size = 25, backgrou
     let lastError;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
-        const response = await fetch(`https://openlibrary.org/search.json?${params}`, { signal: AbortSignal.timeout(15000) });
-        if (!response.ok) throw new Error(`Open Library genre search failed with ${response.status}`);
-        const data = await response.json();
+        const data = await fetchOpenLibrarySearch(params, 15000);
         const docs = Array.isArray(data.docs) ? data.docs : [];
         const seen = new Set();
         return {
@@ -3774,9 +3804,7 @@ async function fetchOpenLibraryBookDetails(book) {
     fields: "key,title,author_name,ratings_average,ratings_count,first_publish_year,number_of_pages_median,first_sentence",
     limit: "10",
   });
-  const response = await fetch(`https://openlibrary.org/search.json?${params}`);
-  if (!response.ok) throw new Error(`Open Library search responded with ${response.status}`);
-  const payload = await response.json();
+  const payload = await fetchOpenLibrarySearch(params);
   const title = normalizeBookText(book.title);
   const author = normalizeBookText(book.author);
   const match = (payload.docs || []).find((doc) =>
@@ -5077,9 +5105,7 @@ async function getOpenLibraryEditionsForBook(book, language = getDefaultBookLang
       fields: "key,title,author_name",
       limit: "10",
     });
-    const response = await fetch(`https://openlibrary.org/search.json?${params}`);
-    if (!response.ok) throw new Error(`Open Library search responded with ${response.status}`);
-    const result = await response.json();
+    const result = await fetchOpenLibrarySearch(params);
     const works = Array.isArray(result.docs) ? result.docs : [];
     const normalizedAuthor = (book.author || "").toLowerCase();
     const matchingWork = works.find((work) =>
@@ -5336,9 +5362,7 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
         offset: String(searchOffset),
       });
       if (selectedLanguage) params.set("lang", selectedLanguage);
-      const response = await fetch(`https://openlibrary.org/search.json?${params}`, { signal: AbortSignal.timeout(20000) });
-      if (!response.ok) throw new Error(`Open Library search failed with ${response.status}`);
-      const data = await response.json();
+      const data = await fetchOpenLibrarySearch(params, 20000);
       return Array.isArray(data.docs) ? data.docs : [];
     };
     let works = [];
@@ -5944,9 +5968,7 @@ async function lookupBooksByTitleOrAuthor() {
   renderSelectedBookConfirmation();
 
   try {
-    const response = await fetch(`https://openlibrary.org/search.json?${params}`, { signal: AbortSignal.timeout(20000) });
-    if (!response.ok) throw new Error(`Open Library responded with ${response.status}`);
-    const payload = await response.json();
+    const payload = await fetchOpenLibrarySearch(params, 20000);
     const works = Array.isArray(payload.docs) ? payload.docs : [];
     const editionResults = await Promise.allSettled(works.map(async (work) => {
       if (!work.key) return null;
