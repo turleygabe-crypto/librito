@@ -2449,10 +2449,11 @@ function applyBrowseControls(books, sort, filters) {
   return compare ? [...visible].sort(compare) : visible;
 }
 
-function createBrowseControls({ sort, filters, languages = false, sortOptions = browseSortOptions, onChange }) {
+function createBrowseControls({ sort, filters, languages = false, sortOptions = browseSortOptions, popover = false, onChange }) {
   const bar = document.createElement("section");
-  bar.className = "browse-bar";
+  bar.className = `browse-bar${popover ? " browse-popover" : ""}`;
   bar.setAttribute("aria-label", "Sort and filter");
+  const panelOpen = popover ? shelfBrowse.panelOpen : browsePanelOpen;
   const main = document.createElement("div");
   main.className = "browse-bar-main";
 
@@ -2470,16 +2471,18 @@ function createBrowseControls({ sort, filters, languages = false, sortOptions = 
   toggle.type = "button";
   toggle.className = "browse-toggle";
   toggle.setAttribute("aria-controls", panelId);
-  toggle.setAttribute("aria-expanded", String(browsePanelOpen));
+  toggle.setAttribute("aria-expanded", String(panelOpen));
   toggle.textContent = activeCount ? `Filters (${activeCount})` : "Filters";
   const panel = document.createElement("div");
   panel.id = panelId;
   panel.className = "browse-panel";
-  panel.hidden = !browsePanelOpen;
+  panel.hidden = !panelOpen;
   toggle.addEventListener("click", () => {
-    browsePanelOpen = !browsePanelOpen;
-    panel.hidden = !browsePanelOpen;
-    toggle.setAttribute("aria-expanded", String(browsePanelOpen));
+    const open = panel.hidden;
+    if (popover) shelfBrowse.panelOpen = open;
+    else browsePanelOpen = open;
+    panel.hidden = !open;
+    toggle.setAttribute("aria-expanded", String(open));
   });
   main.append(sortLabel, toggle);
 
@@ -2883,8 +2886,12 @@ function showShelfPage(shelfName) {
   const shelfBrowser = shelfName !== "Currently Reading" && shelfName !== "Completed Books" && books.length
     ? createShelfBrowser(books)
     : null;
-  if (shelfBrowser) toolbar.append(shelfBrowser.controlsHost);
-  toolbar.classList.toggle("shelf-toolbar", Boolean(shelfBrowser));
+  let headBlock = header;
+  if (shelfBrowser) {
+    headBlock = document.createElement("div");
+    headBlock.className = "shelf-head";
+    headBlock.append(header, shelfBrowser.controlsHost);
+  }
   if (shelfName === "Currently Reading") {
     page.append(header, toolbar, createCurrentlyReadingList(books));
     return;
@@ -2893,7 +2900,7 @@ function showShelfPage(shelfName) {
     page.append(header, createCompletedBooksList(books));
     return;
   }
-  page.append(header, toolbar, shelfBrowser || createBookTable(books));
+  page.append(headBlock, toolbar, shelfBrowser || createBookTable(books));
 }
 
 const shelfSortOptions = [
@@ -2905,11 +2912,11 @@ const shelfSortOptions = [
   ["old", "Oldest published"],
   ["rating", "Top rated"],
 ];
-const shelfBrowse = { shelf: "", sort: "added", filters: {}, page: 1 };
+const shelfBrowse = { shelf: "", sort: "added", filters: {}, page: 1, panelOpen: false };
 
 function createShelfBrowser(books) {
   if (shelfBrowse.shelf !== state.currentShelf) {
-    Object.assign(shelfBrowse, { shelf: state.currentShelf, sort: "added", filters: {}, page: 1 });
+    Object.assign(shelfBrowse, { shelf: state.currentShelf, sort: "added", filters: {}, page: 1, panelOpen: false });
   }
   const section = document.createElement("section");
   section.className = "search-result-group";
@@ -2928,6 +2935,7 @@ function createShelfBrowser(books) {
       sort: shelfBrowse.sort,
       filters: shelfBrowse.filters,
       sortOptions: shelfSortOptions,
+      popover: true,
       onChange: ({ sort, filters }) => {
         Object.assign(shelfBrowse, { sort, filters, page: 1 });
         render();
