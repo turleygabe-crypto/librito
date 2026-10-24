@@ -1322,9 +1322,9 @@ async function fetchOpenLibraryRecommendations({ genre = "", author = "" }) {
       offset: String(offset),
     });
     let lastError;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        const response = await fetch(`https://openlibrary.org/search.json?${params}`, { signal: AbortSignal.timeout(15000) });
+        const response = await fetch(`https://openlibrary.org/search.json?${params}`, { signal: AbortSignal.timeout(12000) });
         if (!response.ok) throw new Error(`Open Library recommendation search failed with ${response.status}`);
         const data = await response.json();
         return Array.isArray(data.docs) ? data.docs : [];
@@ -2322,8 +2322,15 @@ function fetchGenreCatalogPage(genre, { sort = "", page = 1, size = 25, backgrou
         };
       } catch (error) {
         lastError = error;
-        await new Promise((resolve) => window.setTimeout(resolve, 1000 * (attempt + 1)));
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
       }
+    }
+    try {
+      const fallback = await fetchGoogleCatalogBooks("", { genre, language: getDefaultBookLanguage(), max: size, startIndex: (page - 1) * size });
+      const books = fallback.books.filter((book) => book.cover_url);
+      if (books.length) return { total: fallback.total, books };
+    } catch (error) {
+      console.warn("Google Books genre fallback failed", error);
     }
     throw lastError;
   };
@@ -3585,6 +3592,75 @@ async function fetchGoogleBookVolumes(query) {
   if (!response.ok) throw new Error(`Google Books responded with ${response.status}`);
   const payload = await response.json();
   return Array.isArray(payload.items) ? payload.items : [];
+}
+
+function googleVolumeToBook(volume, genre = "") {
+  const info = volume.volumeInfo || {};
+  if (!info.title) return null;
+  const identifiers = info.industryIdentifiers || [];
+  const isbnList = identifiers.map((item) => item.identifier).filter(Boolean);
+  const thumbnail = info.imageLinks?.thumbnail || info.imageLinks?.smallThumbnail || "";
+  return {
+    title: info.subtitle ? `${info.title}: ${info.subtitle}` : info.title,
+    author: info.authors?.[0] || "Unknown author",
+    author_name: info.authors || [],
+    isbn: isbnList.find((value) => value.length === 13) || isbnList[0] || "",
+    isbnList,
+    cover_url: thumbnail.replace(/^http:/, "https:").replace("&edge=curl", ""),
+    subjects: info.categories || [],
+    genre: genre || info.categories?.[0] || "",
+    language: info.language || "",
+    pages: info.pageCount || undefined,
+    page_count: info.pageCount || undefined,
+    first_publish_year: Number.parseInt(info.publishedDate, 10) || undefined,
+  };
+}
+
+// Google Books tolerates misspellings, so it backs up Open Library when that is slow, down, or finds nothing.
+async function fetchGoogleCatalogBooks(query, { genre = "", language = "", max = 24, startIndex = 0 } = {}) {
+  const params = new URLSearchParams({
+    q: genre ? `subject:${JSON.stringify(genre)}` : query,
+    maxResults: String(Math.min(max, 40)),
+    startIndex: String(startIndex),
+    printType: "books",
+  });
+  if (language && language.length === 3) {
+    const twoLetter = { eng: "en", spa: "es", fre: "fr", ger: "de", ita: "it", por: "pt" }[language];
+    if (twoLetter) params.set("langRestrict", twoLetter);
+  }
+  const response = await fetch(`https://www.googleapis.com/books/v1/volumes?${params}`, { signal: AbortSignal.timeout(12000) });
+  if (!response.ok) throw new Error(`Google Books responded with ${response.status}`);
+  const payload = await response.json();
+  const seen = new Set();
+  return {
+    total: Number(payload.totalItems) || 0,
+    books: (Array.isArray(payload.items) ? payload.items : []).flatMap((volume) => {
+      const book = googleVolumeToBook(volume, genre);
+      if (!book) return [];
+      const key = `${normalizeBookText(book.title)}|${normalizeBookText(book.author)}`;
+      if (seen.has(key)) return [];
+      seen.add(key);
+      return [book];
+    }),
+  };
+}
+
+function editDistance(a, b) {
+  if (a === b) return 0;
+  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i += 1) {
+    const current = [i];
+    for (let j = 1; j <= b.length; j += 1) {
+      current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    previous = current;
+  }
+  return previous[b.length];
+}
+
+function fuzzyTermMatches(term, words) {
+  const allowed = term.length <= 3 ? 0 : term.length <= 6 ? 1 : 2;
+  return words.some((word) => word.includes(term) || (allowed > 0 && editDistance(term, word) <= allowed));
 }
 
 async function fetchBookProfileVolumes(book) {
@@ -5062,7 +5138,7 @@ function findLocalSearchMatches(query) {
   const parsed = parseNaturalSearch(query);
   const candidates = [...getLibraryBooks(), ...discoveryBooks].filter((book, index, all) =>
     all.findIndex((candidate) => getBookKey(candidate) === getBookKey(book)) === index);
-  return candidates.filter((book) => {
+  const exact = candidates.filter((book) => {
     const searchable = [book.title, book.author, book.genre, ...(book.subjects || [])]
       .filter(Boolean).join(" ").toLowerCase();
     if (parsed.genre && !searchable.includes(parsed.genre) && !searchable.includes(parsed.genre.replace("science fiction", "sci-fi"))) return false;
@@ -5071,6 +5147,12 @@ function findLocalSearchMatches(query) {
       && !book.mood?.toLowerCase().includes(parsed.mood)) return false;
     if (parsed.pageLimit && (!book.pages || Number(book.pages) > parsed.pageLimit)) return false;
     return !parsed.cleaned || parsed.cleaned.split(/\s+/).every((term) => searchable.includes(term));
+  });
+  if (exact.length || !parsed.cleaned) return exact;
+  const terms = parsed.cleaned.split(/\s+/).filter(Boolean);
+  return candidates.filter((book) => {
+    const words = normalizeBookText([book.title, book.author].filter(Boolean).join(" ")).split(" ");
+    return terms.every((term) => fuzzyTermMatches(term, words));
   });
 }
 
@@ -5120,8 +5202,15 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
       const data = await response.json();
       return Array.isArray(data.docs) ? data.docs : [];
     };
-    let works = await fetchWorks(offset);
-    if (!works.length && offset) works = await fetchWorks(0);
+    let works = [];
+    let catalogFailed = false;
+    try {
+      works = await fetchWorks(offset);
+      if (!works.length && offset) works = await fetchWorks(0);
+    } catch (error) {
+      catalogFailed = true;
+      console.warn("Open Library search failed; trying Google Books.", error);
+    }
     let externalBooks = [];
     let editionLookupFailures = 0;
     if (searchGenre) {
@@ -5200,11 +5289,24 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
         return book && (!parsed.pageLimit || (book.pages && book.pages <= parsed.pageLimit)) ? [book] : [];
       });
     }
+    if (!externalBooks.length) {
+      try {
+        const fallback = await fetchGoogleCatalogBooks(searchTerms.join(" ") || state.searchQuery, {
+          genre: searchGenre,
+          language: selectedLanguage,
+        });
+        externalBooks = fallback.books.filter((book) => !parsed.pageLimit || (book.pages && book.pages <= parsed.pageLimit));
+        if (externalBooks.length && !searchGenre) state.searchMessage = "Showing closest matches.";
+      } catch (error) {
+        console.warn("Google Books fallback failed", error);
+        if (catalogFailed) throw error;
+      }
+    }
     state.searchResults = [...state.searchResults, ...externalBooks]
       .filter((book, index, all) =>
         all.findIndex((candidate) =>
           isSameBookWork(candidate, book) && (candidate.language || "") === (book.language || "")) === index);
-    if (editionLookupFailures) {
+    if (editionLookupFailures && !externalBooks.length) {
       state.searchMessage = `Some matching ${languageName} editions could not be checked; showing verified editions only.`;
     }
     if (!state.searchResults.length && parsed.pageLimit) {
