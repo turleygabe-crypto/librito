@@ -93,17 +93,23 @@ test("resume control uses Librito confirmation and never calls a browser prompt"
   const functionSource = source.slice(source.indexOf("async function resumeBilling("), source.indexOf("\nlet reminderRequest"));
   assert.doesNotMatch(functionSource, /window\.confirm/);
   let options;
+  let confirmationMessage;
   let request;
   let refreshed = false;
   const context = {
-    showAppConfirm: async (message, value) => { options = value; await value.onConfirm(); return true; },
+    showAppConfirm: async (message, value) => { confirmationMessage = message; options = value; await value.onConfirm(); return true; },
     billingRequest: async (body) => { request = body; },
     formatDate: () => "October 24, 2027", showToast() {}, console,
   };
   runInNewContext(`${functionSource}\nthis.resume = resumeBilling;`, context);
   const button = { disabled: false };
   await context.resume(button, { periodEnd: "2027-10-24" }, async () => { refreshed = true; });
-  assert.equal(options.confirmLabel, "Resume renewal");
+  assert.equal(options.confirmLabel, "Renew subscription");
+  assert.equal(options.cancelLabel, "Continue cancellation");
+  assert.match(confirmationMessage, /subscription is canceled/);
+  assert.match(confirmationMessage, /no further payments are scheduled/);
+  assert.match(confirmationMessage, /If you choose Renew subscription, automatic renewal will resume/);
+  assert.doesNotMatch(confirmationMessage, /plan will renew automatically/);
   assert.equal(request.action, "resume");
   assert.equal(refreshed, true);
   assert.equal(button.disabled, false);

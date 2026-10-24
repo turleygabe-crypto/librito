@@ -53,7 +53,7 @@ test("upgrade page displays canceled countdown and resume action, then resubscri
     };
     runInNewContext(`${upgradeFunction}\nshowUpgradePage();`, context);
     await new Promise((resolve) => setImmediate(resolve));
-    const resume = elements.find((element) => element.textContent === "Resume renewal");
+    const resume = elements.find((element) => element.textContent === "Renew subscription");
     const panel = elements.find((element) => element.className === "upgrade-billing-panel");
     const message = elements.find((element) => element.className === "upgrade-billing-status");
     const cta = elements.find((element) => element.className === "upgrade-cta");
@@ -63,7 +63,7 @@ test("upgrade page displays canceled countdown and resume action, then resubscri
       assert.equal(cta.textContent, "Resubscribe to Book Lover");
       assert.equal(cta.disabled, false);
     } else {
-      assert.match(message.textContent, /365 days left/);
+      assert.match(message.textContent, /365 days left on your canceled Book Lover plan/);
       assert.equal(cta.disabled, true);
       resume.events.click();
       assert.equal(resumeClicked, true);

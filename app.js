@@ -6626,11 +6626,11 @@ async function resumeBilling(button, status, onSuccess) {
   button.disabled = true;
   try {
     const confirmed = await showAppConfirm(
-      `Your Book Lover plan will renew automatically on ${formatDate(status.periodEnd)} at your existing price and billing interval. This restores your current subscription rather than purchasing another plan.`,
+      `Your Book Lover subscription is canceled. Your remaining access ends on ${formatDate(status.periodEnd)}, and no further payments are scheduled. If you choose Renew subscription, automatic renewal will resume on that date at your existing price and billing interval. Choose Continue cancellation to leave your plan canceled.`,
       {
-        title: "Resume your Book Lover plan?",
-        confirmLabel: "Resume renewal",
-        cancelLabel: "Keep cancellation",
+        title: "Renew your Book Lover subscription?",
+        confirmLabel: "Renew subscription",
+        cancelLabel: "Continue cancellation",
         onConfirm: () => billingRequest({ action: "resume" }),
       },
     );
@@ -6687,7 +6687,7 @@ async function refreshSubscriptionReminder(force = false) {
       const action = document.createElement("button");
       action.type = "button";
       action.className = "action-btn";
-      action.textContent = timing.canceled ? "Resume renewal" : "Manage billing";
+      action.textContent = timing.canceled ? "Renew subscription" : "Manage billing";
       action.addEventListener("click", () => timing.canceled
         ? resumeBilling(action, status, async () => {
           await refreshSubscriptionReminder(true);
@@ -6852,7 +6852,7 @@ function showUpgradePage() {
   const resume = document.createElement("button");
   resume.type = "button";
   resume.className = "action-btn";
-  resume.textContent = "Resume renewal";
+  resume.textContent = "Renew subscription";
   resume.hidden = true;
   resume.addEventListener("click", () => resumeBilling(resume, currentBillingStatus, async () => {
     await loadBillingStatus();
