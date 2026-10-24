@@ -5813,6 +5813,20 @@ body {
   margin: 0 0 0.75rem;
   color: var(--muted);
 }
+.upgrade-billing-panel button { margin: 0.25rem; }
+.subscription-reminder {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0 0 1.25rem;
+  padding: 1rem;
+  border: 1px solid #e3d6c8;
+  border-radius: 0.75rem;
+  background: var(--panel);
+}
+.subscription-reminder[hidden] { display: none; }
+.subscription-reminder p { flex: 1 1 18rem; margin: 0; }
 .export-card {
   display: grid;
   gap: 0.75rem;

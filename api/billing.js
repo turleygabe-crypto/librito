@@ -1,5 +1,5 @@
 import {
-  authenticate, billingDependencies, BillingError, checked, respondError, startCheckout, withAccount,
+  authenticate, billingDependencies, BillingError, checked, respondError, resumeRenewal, startCheckout, withAccount,
 } from "../lib/server/billing.js";
 
 export function createHandler(dependencies = billingDependencies) {
@@ -29,7 +29,7 @@ export function createHandler(dependencies = billingDependencies) {
         });
       }
       const { action, billing } = req.body || {};
-      if (!["checkout", "portal"].includes(action)) throw new BillingError(400, "Invalid billing action.");
+      if (!["checkout", "portal", "resume"].includes(action)) throw new BillingError(400, "Invalid billing action.");
       if (action === "checkout") {
         const profile = checked(await db.from("profiles").select("complimentary_book_lover").eq("id", user.id).single());
         if (profile.complimentary_book_lover) throw new BillingError(409, "You already have complimentary Book Lover access.");
@@ -37,13 +37,17 @@ export function createHandler(dependencies = billingDependencies) {
       }
       const url = await withAccount(db, user.id, async (account, save) => {
         if (action === "checkout") return startCheckout(deps, user, account, save, billing);
+        if (action === "resume") {
+          await resumeRenewal(deps, account, save);
+          return null;
+        }
         if (!account.customer_id) throw new BillingError(409, "There is no billing account to manage yet.");
         const session = await stripe.billingPortal.sessions.create({
           customer: account.customer_id, return_url: `${config.origin}/#/upgrade`,
         });
         return session.url;
       });
-      return res.status(200).json({ url });
+      return res.status(200).json(action === "resume" ? { resumed: true } : { url });
     } catch (error) {
       return respondError(res, error);
     }

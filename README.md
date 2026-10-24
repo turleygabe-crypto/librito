@@ -39,6 +39,10 @@ The upgrade page calls authenticated Vercel functions. The server validates the 
 
 Signed webhooks reconcile current Stripe subscription state rather than trusting redirects or old event payloads. Deliveries are recorded for deduplication, and concurrent updates are serialized. Active, trialing and past-due subscriptions retain access; canceled, unpaid, paused or expired incomplete subscriptions do not. Configure Stripe's retry policy to move exhausted subscriptions to **canceled or unpaid**, not leave them past due forever. Cancellation at period end preserves access until Stripe ends the subscription. Downgrades never delete books or shelves; existing database limits apply when adding books, shelves or reading entries.
 
+The plan page shows the days remaining (rounded up in 24-hour periods) and the exact end or renewal date. Canceled but still-active subscriptions offer **Resume renewal**, with a confirmation before restoring automatic renewal on the same subscription; this does not create a second subscription. Once access has ended, **Resubscribe to Book Lover** opens Checkout. Resuming requires **Subscriptions: Write** on the restricted Stripe key.
+
+In-app banners remind signed-in readers when canceled access ends or automatic renewal approaches, within 30 days, 7 days, and 1 day. They also cover trial endings and direct past-due customers to update payment details. Dismissing a banner hides that milestone for the current browser session; the next milestone, changed end date, or changed cancellation state gets a new reminder. Status is checked on library load, focus, and while the visible app is open (at most every five minutes). No email, push notification, scheduled job, or reminder delivery while the app is closed is included. Complimentary-only accounts have no expiry reminder.
+
 ### Sandbox setup
 
 1. In Stripe Dashboard, create a separate **sandbox** for development. Keep production and CI credentials/data separate. No live Stripe resources have been created by this setup.
@@ -47,7 +51,7 @@ Signed webhooks reconcile current Stripe subscription state rather than trusting
 4. Set server environment variables using [.env.example](.env.example) as a list of names:
    - `APP_URL`: the exact application origin, such as `https://librito.casa` or `http://localhost:3000`. HTTPS is required except on localhost.
    - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`: match the project used by the browser's `config.js`. The service-role key must never enter browser configuration.
-   - `STRIPE_SECRET_KEY`: prefer a sandbox **restricted API key** with only the permissions needed to read/write Customers and Checkout Sessions, read Prices, Subscriptions and Charges, and create Customer Portal sessions. Adjust permissions if Stripe reports an authorization error.
+   - `STRIPE_SECRET_KEY`: prefer a sandbox **restricted API key** with only the permissions needed to read/write Customers, Checkout Sessions and Subscriptions, read Prices and Charges, and create Customer Portal sessions. Subscriptions write access is required to resume renewal. Adjust permissions if Stripe reports an authorization error.
    - `STRIPE_PRICE_MONTHLY` and `STRIPE_PRICE_ANNUAL`: the sandbox Price IDs.
    - `STRIPE_WEBHOOK_SECRET`: the endpoint's signing secret, not an API key. For local forwarding, use the signing secret printed by `stripe listen`.
    Store secrets in Vercel's **sensitive environment variables**. For local development only, use an ignored `.env.local`; never paste keys into chat, commit them, or log them. The deployment only publishes explicitly selected browser assets.

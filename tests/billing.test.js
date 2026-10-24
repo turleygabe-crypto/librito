@@ -5,7 +5,7 @@ import { Readable } from "node:stream";
 import { PGlite } from "@electric-sql/pglite";
 import Stripe from "stripe";
 import {
-  authenticate, billingConfig, BillingError, eventCustomer, startCheckout, subscriptionSnapshot, processWebhook, withAccount,
+  authenticate, billingConfig, BillingError, eventCustomer, resumeRenewal, startCheckout, subscriptionSnapshot, processWebhook, withAccount,
 } from "../lib/server/billing.js";
 import { createHandler } from "../api/billing.js";
 import { createWebhookHandler } from "../api/stripe-webhook.js";
@@ -170,6 +170,42 @@ test("subscription lifecycle preserves access during retries, ends it on cancell
     assert.equal(snapshot.has_subscription, live, status);
   }
   assert.equal((await subscriptionSnapshot(stripeMock([subscription("active", "price_other")]), "cus_reader", config)).has_access, false);
+});
+
+test("scheduled cancellation uses its actual end date and ignores unrelated item periods", async () => {
+  const sub = subscription("active");
+  sub.cancel_at_period_end = false;
+  sub.cancel_at = 1799000000;
+  sub.items.data.push({ price: { id: "price_other" }, current_period_end: 1809000000 });
+  const snapshot = await subscriptionSnapshot(stripeMock([sub]), "cus_reader", config);
+  assert.equal(snapshot.cancel_at_period_end, true);
+  assert.equal(snapshot.period_end, new Date(sub.cancel_at * 1000).toISOString());
+});
+
+test("resuming renewal updates the existing owned subscription and reconciles access without Checkout", async () => {
+  const sub = { ...subscription("active"), id: "sub_existing" };
+  const stripe = stripeMock([sub]);
+  let saved;
+  stripe.subscriptions.update = async (id, params) => {
+    assert.equal(id, "sub_existing");
+    assert.deepEqual(params, { cancel_at_period_end: false, cancel_at: "" });
+    sub.cancel_at_period_end = false;
+  };
+  await resumeRenewal({ stripe, config }, { customer_id: "cus_reader" }, async (values) => { saved = values; });
+  assert.equal(saved.cancel_at_period_end, false);
+  assert.equal(saved.has_access, true);
+  await assert.rejects(resumeRenewal({ stripe, config }, { customer_id: "cus_reader" }, async () => {}), { status: 409 });
+  sub.status = "canceled";
+  sub.cancel_at_period_end = true;
+  await assert.rejects(resumeRenewal({ stripe, config }, { customer_id: "cus_reader" }, async () => {}), { status: 409 });
+});
+
+test("resume failures propagate and never mark renewal as restored", async () => {
+  const stripe = stripeMock([{ ...subscription("active"), id: "sub_existing" }]);
+  stripe.subscriptions.update = async () => { throw new Error("Stripe permission denied"); };
+  let saved = false;
+  await assert.rejects(resumeRenewal({ stripe, config }, { customer_id: "cus_reader" }, async () => { saved = true; }), /permission denied/);
+  assert.equal(saved, false);
 });
 
 test("account lock rejects concurrent work and releases on errors", async () => {
@@ -348,4 +384,32 @@ test("billing endpoint rejects methods, cross-origin requests and missing auth; 
   await createHandler(() => { throw new BillingError(503, "Billing is not configured yet."); })({ method: "GET", headers: {} }, res);
   assert.equal(res.code, 503);
   assert.equal(res.body.error, "Billing is not configured yet.");
+});
+
+test("resume endpoint uses the authenticated Customer and rejects cross-origin mutations", async () => {
+  const db = database();
+  db.auth = { getUser: async () => ({ data: { user } }) };
+  const sub = { ...subscription("active"), id: "sub_owned" };
+  const stripe = stripeMock([sub]);
+  const list = stripe.subscriptions.list;
+  stripe.subscriptions.list = (params) => {
+    assert.equal(params.customer, "cus_reader");
+    return list(params);
+  };
+  stripe.subscriptions.update = async (id) => {
+    assert.equal(id, "sub_owned");
+    sub.cancel_at_period_end = false;
+  };
+  const handler = createHandler(() => ({ db, stripe, config }));
+  const res = response();
+  await handler({
+    method: "POST", headers: { origin: config.origin, authorization: "Bearer valid" },
+    body: { action: "resume", customer: "cus_attacker", userId: "someone_else" },
+  }, res);
+  assert.equal(res.code, 200);
+  assert.deepEqual(res.body, { resumed: true });
+  assert.equal((await sql.query("select cancel_at_period_end from billing_accounts")).rows[0].cancel_at_period_end, false);
+  const rejected = response();
+  await handler({ method: "POST", headers: { origin: "https://evil.example" }, body: { action: "resume" } }, rejected);
+  assert.equal(rejected.code, 403);
 });

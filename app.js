@@ -1,4 +1,5 @@
 import { createSupabaseClient } from "./lib/supabase-client.js";
+import { subscriptionTiming, subscriptionTimingMessage } from "./lib/billing-status.js";
 
 const storageKey = "librito-library-v1";
 const shelvesStorageKey = "librito-shelves-v1";
@@ -6574,6 +6575,96 @@ async function openBilling(button, body) {
   }
 }
 
+async function resumeBilling(button, status, onSuccess) {
+  if (!window.confirm(`Resume automatic renewal of your existing Book Lover subscription? Your next scheduled billing date is ${formatDate(status.periodEnd)}. Your existing billing interval and price will stay the same.`)) return;
+  button.disabled = true;
+  try {
+    await billingRequest({ action: "resume" });
+    showToast("Automatic renewal resumed.");
+    await onSuccess();
+  } catch (error) {
+    console.error("Could not resume renewal", error);
+    showToast(error.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+let reminderRequest = null;
+let reminderCheckedAt = 0;
+let reminderUserId = null;
+async function refreshSubscriptionReminder(force = false) {
+  const userId = state.session?.user.id;
+  let banner = document.getElementById("subscriptionReminder");
+  if (!banner) {
+    banner = document.createElement("section");
+    banner.id = "subscriptionReminder";
+    banner.className = "subscription-reminder";
+    banner.setAttribute("aria-label", "Book Lover reminder");
+    banner.setAttribute("role", "status");
+    banner.hidden = true;
+    document.querySelector("main").prepend(banner);
+  }
+  if (!userId || reminderUserId !== userId || state.profile?.complimentary_book_lover) banner.hidden = true;
+  if (!userId) {
+    reminderUserId = null;
+    reminderCheckedAt = 0;
+    return;
+  }
+  if (reminderRequest) return;
+  if (!force && reminderUserId === userId && Date.now() - reminderCheckedAt < 5 * 60 * 1000) return;
+  reminderUserId = userId;
+  reminderRequest = (async () => {
+    try {
+      const status = await billingRequest();
+      if (state.session?.user.id !== userId) return;
+      const timing = subscriptionTiming(status);
+      banner.replaceChildren();
+      banner.hidden = !timing?.milestone || Boolean(state.profile?.complimentary_book_lover);
+      if (banner.hidden) return;
+      const key = `librito-billing-reminder:${userId}:${status.periodEnd}:${timing.canceled}:${timing.milestone}`;
+      if (sessionStorage.getItem(key)) {
+        banner.hidden = true;
+        return;
+      }
+      const message = document.createElement("p");
+      message.textContent = subscriptionTimingMessage(status);
+      const action = document.createElement("button");
+      action.type = "button";
+      action.className = "action-btn";
+      action.textContent = timing.canceled ? "Resume renewal" : "Manage billing";
+      action.addEventListener("click", () => timing.canceled
+        ? resumeBilling(action, status, async () => {
+          await refreshSubscriptionReminder(true);
+          if (state.view === "upgrade") showUpgradePage();
+        })
+        : openBilling(action, { action: "portal" }));
+      const dismiss = document.createElement("button");
+      dismiss.type = "button";
+      dismiss.className = "text-btn";
+      dismiss.textContent = "Dismiss";
+      dismiss.addEventListener("click", () => {
+        sessionStorage.setItem(key, "dismissed");
+        banner.hidden = true;
+      });
+      banner.append(message, action, dismiss);
+    } catch (error) {
+      console.error("Could not load subscription reminders", error);
+      banner.hidden = true;
+      showToast("Subscription reminders couldn't be loaded. Check your plan page for billing details.");
+    } finally {
+      reminderCheckedAt = Date.now();
+      reminderRequest = null;
+    }
+  })();
+  await reminderRequest;
+}
+
+window.addEventListener("focus", () => refreshSubscriptionReminder());
+setInterval(() => {
+  if (document.visibilityState === "visible") refreshSubscriptionReminder();
+}, 60 * 1000);
+
 function showUpgradePage() {
   updateActiveNavigation("");
   const page = showPage("upgrade");
@@ -6581,6 +6672,7 @@ function showUpgradePage() {
   const isBookLover = getAccountTier().premium;
   const annualSavings = Math.round((1 - UPGRADE_PRICES.annual / (UPGRADE_PRICES.monthly * 12)) * 100);
   let billing = "annual";
+  let currentBillingStatus = null;
 
   const hero = document.createElement("section");
   hero.className = "home-hero upgrade-hero";
@@ -6681,7 +6773,7 @@ function showUpgradePage() {
       ? `${formatCurrency(UPGRADE_PRICES.annual)} / year`
       : `${formatCurrency(UPGRADE_PRICES.monthly)} / month`;
     cardSaveTag.hidden = billing !== "annual";
-    if (!cta.disabled) cta.textContent = "Upgrade to Book Lover";
+    if (!cta.disabled) cta.textContent = currentBillingStatus?.canManage ? "Resubscribe to Book Lover" : "Upgrade to Book Lover";
   }
   updateBilling();
 
@@ -6702,6 +6794,15 @@ function showUpgradePage() {
   manage.textContent = "Manage billing";
   manage.hidden = true;
   manage.addEventListener("click", () => openBilling(manage, { action: "portal" }));
+  const resume = document.createElement("button");
+  resume.type = "button";
+  resume.className = "action-btn";
+  resume.textContent = "Resume renewal";
+  resume.hidden = true;
+  resume.addEventListener("click", () => resumeBilling(resume, currentBillingStatus, async () => {
+    await loadBillingStatus();
+    await refreshSubscriptionReminder(true);
+  }));
   const refresh = document.createElement("button");
   refresh.type = "button";
   refresh.className = "text-btn";
@@ -6716,23 +6817,26 @@ function showUpgradePage() {
       if (error) throw error;
       if (state.session?.user.id !== userId || !page.isConnected || !page.contains(manage)) return;
       state.profile = profile;
+      currentBillingStatus = status;
       updateAuthButton();
       manage.hidden = !status.canManage;
+      resume.hidden = !subscriptionTiming(status)?.canceled;
       billingPanel.hidden = !status.canManage && !profile.complimentary_book_lover && !checkout;
       refresh.hidden = billingPanel.hidden;
       const premiumAccess = getAccountTier().premium;
       liteStatus.textContent = premiumAccess ? "Free plan" : "Your current plan";
       cta.disabled = premiumAccess || status.hasSubscription;
       cta.classList.toggle("is-current", premiumAccess);
-      cta.textContent = premiumAccess ? "Your current plan" : status.hasSubscription ? "Manage your existing subscription below" : "Upgrade to Book Lover";
-      billingStatus.textContent = status.cancelAtPeriodEnd
-        ? `Cancellation scheduled. Book Lover remains available until ${formatDate(status.periodEnd)}.`
+      cta.textContent = premiumAccess ? "Your current plan" : status.hasSubscription ? "Manage your existing subscription below"
+        : status.canManage ? "Resubscribe to Book Lover" : "Upgrade to Book Lover";
+      billingStatus.textContent = status.cancelAtPeriodEnd && subscriptionTiming(status)
+        ? subscriptionTimingMessage(status)
         : status.status === "past_due"
           ? "Payment needs attention. Book Lover remains available during payment retries; update your payment method below."
           : profile.complimentary_book_lover
             ? "You have complimentary Book Lover access."
             : status.status === "active" || status.status === "trialing"
-              ? "Your Book Lover subscription is active."
+              ? subscriptionTimingMessage(status) || "Your Book Lover subscription is active."
               : status.hasSubscription ? "Your subscription needs attention. Open Manage billing to review it."
                 : status.canManage ? "Your subscription has ended. You can still view your billing history."
                   : checkout === "success" ? "Your payment is being confirmed. Refresh your status shortly."
@@ -6747,7 +6851,7 @@ function showUpgradePage() {
     }
   }
   refresh.addEventListener("click", loadBillingStatus);
-  billingPanel.append(billingStatus, manage, refresh);
+  billingPanel.append(billingStatus, resume, manage, refresh);
   page.append(hero, toggle, plans, tagline, billingPanel);
   const checkout = new URLSearchParams(window.location.hash.split("?")[1] || "").get("checkout");
   if (checkout === "success") {
@@ -6851,6 +6955,7 @@ function topEntry(counts) {
 }
 
 function render() {
+  refreshSubscriptionReminder();
   removeOrphanPopovers();
   renderShelfOptions();
   renderStats();
@@ -6878,6 +6983,7 @@ function render() {
   else if (state.view === "stats") showStatsPage();
   else if (state.view === "book") renderBookRoute();
   else if (state.view === "purchase") showPurchasePage();
+  else if (state.view === "upgrade") showUpgradePage();
 }
 
 function openDialog() {

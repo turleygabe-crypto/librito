@@ -15,7 +15,7 @@
       "use": "@vercel/static"
     },
     {
-      "src": "lib/supabase-client.js",
+      "src": "lib/{supabase-client,billing-status}.js",
       "use": "@vercel/static"
     }
   ],
