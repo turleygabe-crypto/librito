@@ -5657,3 +5657,27 @@ body {
   background: #39241d;
   border-color: rgba(245, 221, 201, 0.25);
 }
+
+.book-detail-content .page-actions > .book-more-menu,
+.book-detail-content .reading-actions > .book-more-menu {
+  width: auto;
+  margin-left: 0;
+  justify-self: start;
+}
+
+.book-detail-content .page-actions > .book-more-menu > summary,
+.book-detail-content .reading-actions > .book-more-menu > summary {
+  width: 2.65rem;
+  height: 2.65rem;
+}
+
+.book-detail-content .reading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.book-detail-content .reading-actions > .book-reading-progress {
+  flex: 1 1 100%;
+}
