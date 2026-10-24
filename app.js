@@ -817,7 +817,7 @@ function createBookCover(book, className = "") {
     let currentCoverSize = coverSize;
     image.src = coverUrl;
     image.alt = `${book.title || "Book"} cover`;
-    image.loading = "lazy";
+    image.loading = className.includes("book-loader-art") ? "eager" : "lazy";
     image.addEventListener("load", () => cover.classList.add("has-cover"), { once: true });
     image.addEventListener("error", () => {
       if (currentCoverSize === "L") {
@@ -4787,6 +4787,18 @@ const loaderPhrases = [
 ];
 
 // Universal loading animation: covers bounce in random order, each paired with a random quip.
+// Warm the HTTP/service-worker caches for loader covers; references keep decoded images in memory.
+const preloadedLoaderCovers = [];
+function preloadLoaderCovers() {
+  if (preloadedLoaderCovers.length) return;
+  loaderClassics.forEach((book) => {
+    const image = new Image();
+    image.src = `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg?default=false`;
+    preloadedLoaderCovers.push(image);
+  });
+}
+preloadLoaderCovers();
+
 function createBookLoader({ message = "Loading…", compact = false } = {}) {
   const loader = document.createElement("div");
   loader.className = `book-loader${compact ? " book-loader-compact" : ""}`;
