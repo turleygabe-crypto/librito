@@ -2079,11 +2079,26 @@ body {
   background: #21130f;
 }
 
+.sidebar .brand {
+  position: relative;
+  flex-direction: column;
+  text-align: center;
+}
+
 .sidebar .brand-mark {
   display: block;
+  width: min(9rem, 100%);
+  height: auto;
   flex: 0 0 auto;
   border-radius: 0;
+  background: transparent;
   object-fit: contain;
+}
+
+.sidebar .brand .mobile-sidebar-close {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 .sidebar .brand .eyebrow {
@@ -2442,12 +2457,6 @@ body {
     gap: 0.55rem;
     padding: 0 0.3rem 0.65rem;
     border: 0;
-  }
-
-  .sidebar .brand-mark {
-    width: 2.85rem;
-    height: 2.85rem;
-    flex: 0 0 2.85rem;
   }
 
   .sidebar .brand .eyebrow {

@@ -23,6 +23,22 @@ test("the sidebar logo is included in the Vercel static deployment", async () =>
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const logoPath = html.match(/class="brand-mark" src="([^"]+)"/)[1];
   await access(new URL(`..${decodeURIComponent(logoPath)}`, import.meta.url));
+  const logo = await readFile(new URL(`..${decodeURIComponent(logoPath)}`, import.meta.url));
+  assert.equal(logo.subarray(1, 4).toString(), "PNG");
+  assert.equal(logo[25], 6, "the displayed logo must be an RGBA PNG");
+});
+
+test("sidebar branding stacks a larger transparent logo above the text at all breakpoints", async () => {
+  const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  const brandRules = [...css.matchAll(/\.sidebar \.brand\s*\{([^}]+)\}/g)];
+  assert.match(brandRules.at(-2)[1], /flex-direction: column/);
+  assert.match(brandRules.at(-2)[1], /text-align: center/);
+  const logoRules = [...css.matchAll(/\.sidebar \.brand-mark\s*\{([^}]+)\}/g)];
+  const logoStyles = logoRules.at(-1)[1];
+  assert.match(logoStyles, /width: min\(9rem, 100%\)/);
+  assert.match(logoStyles, /height: auto/);
+  assert.match(logoStyles, /background: transparent/);
+  assert.match(css, /\.sidebar \.brand \.mobile-sidebar-close\s*\{[^}]*position: absolute/);
 });
 
 test("startup keeps the library pending until account initialization", () => {
