@@ -2838,7 +2838,6 @@ function showShelfPage(shelfName) {
         : shelfName === "Library"
           ? getBookShelfNames(book).length === 0
           : getBookShelfNames(book).includes(shelfName));
-  const coverBook = books[0] || { title: shelfName, author: "", isbn: "" };
   const totalValue = books.reduce((total, book) => total + Number(book.cost || 0), 0);
   const description = shelfName === "Currently Reading"
     ? `${books.length} ${books.length === 1 ? "book" : "books"} in progress`
@@ -2889,19 +2888,7 @@ function showShelfPage(shelfName) {
     page.append(header, createCompletedBooksList(books));
     return;
   }
-  const hero = document.createElement("div");
-  hero.className = "shelf-hero";
-  const cover = createBookCover(coverBook, "shelf-hero-cover");
-  if (shelf) cover.style.setProperty("--cover-tint", shelf.color || "#8b5e3c");
-  const meta = document.createElement("div");
-  meta.className = "shelf-hero-meta";
-  const owner = document.createElement("span");
-  owner.textContent = state.profile?.full_name || state.session?.user?.email || "Your library";
-  const count = document.createElement("strong");
-  count.textContent = `${books.length} ${books.length === 1 ? "book" : "books"}`;
-  meta.append(owner, count);
-  hero.append(cover, meta);
-  page.append(header, hero, toolbar, books.length ? createShelfBrowser(books) : createBookTable(books));
+  page.append(header, toolbar, books.length ? createShelfBrowser(books) : createBookTable(books));
 }
 
 const shelfSortOptions = [
@@ -2963,7 +2950,8 @@ function createShelfBrowser(books) {
     grid.className = "card-row expanded genre-browse-grid";
     pageBooks.forEach((book) => grid.append(createBookCard(book)));
     section.replaceChildren(controls, summary);
-    if (pageBooks.length) section.append(bar(), grid, bar());
+    if (pageBooks.length) section.append(bar(), grid);
+    if (totalPages > 1) section.append(bar());
   };
   render();
   return section;
