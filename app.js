@@ -5225,11 +5225,11 @@ function createBookLoader({ message = "Loading…", compact = false, mini = fals
   return loader;
 }
 
-function setBookProfileLoadingStatus(status, message) {
+function setBookProfileLoadingStatus(status, message, showText = false) {
   const loader = createBookLoader({ message, mini: true });
   loader.setAttribute("aria-hidden", "true");
   const announcement = document.createElement("span");
-  announcement.className = "visually-hidden";
+  announcement.className = showText ? "scan-loading-text" : "visually-hidden";
   announcement.textContent = message;
   status.replaceChildren(loader, announcement);
 }
@@ -6365,7 +6365,7 @@ async function lookupBookByIsbn(isbn) {
   }
 
   scanStatus.parentElement.querySelector(".retailer-fallback")?.remove();
-  scanStatus.textContent = `Looking up ${normalized}…`;
+  setBookProfileLoadingStatus(scanStatus, `ISBN ${normalized} captured. Looking up your book…`, true);
   try {
     let bookData = null;
 
@@ -6434,9 +6434,8 @@ async function startCameraScan() {
           if (barcodes.length) {
             const value = barcodes[0].rawValue;
             isbnInput.value = value;
-            scanStatus.textContent = `Detected ${value}`;
-            await lookupBookByIsbn(value);
             stopCameraScan();
+            await lookupBookByIsbn(value);
             return;
           }
         } catch (error) {
@@ -6453,10 +6452,9 @@ async function startCameraScan() {
         if (!result || !cameraStream) return;
         const value = result.getText();
         isbnInput.value = value;
-        scanStatus.textContent = `Detected ${value}`;
-        await lookupBookByIsbn(value);
         reader.reset();
         stopCameraScan();
+        await lookupBookByIsbn(value);
       });
     }
   } catch (error) {
