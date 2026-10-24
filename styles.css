@@ -5598,3 +5598,62 @@ body {
   color: #8b5e3c;
   font-weight: 700;
 }
+
+/* Book profile buttons themed to match the sidebar */
+.book-detail-content .page-actions {
+  flex-wrap: wrap;
+}
+
+.book-detail-content .page-actions > .book-shelf-menu {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+.book-detail-content .page-actions > .book-shelf-menu > summary,
+.book-detail-content .reading-actions > .book-shelf-menu > summary {
+  display: inline-flex;
+  width: auto;
+}
+
+.book-detail-content .reading-actions > .book-shelf-menu {
+  width: auto;
+  justify-self: start;
+}
+
+.book-detail-content .page-actions > .secondary-btn,
+.book-detail-content .page-actions > .currently-reading-button:not(.is-reading),
+.book-detail-content .page-actions > .action-btn:not(:disabled),
+.book-detail-content .reading-actions > .book-shelf-menu > summary,
+.book-detail-content .reading-actions > .book-continue-reading,
+.book-detail-content .reading-actions > .currently-reading-button:not(.is-reading),
+.book-more-menu > summary,
+.edition-picker-button,
+.audiobook-sample-button,
+.book-audiobook-find {
+  border: 1px solid rgba(245, 221, 201, 0.12);
+  background: #1f110d;
+  color: #f4e4da;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.book-detail-content .page-actions > .secondary-btn:hover,
+.book-detail-content .page-actions > .currently-reading-button:not(.is-reading):hover,
+.book-detail-content .page-actions > .action-btn:not(:disabled):hover,
+.book-detail-content .reading-actions > .book-shelf-menu > summary:hover,
+.book-more-menu > summary:hover,
+.edition-picker-button:hover,
+.audiobook-sample-button:hover,
+.book-audiobook-find:hover {
+  border-color: rgba(245, 221, 201, 0.3);
+  background: #39241d;
+}
+
+.book-detail-content .page-actions > .secondary-btn[aria-pressed="true"] {
+  background: #39241d;
+  color: #f3c99b;
+}
+
+.book-audiobook-find {
+  background: #39241d;
+  border-color: rgba(245, 221, 201, 0.25);
+}
