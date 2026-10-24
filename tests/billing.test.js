@@ -5,7 +5,7 @@ import { Readable } from "node:stream";
 import { PGlite } from "@electric-sql/pglite";
 import Stripe from "stripe";
 import {
-  authenticate, billingConfig, BillingError, cancelRenewal, eventCustomer, resumeRenewal, startCheckout, subscriptionSnapshot, processWebhook, withAccount,
+  authenticate, billingConfig, BillingBusyError, BillingError, cancelRenewal, eventCustomer, respondError, resumeRenewal, startCheckout, subscriptionSnapshot, processWebhook, withAccount,
 } from "../lib/server/billing.js";
 import { createHandler } from "../api/billing.js";
 import { createWebhookHandler } from "../api/stripe-webhook.js";
@@ -271,6 +271,63 @@ test("account lock rejects concurrent work and releases on errors", async () => 
   await withAccount(db, userId, async () => {});
 });
 
+test("a competing billing request waits for the lock and executes exactly once", async () => {
+  const db = database();
+  let release;
+  let started;
+  const acquired = new Promise((resolve) => { started = resolve; });
+  const held = withAccount(db, userId, async () => {
+    started();
+    await new Promise((resolve) => { release = resolve; });
+  });
+  await acquired;
+  const rpc = db.rpc;
+  let attempts = 0;
+  let executions = 0;
+  const contender = {
+    ...db,
+    rpc: async (...args) => { attempts++; return rpc(...args); },
+  };
+  const waiting = withAccount(contender, userId, async () => { executions++; return "done"; });
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.equal(executions, 0);
+  release();
+  await held;
+  assert.equal(await waiting, "done");
+  assert.ok(attempts >= 2);
+  assert.equal(executions, 1);
+});
+
+test("non-contention database failures and work failures are never retried", async () => {
+  let attempts = 0;
+  let executions = 0;
+  const error = { code: "42703", message: "Missing column" };
+  await assert.rejects(withAccount({
+    rpc: async () => { attempts++; return { error }; },
+  }, userId, async () => { executions++; }), (actual) => actual === error);
+  assert.equal(attempts, 1);
+  assert.equal(executions, 0);
+  await assert.rejects(withAccount(database(), userId, async () => {
+    executions++;
+    throw new Error("Stripe request failed");
+  }), /Stripe request failed/);
+  assert.equal(executions, 1);
+});
+
+test("exhausted lock contention remains retryable and is logged as a warning", () => {
+  const originalWarn = console.warn;
+  let logged;
+  console.warn = (...args) => { logged = args; };
+  try {
+    const res = response();
+    respondError(res, new BillingBusyError());
+    assert.equal(res.code, 409);
+    assert.equal(res.headers["Retry-After"], "2");
+    assert.match(logged[0], /still busy after retrying/);
+  } finally {
+    console.warn = originalWarn;
+  }
+});
 test("checkout uses server Prices and verified user, validates amount, reuses open sessions and blocks duplicate subscriptions", async () => {
   const stripe = stripeMock();
   const account = {};

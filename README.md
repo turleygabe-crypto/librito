@@ -49,6 +49,8 @@ Successful cancellation opens a lasting **Sorry to see you go** dialog confirmin
 
 Billing-status requests reconcile directly with Stripe under the same account lock as webhooks, so refreshing also repairs stale cancellation flags from missed or older webhook deliveries. If Stripe cannot be reached, the page shows a retry error instead of presenting cached renewal information as current. Webhooks are still required for updates while the user is away.
 
+Concurrent billing requests and webhooks briefly retry account-lock acquisition (250ms, 500ms, 1s, 2s) instead of immediately failing while another request saves the subscription. Only lock acquisition is retried, never Stripe mutations or failed database writes. If contention persists, the endpoint returns HTTP 409 with `Retry-After: 2` and logs a warning; webhook responses remain non-2xx so Stripe retries delivery. Other failures remain errors.
+
 In-app banners remind signed-in readers when canceled access ends or automatic renewal approaches, within 30 days, 7 days, and 1 day. They also cover trial endings and direct past-due customers to update payment details. Dismissing a banner hides that milestone for the current browser session; the next milestone, changed end date, or changed cancellation state gets a new reminder. Status is checked on library load, focus, and while the visible app is open (at most every five minutes). No email, push notification, scheduled job, or reminder delivery while the app is closed is included. Complimentary-only accounts have no expiry reminder.
 
 ### Sandbox setup
