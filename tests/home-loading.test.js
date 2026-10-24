@@ -28,7 +28,11 @@ test("the sidebar logo is included in the Vercel static deployment", async () =>
   assert.equal(logo[25], 6, "the displayed logo must be an RGBA PNG");
 });
 
-test("sidebar branding stacks a larger transparent logo above the text at all breakpoints", async () => {
+test("sidebar branding centers a larger transparent logo without duplicate brand text", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const brand = html.slice(html.indexOf('<div class="brand">'), html.indexOf('<nav class="sidebar-nav"'));
+  assert.match(brand, /alt="Librito"/);
+  assert.doesNotMatch(brand, /Your home library|<h2>|aria-hidden="true"/);
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const brandRules = [...css.matchAll(/\.sidebar \.brand\s*\{([^}]+)\}/g)];
   assert.match(brandRules.at(-2)[1], /flex-direction: column/);

@@ -25,7 +25,7 @@ Then open http://127.0.0.1:3000/.
 
 ## Branding and home loading states
 
-The sidebar logo is loaded from `assets/librito-logo-transparent.png` in `index.html`, centered above the brand text at up to 9rem wide on desktop and mobile. This image has a real alpha channel; the original `assets/Cozy Librito Cottage Bookshop Logo.png` is kept as source artwork but has a baked-in checkerboard background. Use a genuinely transparent PNG when replacing the displayed logo. Vercel's static build includes `assets/**`, so images added there are deployed alongside the app.
+The sidebar logo is loaded from `assets/librito-logo-transparent.png` in `index.html`, centered at up to 9rem wide on desktop and mobile without additional brand text below it. Its alt text identifies Librito for screen readers. This image has a real alpha channel; the original `assets/Cozy Librito Cottage Bookshop Logo.png` is kept as source artwork but has a baked-in checkerboard background. Use a genuinely transparent PNG when replacing the displayed logo. Vercel's static build includes `assets/**`, so images added there are deployed alongside the app.
 
 Home rows use the bouncing-book loader while the account library or catalog requests are pending (animation respects reduced-motion preferences). Once a new account's empty library has loaded, Currently reading and Recently added show prompts to add books, and author recommendations need books in the library first. These empty states are not ongoing loading states; general recommendations remain available under Picked for your library.
 
