@@ -1333,10 +1333,12 @@ function renderBooks() {
       })],
     ["More by authors you own", () => createCardRow("More by authors you own", moreByOwnedAuthors.slice(0, homeRowBookCount)
       .map(({ book }) => ({ type: "book", book })), {
-        loading: state.catalogLoading,
-        emptyMessage: state.catalogLoading
+        loading: state.loading || state.catalogLoading,
+        emptyMessage: state.loading || state.catalogLoading
           ? "Finding books by authors in your library…"
-          : state.catalogError || "No more books by your authors found in the catalog yet.",
+          : state.loadError || state.catalogError || (libraryBooks.length
+            ? "No more books by your authors found in the catalog yet."
+            : "Add books to your library to discover more by their authors."),
       })],
     ["Shelves for your taste", () => createCardRow("Shelves for your taste",
       buildSuggestedShelves(genres, shelfRecommendations, moreByOwnedAuthors), {
@@ -1586,6 +1588,10 @@ function createCurrentlyReadingHomeSection(books, libraryBooks) {
   const title = document.createElement("h2");
   title.textContent = "Currently reading";
   heading.append(title);
+  if (state.loading) {
+    section.append(heading, createBookLoader({ message: "Loading your reading list…", compact: true }));
+    return section;
+  }
   if (books.length) {
     const content = document.createElement("div");
     content.className = "reading-home-layout";
@@ -1611,9 +1617,8 @@ function createCurrentlyReadingHomeSection(books, libraryBooks) {
 
   const empty = document.createElement("p");
   empty.className = "row-empty-state";
-  empty.textContent = state.loading
-    ? "Loading your reading list…"
-    : "Ready to start a book? Choose one from your library to add to Currently Reading.";
+  empty.textContent = state.loadError
+    || "Ready to start a book? Choose one from your library to add to Currently Reading.";
   section.append(heading, empty);
 
   const booksToStart = libraryBooks.filter((book) => book.reading_status !== "reading");
@@ -1631,7 +1636,7 @@ function createCurrentlyReadingHomeSection(books, libraryBooks) {
     });
     booksToStart.slice(0, 6).forEach((book) => row.append(createReadingBookCard(book)));
     section.append(row);
-  } else if (!state.loading && !libraryBooks.length) {
+  } else if (!state.loadError && !libraryBooks.length) {
     const addBook = document.createElement("button");
     addBook.type = "button";
     addBook.className = "secondary-btn row-empty-action";
@@ -8476,8 +8481,6 @@ bookForm.addEventListener("submit", async (event) => {
 });
 
 initializeBookLanguageOptions();
-state.books = loadBooks();
-state.loading = false;
 updateAuthButton();
 restoreRouteFromLocation();
 initializeSupabase();
