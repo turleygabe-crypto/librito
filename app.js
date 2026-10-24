@@ -356,6 +356,8 @@ let editionDialogReturnFocus = null;
 let appDialogOverlay = null;
 let appDialogResolver = null;
 let appDialogReturnFocus = null;
+let appDialogBusy = false;
+let appDialogConfirmAction = null;
 const oauthRedirectKey = "librito-oauth-redirect";
 let authPrompted = sessionStorage.getItem(oauthRedirectKey) === "true";
 let authMode = "signin";
@@ -4921,6 +4923,10 @@ function ensureAppDialog() {
   header.append(title, close);
   const message = document.createElement("p");
   message.className = "app-dialog-message";
+  const errorMessage = document.createElement("p");
+  errorMessage.className = "app-dialog-error";
+  errorMessage.setAttribute("role", "alert");
+  errorMessage.hidden = true;
   const form = document.createElement("form");
   form.className = "app-dialog-form";
   const input = document.createElement("input");
@@ -4941,11 +4947,34 @@ function ensureAppDialog() {
   confirm.className = "action-btn";
   actions.append(cancel, confirm);
   form.append(actions);
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    settleAppDialog(input.hidden ? true : input.value);
+    if (appDialogBusy) return;
+    const result = input.hidden ? true : input.value;
+    if (!appDialogConfirmAction) {
+      settleAppDialog(result);
+      return;
+    }
+    appDialogBusy = true;
+    const label = confirm.textContent;
+    confirm.textContent = "Please wait...";
+    [confirm, cancel, close].forEach((button) => { button.disabled = true; });
+    errorMessage.hidden = true;
+    try {
+      await appDialogConfirmAction();
+      appDialogBusy = false;
+      settleAppDialog(result);
+    } catch (error) {
+      console.error("Dialog action failed", error);
+      errorMessage.textContent = error.message || "This action couldn't be completed. Please try again.";
+      errorMessage.hidden = false;
+    } finally {
+      appDialogBusy = false;
+      confirm.textContent = label;
+      [confirm, cancel, close].forEach((button) => { button.disabled = false; });
+    }
   });
-  dialog.append(header, message, form);
+  dialog.append(header, message, errorMessage, form);
   overlay.append(dialog);
   overlay.addEventListener("click", (event) => {
     if (event.target === overlay) settleAppDialog(null);
@@ -4956,11 +4985,12 @@ function ensureAppDialog() {
 }
 
 function settleAppDialog(result) {
-  if (!appDialogOverlay) return;
+  if (!appDialogOverlay || appDialogBusy) return;
   const resolver = appDialogResolver;
   const returnFocus = appDialogReturnFocus;
   appDialogResolver = null;
   appDialogReturnFocus = null;
+  appDialogConfirmAction = null;
   appDialogOverlay.classList.add("hidden");
   appDialogOverlay.querySelector(".app-dialog-form").reset();
   if (returnFocus instanceof HTMLElement && returnFocus.isConnected) returnFocus.focus();
@@ -4974,7 +5004,9 @@ function showAppDialog({
   cancelLabel = "Cancel",
   danger = false,
   input = null,
+  onConfirm = null,
 }) {
+  if (appDialogBusy) return Promise.resolve(null);
   if (appDialogResolver) settleAppDialog(null);
   const overlay = ensureAppDialog();
   const dialog = overlay.querySelector("[role='dialog']");
@@ -4986,6 +5018,8 @@ function showAppDialog({
   const confirm = form.querySelector(".action-btn");
   heading.textContent = title;
   messageNode.textContent = message;
+  overlay.querySelector(".app-dialog-error").hidden = true;
+  appDialogConfirmAction = onConfirm;
   dialog.setAttribute("aria-labelledby", `appDialogTitle`);
   heading.id = "appDialogTitle";
   cancel.textContent = cancelLabel;
@@ -6589,10 +6623,18 @@ async function openBilling(button, body) {
 }
 
 async function resumeBilling(button, status, onSuccess) {
-  if (!window.confirm(`Resume automatic renewal of your existing Book Lover subscription? Your next scheduled billing date is ${formatDate(status.periodEnd)}. Your existing billing interval and price will stay the same.`)) return;
   button.disabled = true;
   try {
-    await billingRequest({ action: "resume" });
+    const confirmed = await showAppConfirm(
+      `Your Book Lover plan will renew automatically on ${formatDate(status.periodEnd)} at your existing price and billing interval. This restores your current subscription rather than purchasing another plan.`,
+      {
+        title: "Resume your Book Lover plan?",
+        confirmLabel: "Resume renewal",
+        cancelLabel: "Keep cancellation",
+        onConfirm: () => billingRequest({ action: "resume" }),
+      },
+    );
+    if (!confirmed) return;
     showToast("Automatic renewal resumed.");
     await onSuccess();
   } catch (error) {

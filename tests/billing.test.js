@@ -188,7 +188,7 @@ test("resuming renewal updates the existing owned subscription and reconciles ac
   let saved;
   stripe.subscriptions.update = async (id, params) => {
     assert.equal(id, "sub_existing");
-    assert.deepEqual(params, { cancel_at_period_end: false, cancel_at: "" });
+    assert.deepEqual(params, { cancel_at_period_end: false });
     sub.cancel_at_period_end = false;
   };
   await resumeRenewal({ stripe, config }, { customer_id: "cus_reader" }, async (values) => { saved = values; });
@@ -206,6 +206,19 @@ test("resume failures propagate and never mark renewal as restored", async () =>
   let saved = false;
   await assert.rejects(resumeRenewal({ stripe, config }, { customer_id: "cus_reader" }, async () => { saved = true; }), /permission denied/);
   assert.equal(saved, false);
+});
+
+test("resuming a timestamp-scheduled cancellation only clears cancel_at", async () => {
+  const sub = { ...subscription("active"), id: "sub_timestamp", cancel_at_period_end: false, cancel_at: 1800000000 };
+  const stripe = stripeMock([sub]);
+  stripe.subscriptions.update = async (id, params) => {
+    assert.equal(id, "sub_timestamp");
+    assert.deepEqual(params, { cancel_at: "" });
+    sub.cancel_at = null;
+  };
+  let saved;
+  await resumeRenewal({ stripe, config }, { customer_id: "cus_reader" }, async (values) => { saved = values; });
+  assert.equal(saved.cancel_at_period_end, false);
 });
 
 test("account lock rejects concurrent work and releases on errors", async () => {
