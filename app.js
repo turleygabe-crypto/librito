@@ -2442,11 +2442,14 @@ function applyBrowseControls(books, sort, filters) {
     rating: (a, b) => (b.ratings_average || 0) - (a.ratings_average || 0),
     popular: (a, b) => (b.popularity || 0) - (a.popularity || 0),
     title: (a, b) => String(a.title || "").localeCompare(String(b.title || "")),
+    author: (a, b) => compareText(a.author, b.author) || compareText(a.title, b.title),
+    added: (a, b) => String(b.added || b.added_on || "").localeCompare(String(a.added || a.added_on || "")),
+    value: (a, b) => Number(b.cost || 0) - Number(a.cost || 0),
   }[sort];
   return compare ? [...visible].sort(compare) : visible;
 }
 
-function createBrowseControls({ sort, filters, languages = false, onChange }) {
+function createBrowseControls({ sort, filters, languages = false, sortOptions = browseSortOptions, onChange }) {
   const bar = document.createElement("section");
   bar.className = "browse-bar";
   bar.setAttribute("aria-label", "Sort and filter");
@@ -2457,7 +2460,7 @@ function createBrowseControls({ sort, filters, languages = false, onChange }) {
   sortLabel.className = "browse-sort";
   sortLabel.append("Sort by ");
   const select = document.createElement("select");
-  browseSortOptions.forEach(([value, label]) => select.add(new Option(label, value, false, value === sort)));
+  sortOptions.forEach(([value, label]) => select.add(new Option(label, value, false, value === sort)));
   select.addEventListener("change", () => onChange({ sort: select.value, filters }));
   sortLabel.append(select);
 
@@ -2898,7 +2901,72 @@ function showShelfPage(shelfName) {
   count.textContent = `${books.length} ${books.length === 1 ? "book" : "books"}`;
   meta.append(owner, count);
   hero.append(cover, meta);
-  page.append(header, hero, toolbar, createBookTable(books));
+  page.append(header, hero, toolbar, books.length ? createShelfBrowser(books) : createBookTable(books));
+}
+
+const shelfSortOptions = [
+  ["added", "Recently added"],
+  ["title", "Title: A to Z"],
+  ["author", "Author: A to Z"],
+  ["value", "Highest value"],
+  ["new", "Newest published"],
+  ["old", "Oldest published"],
+  ["rating", "Top rated"],
+];
+const shelfBrowse = { shelf: "", sort: "added", filters: {}, page: 1 };
+
+function createShelfBrowser(books) {
+  if (shelfBrowse.shelf !== state.currentShelf) {
+    Object.assign(shelfBrowse, { shelf: state.currentShelf, sort: "added", filters: {}, page: 1 });
+  }
+  const section = document.createElement("section");
+  section.className = "search-result-group";
+  const render = () => {
+    const visible = applyBrowseControls(books, shelfBrowse.sort, shelfBrowse.filters);
+    const size = getStoredSearchPageSize();
+    const totalPages = Math.max(1, Math.ceil(visible.length / size));
+    shelfBrowse.page = Math.min(Math.max(1, shelfBrowse.page), totalPages);
+    const start = (shelfBrowse.page - 1) * size;
+    const pageBooks = visible.slice(start, start + size);
+
+    const controls = createBrowseControls({
+      sort: shelfBrowse.sort,
+      filters: shelfBrowse.filters,
+      sortOptions: shelfSortOptions,
+      onChange: ({ sort, filters }) => {
+        Object.assign(shelfBrowse, { sort, filters, page: 1 });
+        render();
+      },
+    });
+    const summary = document.createElement("p");
+    summary.className = "genre-summary";
+    summary.setAttribute("aria-live", "polite");
+    summary.textContent = pageBooks.length
+      ? `Showing ${start + 1}–${start + pageBooks.length} of ${visible.length} books`
+      : "No books match these filters. Books missing year, page, or rating data are hidden when filtering by them.";
+    const bar = () => createPagingBar({
+      page: shelfBrowse.page,
+      totalPages,
+      size,
+      onGo: (target) => {
+        shelfBrowse.page = target;
+        render();
+        section.scrollIntoView({ block: "start" });
+      },
+      onSize: (next) => {
+        localStorage.setItem(searchPageSizeKey, String(next));
+        shelfBrowse.page = 1;
+        render();
+      },
+    });
+    const grid = document.createElement("div");
+    grid.className = "card-row expanded genre-browse-grid";
+    pageBooks.forEach((book) => grid.append(createBookCard(book)));
+    section.replaceChildren(controls, summary);
+    if (pageBooks.length) section.append(bar(), grid, bar());
+  };
+  render();
+  return section;
 }
 
 function createCompletedBooksList(books) {
