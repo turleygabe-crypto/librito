@@ -1873,9 +1873,6 @@ function createBookCard(book, { compact = false, subtitle = "", recommendation =
     tag.className = `card-shelf-tag${shelfNames.length ? " is-on-shelf" : ""}`;
     tag.textContent = shelfNames.length ? `📚 ${shelfNames.join(", ")}` : "No shelf yet";
     open.append(tag);
-    const shelfMenu = createBookShelfMenu(ownedBook, { compact: true });
-    shelfMenu.classList.add("card-shelf-button");
-    card.append(shelfMenu);
   }
   if (!ownedBook) {
     const addMenu = document.createElement("details");
@@ -2004,7 +2001,14 @@ function createBookCardMenu(book, ownedBook, recommendation) {
   return menu;
 }
 
+function removeOrphanPopovers() {
+  document.querySelectorAll("body > .card-add-actions, body > .card-menu-actions").forEach((panel) => {
+    if (!panel.popoverMenu?.isConnected || !panel.popoverMenu.open) panel.remove();
+  });
+}
+
 function wireCardPopover(menu, summary, panel) {
+  panel.popoverMenu = menu;
   panel.hidden = true;
   const positionPanel = () => {
     const summaryRect = summary.getBoundingClientRect();
@@ -6211,6 +6215,7 @@ function topEntry(counts) {
 }
 
 function render() {
+  removeOrphanPopovers();
   renderShelfOptions();
   renderStats();
   renderShelves();
@@ -7562,3 +7567,7 @@ if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch(console.error);
   });
 }
+
+window.addEventListener("hashchange", removeOrphanPopovers);
+window.addEventListener("popstate", removeOrphanPopovers);
+new MutationObserver(removeOrphanPopovers).observe(document.querySelector("main") || document.body, { childList: true, subtree: true });
