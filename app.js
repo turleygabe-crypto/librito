@@ -2801,12 +2801,16 @@ function createPageHeader(kicker, title, description = "") {
   back.className = "text-btn page-back";
   back.textContent = "‹ Home";
   back.addEventListener("click", () => navigateTo("home"));
-  const eyebrow = document.createElement("p");
-  eyebrow.className = "eyebrow";
-  eyebrow.textContent = kicker;
   const heading = document.createElement("h1");
   heading.textContent = title;
-  header.append(back, eyebrow, heading);
+  header.append(back);
+  if (kicker && kicker.trim().toLowerCase() !== title.trim().toLowerCase()) {
+    const eyebrow = document.createElement("p");
+    eyebrow.className = "eyebrow";
+    eyebrow.textContent = kicker;
+    header.append(eyebrow);
+  }
+  header.append(heading);
   if (description) {
     const copy = document.createElement("p");
     copy.className = "page-description";
@@ -3116,7 +3120,7 @@ function createCurrentlyReadingControls(book) {
 function showShelvesPage() {
   updateActiveNavigation("Your shelves");
   const page = showPage("shelves");
-  const header = createPageHeader("Your Library", "Your shelves", "Your books, gathered into collections.");
+  const header = createPageHeader("", "Your shelves", "Your books, gathered into collections.");
   const createShelf = document.createElement("button");
   createShelf.type = "button";
   createShelf.className = "action-btn";
@@ -3183,7 +3187,7 @@ function showLibraryPage() {
   updateActiveNavigation("Your Library");
   const page = showPage("library");
   const prefs = state.library;
-  const header = createPageHeader("Your Library", "Your Library", "Every book you've added, all in one place.");
+  const header = createPageHeader("", "Your Library", "Every book you've added, all in one place.");
 
   const toolbar = document.createElement("div");
   toolbar.className = "page-toolbar library-toolbar";
@@ -5865,12 +5869,10 @@ function showPurchasePage(params = new URLSearchParams(window.location.hash.spli
   summary.className = "purchase-book-summary";
   summary.append(createBookCover(book));
   const details = document.createElement("div");
-  const heading = document.createElement("h2");
-  heading.textContent = title;
   const byline = document.createElement("p");
   byline.className = "page-description";
   byline.textContent = author || "Unknown author";
-  details.append(heading, byline);
+  details.append(byline);
   if (isbn) {
     const identifier = document.createElement("p");
     identifier.className = "purchase-isbn";

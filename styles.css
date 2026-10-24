@@ -1432,12 +1432,6 @@ h1, h2, h3, h4, p { margin-top: 0; }
   aspect-ratio: 0.72;
 }
 
-.purchase-book-summary h2 {
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-size: clamp(1.2rem, 4vw, 1.7rem);
-}
-
 .purchase-isbn {
   margin: 0.65rem 0 0;
   color: var(--muted);
@@ -2707,7 +2701,6 @@ body {
 }
 
 .purchase-book-summary,
-.purchase-book-summary h2,
 .currently-reading-details .table-book-title,
 .stat-card strong {
   color: #302720;
