@@ -216,6 +216,7 @@ const bookForm = document.getElementById("bookForm");
 const dialogOverlay = document.getElementById("dialogOverlay");
 const closeDialogBtn = document.getElementById("closeDialogBtn");
 const bookEntryChoice = document.getElementById("bookEntryChoice");
+const scanBookOptionBtn = document.getElementById("scanBookOptionBtn");
 const lookupBookOptionBtn = document.getElementById("lookupBookOptionBtn");
 const manualBookOptionBtn = document.getElementById("manualBookOptionBtn");
 const bookLookupFlow = document.getElementById("bookLookupFlow");
@@ -5973,18 +5974,40 @@ function openDialog() {
 
 function showEntryChoice() {
   bookEntryMode = "";
+  updateEntryModeSwitch("");
   bookEntryChoice.classList.remove("hidden");
   bookLookupFlow.classList.add("hidden");
   bookDetailsPanel.classList.add("hidden");
 }
 
-function startBookLookup() {
+const entryModeSwitch = document.getElementById("entryModeSwitch");
+
+function updateEntryModeSwitch(mode) {
+  entryModeSwitch.classList.toggle("hidden", !mode);
+  entryModeSwitch.querySelectorAll("[data-entry-mode]").forEach((btn) => {
+    const active = btn.dataset.entryMode === mode;
+    btn.classList.toggle("is-active", active);
+    btn.setAttribute("aria-pressed", String(active));
+  });
+}
+
+entryModeSwitch.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-entry-mode]");
+  if (!btn) return;
+  stopCameraScan();
+  if (btn.dataset.entryMode === "manual") startManualEntry();
+  else startBookLookup(btn.dataset.entryMode);
+});
+
+function startBookLookup(tab = "search") {
   bookEntryMode = "lookup";
   bookEntryChoice.classList.add("hidden");
   bookLookupFlow.classList.remove("hidden");
   bookDetailsPanel.classList.add("hidden");
-  setLookupTab("search");
-  lookupTitleInput.focus();
+  setLookupTab(tab);
+  updateEntryModeSwitch(tab);
+  if (tab === "scan") startCameraScan();
+  else lookupTitleInput.focus();
 }
 
 function setLookupTab(tab) {
@@ -6012,6 +6035,7 @@ function startManualEntry() {
   bookLookupFlow.classList.add("hidden");
   bookDetailsPanel.classList.remove("hidden");
   bookDetailsBackBtn.textContent = "Choose another method";
+  updateEntryModeSwitch("manual");
   bookForm.elements.title.focus();
 }
 
@@ -6872,6 +6896,10 @@ document.addEventListener("keydown", (event) => {
       first.focus();
     }
   }
+});
+
+scanBookOptionBtn.addEventListener("click", () => {
+  startBookLookup("scan");
 });
 
 lookupBookOptionBtn.addEventListener("click", () => {

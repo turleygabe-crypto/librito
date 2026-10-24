@@ -95,7 +95,7 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .book-form input, .book-form textarea, .book-form select { padding: 0.78rem 0.9rem; border: 1px solid rgba(139,94,60,.18); border-radius: 0.75rem; background: #fff; color: var(--ink); }
 .book-entry-choice { display: grid; gap: 0.75rem; }
 .book-entry-choice > p { margin: 0; }
-.book-entry-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+.book-entry-options { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
 .entry-option { display: grid; gap: 0.45rem; padding: 1rem; border: 1px solid rgba(139,94,60,.2); border-radius: 0.75rem; background: #fff; color: var(--ink); text-align: left; }
 .entry-option strong { font-size: 1rem; }
 .entry-option span { color: rgba(63,46,35,.74); font-size: 0.9rem; }
@@ -115,6 +115,7 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .scan-zone { padding: 0.8rem; border: 1px solid rgba(139,94,60,.16); border-radius: 1rem; }
 .lookup-panel { display: grid; gap: 0.6rem; margin-top: 0.65rem; }
 .lookup-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.35rem; padding: 0.3rem; border-radius: 0.8rem; background: rgba(139,94,60,.1); }
+.entry-mode-switch { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 0.75rem; }
 .lookup-tab { padding: 0.7rem 1rem; border: 0; border-radius: 0.6rem; background: transparent; color: var(--ink); font: inherit; }
 .lookup-tab.is-active { background: #7a4a2d; color: #fff; }
 .book-dialog-card { width: min(680px, 100%); }

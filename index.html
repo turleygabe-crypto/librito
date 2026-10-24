@@ -162,9 +162,13 @@
           <section id="bookEntryChoice" class="book-entry-choice">
             <p>How would you like to add this book?</p>
             <div class="book-entry-options">
+              <button id="scanBookOptionBtn" type="button" class="entry-option">
+                <strong>Scan Book</strong>
+                <span>Scan the book's ISBN barcode with your camera.</span>
+              </button>
               <button id="lookupBookOptionBtn" type="button" class="entry-option">
-                <strong>Lookup Book</strong>
-                <span>Search by title or author, or scan an ISBN barcode.</span>
+                <strong>Search Book</strong>
+                <span>Search by title or author.</span>
               </button>
               <button id="manualBookOptionBtn" type="button" class="entry-option">
                 <strong>Manually Enter Book</strong>
@@ -173,9 +177,15 @@
             </div>
           </section>
 
+          <div id="entryModeSwitch" class="lookup-tabs entry-mode-switch hidden" role="group" aria-label="Add book method">
+            <button type="button" class="lookup-tab" data-entry-mode="scan">Scan</button>
+            <button type="button" class="lookup-tab" data-entry-mode="search">Search</button>
+            <button type="button" class="lookup-tab" data-entry-mode="manual">Manual</button>
+          </div>
+
           <section id="bookLookupFlow" class="hidden">
             <div class="scan-zone">
-              <div class="lookup-tabs" role="tablist" aria-label="Book lookup method">
+              <div class="lookup-tabs hidden" role="tablist" aria-label="Book lookup method">
                 <button id="lookupSearchTab" type="button" class="lookup-tab is-active" role="tab" aria-selected="true" aria-controls="titleLookupPanel">Search</button>
                 <button id="lookupScanTab" type="button" class="lookup-tab" role="tab" aria-selected="false" aria-controls="isbnLookupPanel" tabindex="-1">Scan</button>
               </div>
@@ -213,7 +223,7 @@
                 </div>
                 <video id="scannerVideo" autoplay playsinline muted></video>
               </div>
-              <p id="scanStatus" class="scan-status">Search by title or author, or switch to ISBN to enter or scan a barcode.</p>
+              <p id="scanStatus" class="scan-status">Search by title, author, or both.</p>
               <div class="entry-navigation">
                 <button id="lookupBackBtn" type="button" class="secondary-btn">Back</button>
                 <button id="manualEntryFromLookupBtn" type="button" class="secondary-btn">Enter details manually</button>
