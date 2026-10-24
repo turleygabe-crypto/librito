@@ -4661,38 +4661,16 @@ body {
   }
 }
 
+#libraryHeading {
+  flex: 1;
+}
+
 .library-heading-btn {
-  display: flex;
   width: 100%;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.55rem 0.5rem;
-  border: 0;
-  border-radius: 0.6rem;
-  background: transparent;
-  color: #bca9a0;
-  font-family: inherit;
-  font-size: 0.9rem;
-  font-weight: 600;
-  letter-spacing: normal;
-  line-height: 1.25;
-  text-align: left;
-  text-transform: none;
-  cursor: pointer;
 }
 
 .library-heading-btn::before {
-  width: 1.15rem;
-  color: #e7cbb7;
   content: "▦";
-  font-size: 1rem;
-  text-align: center;
-}
-
-.library-heading-btn:hover,
-.library-heading-btn.active {
-  background: #43271e;
-  color: #fff;
 }
 
 .library-toolbar {
