@@ -2319,13 +2319,16 @@ const searchCacheName = "librito-search-v1";
 const searchCacheFreshMs = 2 * 60 * 1000;
 const searchCacheMaxAgeMs = 7 * 24 * 60 * 60 * 1000;
 
-// Stale-while-revalidate for Open Library searches: cached results return instantly while a background request refreshes the cache.
-async function fetchOpenLibrarySearch(params, timeout = 15000) {
-  const url = `https://openlibrary.org/search.json?${params}`;
+function fetchOpenLibrarySearch(params, timeout = 15000) {
+  return fetchJsonCached(`https://openlibrary.org/search.json?${params}`, timeout);
+}
+
+// Stale-while-revalidate for catalog lookups: cached results return instantly while a background request refreshes the cache.
+async function fetchJsonCached(url, timeout = 15000) {
   const cache = window.caches ? await caches.open(searchCacheName).catch(() => null) : null;
   const refresh = async () => {
     const response = await fetch(url, { signal: AbortSignal.timeout(timeout) });
-    if (!response.ok) throw new Error(`Open Library search failed with ${response.status}`);
+    if (!response.ok) throw new Error(`Request failed with ${response.status}: ${url}`);
     const text = await response.text();
     const data = JSON.parse(text);
     if (cache) {
@@ -3926,9 +3929,7 @@ function getBookProfileQuery(book, isbnOnly = false) {
 
 async function fetchGoogleBookVolumes(query) {
   const params = new URLSearchParams({ q: query, maxResults: "20", printType: "books" });
-  const response = await fetch(`https://www.googleapis.com/books/v1/volumes?${params}`);
-  if (!response.ok) throw new Error(`Google Books responded with ${response.status}`);
-  const payload = await response.json();
+  const payload = await fetchJsonCached(`https://www.googleapis.com/books/v1/volumes?${params}`);
   return Array.isArray(payload.items) ? payload.items : [];
 }
 
@@ -5325,14 +5326,10 @@ async function getOpenLibraryEditionsForBook(book, language = getDefaultBookLang
   let workKeys = [];
   const isbn = normalizeBookIsbn(book.isbn);
   if (isbn) {
-    const response = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(isbn)}&format=json&jscmd=data`);
-    if (!response.ok) throw new Error(`Open Library ISBN lookup responded with ${response.status}`);
-    const result = await response.json();
+    const result = await fetchJsonCached(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(isbn)}&format=json&jscmd=data`);
     const editionKey = result[`ISBN:${isbn}`]?.key;
     if (editionKey && /^\/books\/[^/]+$/.test(editionKey)) {
-      const editionResponse = await fetch(`https://openlibrary.org${editionKey}.json`);
-      if (!editionResponse.ok) throw new Error(`Open Library edition responded with ${editionResponse.status}`);
-      const edition = await editionResponse.json();
+      const edition = await fetchJsonCached(`https://openlibrary.org${editionKey}.json`);
       workKeys = (edition.works || []).map((work) => work.key).filter((key) => /^\/works\/[^/]+$/.test(key));
     }
   }
@@ -5353,9 +5350,7 @@ async function getOpenLibraryEditionsForBook(book, language = getDefaultBookLang
   }
 
   const results = await Promise.all(workKeys.map(async (workKey) => {
-    const response = await fetch(`https://openlibrary.org${workKey}/editions.json?limit=100`);
-    if (!response.ok) throw new Error(`Open Library editions responded with ${response.status}`);
-    const payload = await response.json();
+    const payload = await fetchJsonCached(`https://openlibrary.org${workKey}/editions.json?limit=100`);
     return Array.isArray(payload.entries) ? payload.entries : [];
   }));
   const choices = results.flat().flatMap((edition) => {
