@@ -23,21 +23,24 @@ const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
 const upgradeFunction = source.slice(source.indexOf("function showUpgradePage()"), source.indexOf("\nfunction showPurchasePage("));
 
 test("upgrade page displays canceled countdown and resume action, then resubscribe after expiry", async () => {
-  for (const ended of [false, true]) {
+  for (const mode of ["canceled", "ended", "active", "complimentary"]) {
+    const ended = mode === "ended";
+    const complimentary = mode === "complimentary";
     const page = new Element();
     const elements = [];
     const status = {
-      canManage: true, hasSubscription: !ended, cancelAtPeriodEnd: !ended,
-      status: ended ? "canceled" : "active", periodEnd: new Date(Date.now() + 365 * 86400000).toISOString(),
+      canManage: !complimentary, hasSubscription: !ended && !complimentary, cancelAtPeriodEnd: mode === "canceled",
+      status: ended ? "canceled" : complimentary ? null : "active", periodEnd: new Date(Date.now() + 365 * 86400000).toISOString(),
     };
     // Start with a stale Lite Reader profile, as happens while account data is loading.
     const state = {
       profile: { tier: "lite_reader" }, session: { user: { id: "reader" } },
       supabase: { from: () => ({ select: () => ({ eq: () => ({
-        single: async () => ({ data: { tier: ended ? "lite_reader" : "book_lover" } }),
+        single: async () => ({ data: { tier: ended ? "lite_reader" : "book_lover", complimentary_book_lover: complimentary } }),
       }) }) }) },
     };
     let resumeClicked = false;
+    let cancelClicked = false;
     const context = {
       state, URLSearchParams, console, subscriptionTiming, subscriptionTimingMessage,
       window: { location: { hash: "#/upgrade" } },
@@ -50,6 +53,7 @@ test("upgrade page displays canceled countdown and resume action, then resubscri
       formatCurrency: (value) => `$${value}`, formatDate: (value) => value,
       billingRequest: async () => status, openBilling() {}, refreshSubscriptionReminder() {},
       resumeBilling: (button, current) => { resumeClicked = current === status; },
+      cancelBilling: (button, current) => { cancelClicked = current === status; },
     };
     runInNewContext(`${upgradeFunction}\nshowUpgradePage();`, context);
     await new Promise((resolve) => setImmediate(resolve));
@@ -58,15 +62,22 @@ test("upgrade page displays canceled countdown and resume action, then resubscri
     const message = elements.find((element) => element.className === "upgrade-billing-status");
     const cta = elements.find((element) => element.className === "upgrade-cta");
     assert.equal(panel.hidden, false);
-    assert.equal(resume.hidden, ended);
+    assert.equal(resume.hidden, mode !== "canceled");
+    const cancel = elements.find((element) => element.textContent === "Cancel subscription");
+    assert.equal(cancel.hidden, mode !== "active");
     if (ended) {
       assert.equal(cta.textContent, "Resubscribe to Book Lover");
       assert.equal(cta.disabled, false);
-    } else {
+    } else if (mode === "canceled") {
       assert.match(message.textContent, /365 days left on your canceled Book Lover plan/);
       assert.equal(cta.disabled, true);
       resume.events.click();
       assert.equal(resumeClicked, true);
+    } else if (mode === "active") {
+      cancel.events.click();
+      assert.equal(cancelClicked, true);
+    } else {
+      assert.match(message.textContent, /complimentary/);
     }
   }
 });

@@ -6636,10 +6636,43 @@ async function resumeBilling(button, status, onSuccess) {
     );
     if (!confirmed) return;
     showToast("Automatic renewal resumed.");
-    await onSuccess();
+    await refreshAfterBillingChange(onSuccess);
   } catch (error) {
     console.error("Could not resume renewal", error);
     showToast(error.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function refreshAfterBillingChange(onSuccess) {
+  try {
+    await onSuccess();
+  } catch (error) {
+    console.error("Billing change saved, but status refresh failed", error);
+    showToast("Your change was saved. Refresh billing status to see the latest details.");
+  }
+}
+
+async function cancelBilling(button, status, complimentary, onSuccess) {
+  button.disabled = true;
+  try {
+    const access = complimentary
+      ? "Your complimentary Book Lover access will remain unchanged."
+      : `Your Book Lover access will continue until ${formatDate(status.periodEnd)}. After that, your account will switch to Lite Reader. Your books and shelves will stay saved.`;
+    const confirmed = await showAppConfirm(
+      `${access} Canceling stops automatic renewal; it does not refund past payments. No new renewal payments will be scheduled. Any outstanding balance is still due.`,
+      {
+        title: "Cancel your Book Lover subscription?",
+        confirmLabel: "Cancel subscription",
+        cancelLabel: "Keep subscription",
+        danger: true,
+        onConfirm: () => billingRequest({ action: "cancel" }),
+      },
+    );
+    if (!confirmed) return;
+    showToast("Cancellation scheduled. Automatic renewal is off.");
+    await refreshAfterBillingChange(onSuccess);
   } finally {
     button.disabled = false;
   }
@@ -6843,6 +6876,12 @@ function showUpgradePage() {
   billingPanel.className = "upgrade-billing-panel";
   billingPanel.setAttribute("aria-label", "Subscription management");
   billingPanel.hidden = true;
+  const billingHeading = document.createElement("h2");
+  billingHeading.textContent = "Your subscription";
+  const billingHelp = document.createElement("p");
+  billingHelp.className = "upgrade-billing-status";
+  billingHelp.textContent = "Manage billing opens Stripe securely to update your payment method or view and download invoices.";
+  billingHelp.hidden = true;
   const manage = document.createElement("button");
   manage.type = "button";
   manage.className = "action-btn";
@@ -6858,6 +6897,16 @@ function showUpgradePage() {
     await loadBillingStatus();
     await refreshSubscriptionReminder(true);
   }));
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "secondary-btn";
+  cancel.textContent = "Cancel subscription";
+  cancel.hidden = true;
+  cancel.addEventListener("click", () => cancelBilling(cancel, currentBillingStatus,
+    Boolean(state.profile?.complimentary_book_lover), async () => {
+      await loadBillingStatus();
+      await refreshSubscriptionReminder(true);
+    }));
   const refresh = document.createElement("button");
   refresh.type = "button";
   refresh.className = "text-btn";
@@ -6875,7 +6924,9 @@ function showUpgradePage() {
       currentBillingStatus = status;
       updateAuthButton();
       manage.hidden = !status.canManage;
+      billingHelp.hidden = !status.canManage;
       resume.hidden = !subscriptionTiming(status)?.canceled;
+      cancel.hidden = !subscriptionTiming(status) || status.cancelAtPeriodEnd;
       billingPanel.hidden = !status.canManage && !profile.complimentary_book_lover && !checkout;
       refresh.hidden = billingPanel.hidden;
       const premiumAccess = getAccountTier().premium;
@@ -6900,6 +6951,7 @@ function showUpgradePage() {
       console.error("Could not load billing status", error);
       currentBillingStatus = null;
       resume.hidden = true;
+      cancel.hidden = true;
       billingPanel.hidden = false;
       refresh.hidden = false;
       billingStatus.textContent = "We couldn't load your subscription details. Please try again.";
@@ -6908,7 +6960,7 @@ function showUpgradePage() {
     }
   }
   refresh.addEventListener("click", loadBillingStatus);
-  billingPanel.append(billingStatus, resume, manage, refresh);
+  billingPanel.append(billingHeading, billingStatus, resume, manage, cancel, refresh, billingHelp);
   page.append(hero, toggle, plans, tagline, billingPanel);
   const checkout = new URLSearchParams(window.location.hash.split("?")[1] || "").get("checkout");
   if (checkout === "success") {

@@ -5,7 +5,7 @@ import { Readable } from "node:stream";
 import { PGlite } from "@electric-sql/pglite";
 import Stripe from "stripe";
 import {
-  authenticate, billingConfig, BillingError, eventCustomer, resumeRenewal, startCheckout, subscriptionSnapshot, processWebhook, withAccount,
+  authenticate, billingConfig, BillingError, cancelRenewal, eventCustomer, resumeRenewal, startCheckout, subscriptionSnapshot, processWebhook, withAccount,
 } from "../lib/server/billing.js";
 import { createHandler } from "../api/billing.js";
 import { createWebhookHandler } from "../api/stripe-webhook.js";
@@ -206,6 +206,42 @@ test("resume failures propagate and never mark renewal as restored", async () =>
   let saved = false;
   await assert.rejects(resumeRenewal({ stripe, config }, { customer_id: "cus_reader" }, async () => { saved = true; }), /permission denied/);
   assert.equal(saved, false);
+});
+
+test("direct cancellation preserves access, is repeat-safe, and does not refund or cancel immediately", async () => {
+  const sub = { ...subscription("active"), id: "sub_cancel", cancel_at_period_end: false };
+  const stripe = stripeMock([sub]);
+  let updates = 0;
+  stripe.subscriptions.update = async (id, params) => {
+    updates++;
+    assert.equal(id, sub.id);
+    assert.deepEqual(params, { cancel_at_period_end: true });
+    sub.cancel_at_period_end = true;
+  };
+  let saved;
+  const save = async (value) => { saved = value; };
+  await cancelRenewal({ stripe, config }, { customer_id: "cus_reader" }, save);
+  assert.equal(saved.has_access, true);
+  assert.equal(saved.cancel_at_period_end, true);
+  await cancelRenewal({ stripe, config }, { customer_id: "cus_reader" }, save);
+  assert.equal(updates, 1);
+  sub.cancel_at_period_end = false;
+  sub.cancel_at = 1799000000;
+  await cancelRenewal({ stripe, config }, { customer_id: "cus_reader" }, save);
+  assert.equal(updates, 1);
+  assert.equal(saved.period_end, new Date(sub.cancel_at * 1000).toISOString());
+});
+
+test("direct cancellation rejects missing, unrelated, ended or ambiguous subscriptions and propagates Stripe failures", async () => {
+  for (const subscriptions of [[], [subscription("canceled")], [subscription("active", "price_other")],
+    [subscription("active"), subscription("active")]]) {
+    await assert.rejects(cancelRenewal({ stripe: stripeMock(subscriptions), config },
+      { customer_id: "cus_reader" }, async () => {}), { status: 409 });
+  }
+  const stripe = stripeMock([{ ...subscription("active"), cancel_at_period_end: false }]);
+  stripe.subscriptions.update = async () => { throw new Error("permission denied"); };
+  await assert.rejects(cancelRenewal({ stripe, config }, { customer_id: "cus_reader" },
+    async () => { assert.fail("Must not report success"); }), /permission denied/);
 });
 
 test("resuming a timestamp-scheduled cancellation only clears cancel_at", async () => {
@@ -454,5 +490,31 @@ test("resume endpoint uses the authenticated Customer and rejects cross-origin m
   assert.equal((await sql.query("select cancel_at_period_end from billing_accounts")).rows[0].cancel_at_period_end, false);
   const rejected = response();
   await handler({ method: "POST", headers: { origin: "https://evil.example" }, body: { action: "resume" } }, rejected);
+  assert.equal(rejected.code, 403);
+});
+
+test("cancel endpoint targets the authenticated account and preserves complimentary access", async () => {
+  const db = database();
+  db.auth = { getUser: async () => ({ data: { user } }) };
+  const sub = { ...subscription("active"), id: "sub_cancel_owned", cancel_at_period_end: false };
+  const stripe = stripeMock([sub]);
+  stripe.subscriptions.update = async (id, params) => {
+    assert.equal(id, "sub_cancel_owned");
+    assert.equal(params.cancel_at_period_end, true);
+    sub.cancel_at_period_end = true;
+  };
+  const res = response();
+  await createHandler(() => ({ db, stripe, config }))({
+    method: "POST", headers: { origin: config.origin, authorization: "Bearer valid" },
+    body: { action: "cancel", customer: "cus_attacker" },
+  }, res);
+  assert.equal(res.code, 200);
+  assert.deepEqual(res.body, { canceled: true });
+  assert.equal((await sql.query("select complimentary_book_lover, tier from profiles")).rows[0].complimentary_book_lover, true);
+  assert.equal((await sql.query("select tier from profiles")).rows[0].tier, "book_lover");
+  const rejected = response();
+  await createHandler(() => ({ db, stripe, config }))({
+    method: "POST", headers: { origin: "https://evil.example" }, body: { action: "cancel" },
+  }, rejected);
   assert.equal(rejected.code, 403);
 });

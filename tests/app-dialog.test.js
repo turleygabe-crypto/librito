@@ -114,3 +114,37 @@ test("resume control uses Librito confirmation and never calls a browser prompt"
   assert.equal(refreshed, true);
   assert.equal(button.disabled, false);
 });
+
+test("cancel confirmation is explicit and a successful change is not reported as failed when refresh fails", async () => {
+  const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
+  const functions = source.slice(source.indexOf("async function refreshAfterBillingChange("), source.indexOf("\nlet reminderRequest"));
+  const toasts = [];
+  let options;
+  let message;
+  let request;
+  const context = {
+    showAppConfirm: async (text, value) => {
+      message = text;
+      options = value;
+      await value.onConfirm();
+      return true;
+    },
+    billingRequest: async (body) => { request = body; },
+    showToast: (text) => toasts.push(text),
+    formatDate: () => "October 24, 2027", console: { error() {} },
+  };
+  runInNewContext(`${functions}\nthis.cancel = cancelBilling;`, context);
+  const button = { disabled: false };
+  await context.cancel(button, { periodEnd: "2027-10-24" }, false,
+    async () => { throw new Error("Refresh failed"); });
+  assert.equal(request.action, "cancel");
+  assert.equal(options.confirmLabel, "Cancel subscription");
+  assert.equal(options.cancelLabel, "Keep subscription");
+  assert.match(message, /continue until October 24, 2027/);
+  assert.match(message, /books and shelves will stay saved/);
+  assert.equal(toasts.length, 2);
+  assert.match(toasts[1], /Your change was saved/);
+  assert.equal(button.disabled, false);
+  await context.cancel(button, {}, true, async () => {});
+  assert.match(message, /complimentary Book Lover access will remain unchanged/);
+});
