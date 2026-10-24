@@ -3369,6 +3369,7 @@ function createBookAudiobookPanel(book) {
 function createProfileRecommendationSection(title, message) {
   const wrapper = document.createElement("section");
   wrapper.className = "book-profile-recommendation";
+  wrapper.dataset.status = "loading";
   const header = document.createElement("div");
   header.className = "book-profile-recommendation-heading";
   const heading = document.createElement("h2");
@@ -4990,6 +4991,7 @@ function renderProfileRecommendationResults(target, books, emptyMessage) {
   const status = target.status;
   status.remove();
   const cards = books.map((book) => ({ type: "book", book }));
+  section.dataset.status = cards.length ? "loaded" : "empty";
   if (!cards.length) {
     const message = document.createElement("p");
     message.className = "book-recommendation-status";

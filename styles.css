@@ -3780,6 +3780,13 @@ body {
   font-size: 0.82rem;
 }
 
+.edition-picker[data-status="loading"] .edition-picker-status {
+  display: flex;
+  min-height: 4.7rem;
+  align-items: center;
+  justify-content: center;
+}
+
 .edition-language-finder {
   display: flex;
   flex-wrap: wrap;
@@ -3985,6 +3992,19 @@ body {
   grid-row: 2;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.9rem;
+}
+
+.book-profile-recommendation {
+  display: flex;
+  flex-direction: column;
+}
+
+.book-profile-recommendation[data-status="loading"] .book-recommendation-status {
+  display: flex;
+  flex: 1;
+  min-height: 4.7rem;
+  align-items: center;
+  justify-content: center;
 }
 
 .book-profile-recommendation > h2 {
@@ -4861,27 +4881,27 @@ body {
 }
 
 .book-loader-mini {
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  gap: 0.55rem;
-  width: auto;
+  justify-content: center;
+  gap: 0.2rem;
+  width: 100%;
   padding: 0;
-  text-align: left;
+  text-align: center;
 }
 
 .book-loader-mini .book-loader-stage {
-  height: 2.1rem;
-  padding-top: 0.4rem;
+  height: 3.8rem;
+  padding-top: 0.8rem;
 }
 
 .book-loader-mini .book-loader-slot {
-  width: 1.2rem;
+  width: 2.4rem;
   animation-name: book-loader-bounce-mini;
 }
 
 .book-loader-mini .book-loader-message {
-  font-size: 0.78rem;
+  font-size: 0.84rem;
 }
 
 /* Three bounces per iteration. */
@@ -4892,7 +4912,7 @@ body {
 
 @keyframes book-loader-bounce-mini {
   0%, 33.333%, 66.667%, 100% { transform: translateY(0) scale(1.05, 0.93); animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1); }
-  16.667%, 50%, 83.333% { transform: translateY(-0.55rem) scale(1, 1.03); animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4); }
+  16.667%, 50%, 83.333% { transform: translateY(-0.8rem) scale(1, 1.03); animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4); }
 }
 
 @media (prefers-reduced-motion: reduce) {
