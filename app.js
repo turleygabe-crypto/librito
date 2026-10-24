@@ -3656,24 +3656,15 @@ function createBookEditionPicker(book) {
   syncLanguageMenu();
   languageMenu.append(languageTrigger, languageList, languageSelect);
   languageLabel.append(languageMenu);
-  const languageButton = document.createElement("button");
-  languageButton.type = "button";
-  languageButton.className = "secondary-btn edition-picker-button edition-language-button";
-  languageButton.textContent = "Search";
-  languageButton.disabled = true;
   languageSelect.addEventListener("change", () => {
-    languageButton.disabled = !languageSelect.value;
+    if (languageSelect.value) loadBookProfileEditionsInLanguage(book, section, languageSelect.value);
   });
-  languageButton.addEventListener("click", () =>
-    loadBookProfileEditionsInLanguage(book, section, languageSelect.value)
-  );
-  languageFinder.append(languageLabel, languageButton);
+  languageFinder.append(languageLabel);
   section.append(header, languageFinder, status, choices);
 
   loadButton.addEventListener("click", () => {
     languageSelect.value = "";
     syncLanguageMenu();
-    languageButton.disabled = true;
     loadBookProfileEditions(book, section);
   });
   section.dataset.status = "loading";
@@ -4691,6 +4682,7 @@ async function loadBookProfileEditions(book, section, knownVolumes = null) {
   const status = section.querySelector(".edition-picker-status");
   const button = section.querySelector(".edition-picker-button");
   const choices = section.querySelector(".edition-cover-choices");
+  section.languageRequestId = (section.languageRequestId || 0) + 1;
   button.disabled = true;
   setBookProfileLoadingStatus(status, "Finding available editions…");
   section.dataset.status = "loading";
@@ -4738,13 +4730,15 @@ async function loadBookProfileEditionsInLanguage(book, section, language) {
   if (!language) return;
   const status = section.querySelector(".edition-picker-status");
   const buttons = section.querySelectorAll(".edition-picker-button");
+  const requestId = (section.languageRequestId = (section.languageRequestId || 0) + 1);
+  const isCurrent = () => section.languageRequestId === requestId;
   const languageName = language === "all" ? "all-language" : getOpenLibraryLanguageName(language);
   buttons.forEach((button) => { button.disabled = true; });
   setBookProfileLoadingStatus(status, `Finding ${languageName} editions…`);
   section.dataset.status = "loading";
   try {
     const editions = await getOpenLibraryEditionsForBook(book, language);
-    if (state.view !== "book" || state.currentBook !== book || !section.isConnected) return;
+    if (!isCurrent() || state.view !== "book" || state.currentBook !== book || !section.isConnected) return;
     if (!editions.length) {
       section.querySelector(".edition-cover-choices").replaceChildren();
       status.textContent = `No ${languageName} editions with covers were found for this book. Try another language.`;
@@ -4772,14 +4766,12 @@ async function loadBookProfileEditionsInLanguage(book, section, language) {
       status.textContent = `${count} ${languageName} edition${count === 1 ? "" : "s"}. Select one to update your book.`;
     }
   } catch (error) {
+    if (!isCurrent()) return;
     console.error("Could not load editions in another language", error);
     status.textContent = `Could not search for ${languageName} editions. Try again.`;
     section.dataset.status = "error";
   } finally {
-    const languageSelect = section.querySelector(".edition-language-select");
-    buttons.forEach((button) => {
-      button.disabled = button.classList.contains("edition-language-button") && !languageSelect.value;
-    });
+    if (isCurrent()) buttons.forEach((button) => { button.disabled = false; });
   }
 }
 
@@ -6421,9 +6413,14 @@ async function initializeSupabaseOnce() {
     state.session = session;
     updateAuthButton();
 
+    let knownUserId = session?.user?.id || null;
     state.supabase.auth.onAuthStateChange((_event, session) => {
       state.session = session;
       updateAuthButton();
+      const nextUserId = session?.user?.id || null;
+      // Supabase re-emits SIGNED_IN on tab refocus and TOKEN_REFRESHED on renewal; only reload on a real user change.
+      if (nextUserId === knownUserId) return;
+      knownUserId = nextUserId;
       if (session) {
         if (sessionStorage.getItem(oauthRedirectKey) === "true") {
           authPrompted = true;
