@@ -1,4 +1,4 @@
--- Shelves can hold any book (wishlists, shopping lists, etc.) without it being in the user's library.
+-- Shelves can hold any book (wishlists, etc.) without it being in the user's library.
 create table if not exists public.shelf_items (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,

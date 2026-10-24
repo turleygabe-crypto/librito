@@ -175,6 +175,36 @@ const defaultBookMetadata = Object.fromEntries(defaultBooks.map((book) => [book.
   isbn: book.isbn,
 }]));
 
+const ACCOUNT_TIERS = {
+  lite_reader: { name: "Lite Reader", premium: false, maxBooks: 100, maxShelves: 5 },
+  book_lover: { name: "Book Lover", premium: true, maxBooks: Infinity, maxShelves: Infinity },
+};
+
+function getAccountTier() {
+  return ACCOUNT_TIERS[state.profile?.tier] || ACCOUNT_TIERS.lite_reader;
+}
+
+// The Wishlist shelf doesn't count toward the shelf limit.
+function countLimitedShelves() {
+  return state.shelves.filter((shelf) => shelf.name.trim().toLowerCase() !== "wishlist").length;
+}
+
+function checkShelfLimit(name) {
+  const tier = getAccountTier();
+  if (name.trim().toLowerCase() === "wishlist" || countLimitedShelves() < tier.maxShelves) return true;
+  showToast(`${tier.name} accounts can have up to ${tier.maxShelves} shelves. Upgrade to Book Lover for more.`);
+  navigateTo("upgrade");
+  return false;
+}
+
+function checkBookLimit() {
+  const tier = getAccountTier();
+  if (state.books.length < tier.maxBooks) return true;
+  showToast(`${tier.name} accounts can hold up to ${tier.maxBooks} books. Upgrade to Book Lover for more.`);
+  navigateTo("upgrade");
+  return false;
+}
+
 const state = {
   books: [],
   shelves: [],
@@ -407,6 +437,9 @@ function restoreRouteFromLocation() {
     case "/book":
       state.view = "book";
       renderBookRoute(params);
+      break;
+    case "/upgrade":
+      showUpgradePage();
       break;
     case "/purchase":
       showPurchasePage(params);
@@ -858,8 +891,10 @@ function createBookCover(book, className = "") {
 function updateAuthButton() {
   authButton.textContent = state.session ? "Sign out" : "Sign in";
   sidebarAuthCopy.textContent = state.session
-    ? "You're signed in. Your shelves are saved to your account."
+    ? `You're signed in with a ${getAccountTier().name} account. Your shelves are saved to your account.`
     : "Sign in to build your own shelves.";
+  const upgradeLink = document.getElementById("upgradeLink");
+  if (upgradeLink) upgradeLink.textContent = getAccountTier().premium ? "Book Lover plan" : "Upgrade to Book Lover";
   const accountName = state.session?.user?.email || "Account";
   document.querySelector(".account-menu-label").textContent = accountName;
   document.querySelector(".account-avatar").textContent = accountName.slice(0, 1).toUpperCase();
@@ -6343,6 +6378,145 @@ function showStatsPage() {
   page.append(stats);
 }
 
+const UPGRADE_PRICES = { monthly: 9.99, annual: 89.99 };
+const LITE_READER_FEATURES = [
+  "Track your reading progress",
+  "Up to 100 books in your library",
+  "Create up to 5 custom shelves",
+  "Get basic book recommendations",
+  "Access to your reading stats",
+];
+const BOOK_LOVER_FEATURES = [
+  "Everything in Lite Reader",
+  "Unlimited books and shelves",
+  "Advanced reading insights & analytics",
+  "Personalized book recommendations",
+  "Early access to new features",
+  "Exclusive reading challenges & community events",
+  "Ad-free experience",
+];
+
+function createUpgradeFeatureList(features) {
+  const list = document.createElement("ul");
+  list.className = "upgrade-features";
+  features.forEach((text) => {
+    const item = document.createElement("li");
+    item.textContent = text;
+    list.append(item);
+  });
+  return list;
+}
+
+function showUpgradePage() {
+  updateActiveNavigation("");
+  const page = showPage("upgrade");
+  page.classList.add("upgrade-page");
+  const isBookLover = getAccountTier().premium;
+  const annualSavings = Math.round((1 - UPGRADE_PRICES.annual / (UPGRADE_PRICES.monthly * 12)) * 100);
+  let billing = "annual";
+
+  const hero = document.createElement("section");
+  hero.className = "upgrade-hero";
+  const heroCopy = document.createElement("div");
+  const back = document.createElement("button");
+  back.type = "button";
+  back.className = "text-btn page-back";
+  back.textContent = "‹ Home";
+  back.addEventListener("click", () => navigateTo("home"));
+  const title = document.createElement("h1");
+  title.textContent = "Unlock a richer reading experience";
+  const intro = document.createElement("p");
+  intro.className = "page-description";
+  intro.textContent = "Upgrade to Book Lover and get more from every page — with more room for your library, deeper insights, personalized recommendations, and a more connected reading community.";
+  heroCopy.append(back, title, intro);
+  hero.append(heroCopy);
+
+  const toggle = document.createElement("div");
+  toggle.className = "upgrade-billing";
+  toggle.setAttribute("role", "group");
+  toggle.setAttribute("aria-label", "Billing period");
+  const buttons = {};
+  [["monthly", "Monthly"], ["annual", "Annual"]].forEach(([key, label]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.addEventListener("click", () => {
+      billing = key;
+      updateBilling();
+    });
+    buttons[key] = button;
+    toggle.append(button);
+  });
+  const saveBadge = document.createElement("span");
+  saveBadge.className = "upgrade-badge";
+  saveBadge.textContent = `Save ${annualSavings}%`;
+  toggle.append(saveBadge);
+
+  const plans = document.createElement("div");
+  plans.className = "upgrade-plans";
+
+  const lite = document.createElement("article");
+  lite.className = "upgrade-plan";
+  const liteName = document.createElement("h2");
+  liteName.textContent = "Lite Reader";
+  const litePrice = document.createElement("p");
+  litePrice.className = "upgrade-price";
+  litePrice.textContent = "Free";
+  const liteCopy = document.createElement("p");
+  liteCopy.textContent = "A great way to get started. Track your reading, explore new books, and build your library.";
+  const liteStatus = document.createElement("button");
+  liteStatus.type = "button";
+  liteStatus.className = "upgrade-cta is-current";
+  liteStatus.disabled = true;
+  liteStatus.textContent = isBookLover ? "Free plan" : "Your current plan";
+  lite.append(liteName, litePrice, liteCopy, createUpgradeFeatureList(LITE_READER_FEATURES), liteStatus);
+
+  const premium = document.createElement("article");
+  premium.className = "upgrade-plan is-featured";
+  const premiumName = document.createElement("h2");
+  premiumName.textContent = "Book Lover";
+  const premiumPrice = document.createElement("p");
+  premiumPrice.className = "upgrade-price";
+  const premiumCopy = document.createElement("p");
+  premiumCopy.textContent = "For readers who want more. Go deeper with personalized insights, exclusive features, and a richer reading community.";
+  const cta = document.createElement("button");
+  cta.type = "button";
+  cta.className = "upgrade-cta";
+  if (isBookLover) {
+    cta.textContent = "Your current plan";
+    cta.classList.add("is-current");
+    cta.disabled = true;
+  } else {
+    cta.addEventListener("click", () => {
+      if (!state.session) {
+        showToast("Sign in to upgrade.");
+        openAuthModal();
+        return;
+      }
+      showToast("Online payments are coming soon. Book Lover isn't available to purchase yet.");
+    });
+  }
+  premium.append(premiumName, premiumPrice, premiumCopy, createUpgradeFeatureList(BOOK_LOVER_FEATURES), cta);
+
+  function updateBilling() {
+    Object.entries(buttons).forEach(([key, button]) => {
+      button.classList.toggle("active", key === billing);
+      button.setAttribute("aria-pressed", String(key === billing));
+    });
+    premiumPrice.textContent = billing === "annual"
+      ? `${formatCurrency(UPGRADE_PRICES.annual)} / year`
+      : `${formatCurrency(UPGRADE_PRICES.monthly)} / month`;
+    if (!isBookLover) cta.textContent = "Upgrade to Book Lover";
+  }
+  updateBilling();
+
+  plans.append(lite, premium);
+  const tagline = document.createElement("p");
+  tagline.className = "upgrade-tagline";
+  tagline.textContent = "More books. More insights. A more connected you.";
+  page.append(hero, toggle, plans, tagline);
+}
+
 function showPurchasePage(params = new URLSearchParams(window.location.hash.split("?")[1] || "")) {
   updateActiveNavigation("");
   const title = params.get("title") || "";
@@ -7130,6 +7304,7 @@ async function ensureProfile(displayName = "") {
     return;
   }
   state.profile = data;
+  updateAuthButton();
 }
 
 async function loadShelvesFromSupabase() {
@@ -7165,6 +7340,7 @@ async function createShelfInSupabase() {
     showToast("A shelf with that name already exists.");
     return;
   }
+  if (!checkShelfLimit(name)) return;
   if (!state.session || !state.supabase) {
     const shelf = {
       id: `local:${crypto.randomUUID()}`,
@@ -7203,7 +7379,7 @@ async function createShelfInSupabase() {
 
   if (error) {
     console.error(error);
-    showToast("Could not create shelf.");
+    showToast(error.message?.includes("limited to") ? error.message : "Could not create shelf.");
     return;
   }
 
@@ -7294,6 +7470,7 @@ async function saveBookToSupabase(book) {
     showToast("Your account connection is unavailable. The book was not saved; try again.");
     return false;
   }
+  if (!checkBookLimit()) return false;
 
   const payload = {
     id: book.id,

@@ -5,8 +5,11 @@ create table if not exists public.profiles (
   email text unique,
   full_name text,
   favorite_shelf text,
+  tier text not null default 'lite_reader' check (tier in ('lite_reader', 'book_lover')),
   created_at timestamptz default now()
 );
+
+alter table public.profiles add column if not exists tier text not null default 'lite_reader';
 
 create table if not exists public.books (
   id uuid primary key default uuid_generate_v4(),
@@ -208,5 +211,6 @@ on conflict (book_id, shelf_id) do nothing;
 alter table public.profiles enable row level security;
 -- See migrations/20261023140000_profiles_rls.sql for profiles policies.
 
--- Shelf items: books saved to a shelf without being in the library (wishlists, shopping lists).
+-- Shelf items: books saved to a shelf without being in the library (wishlists).
 -- See migrations/20261024180000_shelf_items.sql.
+-- Lite Reader book/shelf limits: see migrations/20261024200000_lite_reader_limits.sql.

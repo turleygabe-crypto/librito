@@ -5681,3 +5681,91 @@ body {
 .book-detail-content .reading-actions > .book-reading-progress {
   flex: 1 1 100%;
 }
+
+/* Upgrade page */
+.upgrade-hero {
+  padding: 1.5rem;
+  border-radius: 1rem;
+  background: linear-gradient(120deg, #fffaf3 40%, #ecd9c3);
+  color: var(--ink);
+}
+.upgrade-hero h1 { max-width: 14ch; }
+.upgrade-billing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  margin: 1.5rem 0;
+}
+.upgrade-billing button {
+  padding: 0.6rem 1.6rem;
+  border: 1px solid #e3d6c8;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+}
+.upgrade-billing button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.upgrade-badge {
+  margin-left: 0.5rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: #f8e3d6;
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.upgrade-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+}
+.upgrade-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  border: 1px solid #e3d6c8;
+  border-radius: 1rem;
+  background: var(--panel);
+  color: var(--ink);
+}
+.upgrade-plan.is-featured { border-color: var(--accent); }
+.upgrade-plan h2 { margin: 0; font-family: Georgia, serif; }
+.upgrade-plan p { margin: 0; }
+.upgrade-price { font-weight: 700; }
+.upgrade-features {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.5rem;
+}
+.upgrade-features li::before {
+  content: "✓";
+  margin-right: 0.6rem;
+  color: var(--accent);
+  font-weight: 700;
+}
+.upgrade-cta {
+  padding: 0.85rem 1rem;
+  border: 0;
+  border-radius: 0.6rem;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+.upgrade-cta.is-current {
+  background: #ece5dc;
+  color: var(--muted);
+  cursor: default;
+}
+.upgrade-tagline {
+  margin: 1.5rem 0 0;
+  text-align: center;
+  color: var(--muted);
+}
