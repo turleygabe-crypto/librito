@@ -4674,13 +4674,13 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 0.7rem 0.8rem;
-  border: 1px solid rgba(240, 165, 111, 0.32);
+  border: 1px solid rgba(245, 221, 201, 0.12);
   border-radius: 0.65rem;
-  background: #43271e;
-  color: #fff4e9;
+  background: rgba(245, 221, 201, 0.045);
+  color: #f2dfd1;
   font-family: inherit;
-  font-size: 1.08rem;
-  font-weight: 700;
+  font-size: 1.02rem;
+  font-weight: 600;
   letter-spacing: normal;
   line-height: 1.25;
   text-align: left;
@@ -4689,22 +4689,22 @@ body {
 }
 
 .library-heading-btn::after {
-  color: #f0a56f;
+  color: #c6a58e;
   content: "→";
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   line-height: 1;
 }
 
 .library-heading-btn:hover,
 .library-heading-btn.active {
-  border-color: #d99463;
-  background: #5a3325;
-  color: #fff;
+  border-color: rgba(245, 221, 201, 0.2);
+  background: #38251e;
+  color: #fff4e9;
 }
 
 .library-heading-btn:hover::after,
 .library-heading-btn.active::after {
-  color: #ffd0a8;
+  color: #e5b58f;
 }
 
 .library-toolbar {
