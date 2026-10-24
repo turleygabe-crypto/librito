@@ -378,6 +378,9 @@ function restoreRouteFromLocation() {
     case "/suggested-shelf":
       showSuggestedShelfPage(params.get("key") || "");
       break;
+    case "/list":
+      showCardListPage(params.get("key") || "");
+      break;
     case "/genre":
       showGenrePage(params.get("name") || "", params.get("sort") || "", Math.max(1, Number(params.get("page")) || 1), Number(params.get("size")) || 0, {
         year: params.get("year") || "",
@@ -1644,6 +1647,36 @@ function buildSuggestedShelves(genres, recommendations, authorRecommendations = 
   }));
 }
 
+const cardRowRegistry = new Map();
+
+function createRowCard(cardData, compact = false) {
+  return cardData.type === "shelf" || cardData.type === "suggested-shelf"
+    ? createShelfCard(cardData, { compact })
+    : cardData.type === "genre"
+      ? createGenreCard(cardData)
+      : createBookCard(cardData.book, {
+        compact: cardData.type === "compact-book",
+        subtitle: cardData.subtitle,
+        recommendation: cardData.recommendation,
+      });
+}
+
+function showCardListPage(key) {
+  const list = cardRowRegistry.get(key);
+  if (!list) {
+    window.history.replaceState(null, "", window.location.pathname);
+    showHomePage();
+    return;
+  }
+  const page = showPage("list");
+  updateActiveNavigation("Home");
+  page.append(createPageHeader("Home", list.title));
+  const grid = document.createElement("div");
+  grid.className = "card-row expanded genre-browse-grid";
+  list.cards.forEach((cardData) => grid.append(createRowCard(cardData, list.compact)));
+  page.append(grid);
+}
+
 function createCardRow(title, cards, {
   compact = false,
   emptyMessage = "",
@@ -1661,7 +1694,7 @@ function createCardRow(title, cards, {
   showAll.type = "button";
   showAll.className = "text-btn show-all-btn";
   showAll.textContent = "See all";
-  showAll.setAttribute("aria-expanded", "false");
+  const listKey = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   heading.append(headingTitle, showAll);
 
   const row = document.createElement("div");
@@ -1691,24 +1724,13 @@ function createCardRow(title, cards, {
       row.append(action);
     }
   } else {
-    cards.forEach((cardData) => row.append(
-      cardData.type === "shelf" || cardData.type === "suggested-shelf"
-        ? createShelfCard(cardData, { compact })
-        : cardData.type === "genre"
-          ? createGenreCard(cardData)
-          : createBookCard(cardData.book, {
-            compact: cardData.type === "compact-book",
-            subtitle: cardData.subtitle,
-            recommendation: cardData.recommendation,
-          })
-    ));
+    cards.forEach((cardData) => row.append(createRowCard(cardData, compact)));
   }
 
   showAll.hidden = cards.length <= 5;
   showAll.addEventListener("click", () => {
-    const expanded = row.classList.toggle("expanded");
-    showAll.setAttribute("aria-expanded", String(expanded));
-    showAll.textContent = expanded ? "Show less" : "See all";
+    cardRowRegistry.set(listKey, { title, cards, compact });
+    navigateTo("list", { key: listKey });
   });
   const wrap = document.createElement("div");
   wrap.className = "card-row-wrap";
@@ -1731,7 +1753,6 @@ function createCardRow(title, cards, {
     next.hidden = !scrollable || row.scrollLeft + row.clientWidth >= row.scrollWidth - 4;
   };
   row.addEventListener("scroll", updateArrows, { passive: true });
-  showAll.addEventListener("click", updateArrows);
   window.addEventListener("resize", updateArrows);
   window.requestAnimationFrame(updateArrows);
   window.setTimeout(updateArrows, 600);
