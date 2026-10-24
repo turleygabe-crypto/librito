@@ -376,19 +376,6 @@ h1, h2, h3, h4, p { margin-top: 0; }
   transform-origin: left center;
 }
 
-.add-book-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  flex: 0 0 auto;
-  border: 1px solid rgba(245, 221, 201, 0.18);
-  border-radius: 999px;
-  padding: 0.6rem 0.9rem;
-  background: transparent;
-  color: #f7e8de;
-}
-
 .account-menu {
   position: relative;
   flex: 0 0 auto;
@@ -612,20 +599,6 @@ h1, h2, h3, h4, p { margin-top: 0; }
   }
 
   .home-button {
-    display: none;
-  }
-
-  .add-book-btn {
-    width: 2.35rem;
-    height: 2.35rem;
-    padding: 0;
-    border-radius: 50%;
-    background: #34231d;
-    color: #fff7f0;
-    font-size: 1.5rem;
-  }
-
-  .add-book-label {
     display: none;
   }
 
@@ -2301,17 +2274,6 @@ body {
   background: rgba(63, 46, 35, 0.08);
 }
 
-.add-book-btn {
-  min-height: 2.35rem;
-  border: 0;
-  border-radius: 0.45rem;
-  padding: 0.5rem 0.9rem;
-  background: #a94729;
-  color: #fffaf5;
-  font-size: 0.86rem;
-}
-
-.add-book-btn:hover,
 .home-hero .action-btn:hover {
   background: #913b22;
 }

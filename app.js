@@ -214,7 +214,6 @@ const discoveryBooks = [
 
 const bookForm = document.getElementById("bookForm");
 const dialogOverlay = document.getElementById("dialogOverlay");
-const openModalBtn = document.getElementById("openModalBtn");
 const closeDialogBtn = document.getElementById("closeDialogBtn");
 const bookEntryChoice = document.getElementById("bookEntryChoice");
 const lookupBookOptionBtn = document.getElementById("lookupBookOptionBtn");
@@ -6873,10 +6872,6 @@ document.addEventListener("keydown", (event) => {
       first.focus();
     }
   }
-});
-
-openModalBtn.addEventListener("click", () => {
-  openDialog();
 });
 
 lookupBookOptionBtn.addEventListener("click", () => {
