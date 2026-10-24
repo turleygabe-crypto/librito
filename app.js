@@ -184,7 +184,7 @@ const state = {
   searchResults: null,
   searchLanguage: "default",
   searchPage: 1,
-  searchSort: "relevance",
+  searchSort: "",
   searchFilters: {},
   searchMessage: "",
   searchLoading: false,
@@ -2329,12 +2329,12 @@ async function fetchOpenLibrarySearch(params, timeout = 15000) {
 }
 
 const browseSortOptions = [
-  ["relevance", "Most relevant", ""],
-  ["new", "Newest", "new"],
-  ["", "Popular", "readinglog"],
+  ["", "Most relevant", ""],
+  ["popular", "Popular", "readinglog"],
+  ["new", "Newest to oldest", "new"],
+  ["old", "Oldest to newest", "old"],
   ["rating", "Top rated", "rating"],
-  ["old", "Oldest", "old"],
-  ["title", "Title A–Z", "title"],
+  ["title", "Title: A to Z", "title"],
 ];
 const browseFilterGroups = [
   { key: "year", label: "Published", options: [
@@ -2380,7 +2380,7 @@ function applyBrowseControls(books, sort, filters) {
     new: (a, b) => (b.first_publish_year || 0) - (a.first_publish_year || 0),
     old: (a, b) => (a.first_publish_year || 9999) - (b.first_publish_year || 9999),
     rating: (a, b) => (b.ratings_average || 0) - (a.ratings_average || 0),
-    "": (a, b) => (b.popularity || 0) - (a.popularity || 0),
+    popular: (a, b) => (b.popularity || 0) - (a.popularity || 0),
     title: (a, b) => String(a.title || "").localeCompare(String(b.title || "")),
   }[sort];
   return compare ? [...visible].sort(compare) : visible;
@@ -5486,7 +5486,7 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
   const languageName = selectedLanguage ? getOpenLibraryLanguageName(selectedLanguage) : "any language";
   if (state.searchQuery !== query.trim()) {
     state.searchPage = 1;
-    state.searchSort = "relevance";
+    state.searchSort = "";
     state.searchFilters = {};
   }
   state.searchQuery = query.trim();

@@ -5047,8 +5047,10 @@ body {
   border: 1px solid rgba(60, 40, 30, 0.3);
   border-radius: 8px;
   background: transparent;
-  color: inherit;
+  color: #a9421c;
   font: inherit;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .browse-toggle {
