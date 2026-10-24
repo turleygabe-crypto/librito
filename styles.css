@@ -5309,3 +5309,110 @@ body {
 .browse-leading .library-search {
   flex: 0 1 16rem;
 }
+
+/* Like button sits on the cover's top-left corner so it never covers the title. */
+.card-like {
+  top: 0.7rem;
+  bottom: auto;
+  left: 0.7rem;
+  width: 2rem;
+  height: 2rem;
+  font-size: 1.1rem;
+}
+
+.compact-book-card .card-like {
+  top: 0.6rem;
+  bottom: auto;
+}
+
+@media (max-width: 700px) {
+  .global-search {
+    flex-basis: 0;
+    min-width: 0;
+  }
+
+  .global-search input {
+    min-width: 0;
+    text-overflow: ellipsis;
+  }
+
+  .global-search .edition-language-trigger {
+    max-width: 4.5rem;
+    padding: 0.25rem 0.55rem;
+  }
+
+  .page-view h1 {
+    overflow-wrap: anywhere;
+  }
+
+  .paging-bar {
+    justify-content: space-between;
+    gap: 0.5rem 0.75rem;
+    margin: 0.6rem 0;
+  }
+
+  .paging-leading,
+  .browse-leading {
+    flex: 1 1 100%;
+    margin-right: 0;
+  }
+
+  .browse-leading {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .browse-leading .library-search {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .browse-popover {
+    width: 100%;
+    border-radius: 14px;
+  }
+
+  .browse-popover .browse-bar-main {
+    justify-content: space-between;
+    padding: 0.35rem;
+  }
+
+  .browse-popover .browse-toggle {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .browse-popover .browse-panel {
+    width: auto;
+    right: 0;
+    max-width: none;
+  }
+
+  .genre-pager {
+    gap: 0.3rem;
+  }
+
+  .genre-summary {
+    margin-bottom: 0.2rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .home-hero {
+    aspect-ratio: auto;
+    align-items: flex-end;
+    background-image:
+      linear-gradient(180deg, rgba(50, 25, 14, 0) 0%, rgba(50, 25, 14, 0) 22%, #32190e 58%),
+      url("/cozy%20banner%20librito.png");
+    background-position: center, center top;
+    background-size: 100% 100%, 100% auto;
+  }
+
+  .home-hero-copy {
+    width: 100%;
+    padding: 6.5rem 1rem 1rem;
+  }
+}
