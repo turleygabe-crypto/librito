@@ -1317,7 +1317,7 @@ async function fetchOpenLibraryRecommendations({ genre = "", author = "" }) {
   });
   const fetchWorks = (offset) => runOpenLibraryTask(async () => {
     const params = new URLSearchParams({
-      q: `${query} language:${getDefaultBookLanguage()}`,
+      q: author ? query : `${query} language:${getDefaultBookLanguage()}`,
       fields: "key,title,author_name,isbn,cover_i,subject,number_of_pages_median,first_publish_year",
       limit: "40",
       offset: String(offset),
@@ -1337,8 +1337,25 @@ async function fetchOpenLibraryRecommendations({ genre = "", author = "" }) {
     throw lastError;
   });
   const offset = Math.floor(Math.random() * 5) * 40;
-  const matches = mapWorks(await fetchWorks(offset));
-  return matches.length || !offset ? matches : mapWorks(await fetchWorks(0));
+  let matches = [];
+  let openLibraryError;
+  try {
+    matches = mapWorks(await fetchWorks(offset));
+    if (!matches.length && offset) matches = mapWorks(await fetchWorks(0));
+  } catch (error) {
+    openLibraryError = error;
+  }
+  if (matches.length || !author) {
+    if (openLibraryError) throw openLibraryError;
+    return matches;
+  }
+  // Author rows go empty when Open Library is slow or misses the author, so fall back to Google Books.
+  try {
+    const { books } = await fetchGoogleCatalogBooks(`inauthor:${JSON.stringify(author)}`, { language: getDefaultBookLanguage() });
+    return books.filter((book) => (book.author_name || []).some((name) => normalizeBookText(name) === normalizedAuthor));
+  } catch (error) {
+    throw openLibraryError || error;
+  }
 }
 
 async function ensureHomeRecommendations(libraryBooks) {
