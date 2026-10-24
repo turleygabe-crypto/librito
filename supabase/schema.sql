@@ -45,6 +45,7 @@ create table if not exists public.shelves (
   user_id uuid references public.profiles(id) on delete cascade,
   name text not null,
   color text default '#8b5e3c',
+  is_wishlist boolean not null default false,
   created_at timestamptz default now()
 );
 
@@ -213,4 +214,6 @@ alter table public.profiles enable row level security;
 
 -- Shelf items: books saved to a shelf without being in the library (wishlists).
 -- See migrations/20261024180000_shelf_items.sql.
+-- Built-in Wishlist shelf: see migrations/20261024240000_builtin_wishlist_shelf.sql.
 -- Lite Reader book/shelf limits: see migrations/20261024200000_lite_reader_limits.sql.
+-- Lite Reader Currently Reading limit: see migrations/20261024210000_lite_reader_reading_limit.sql.

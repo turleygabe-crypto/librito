@@ -176,8 +176,8 @@ const defaultBookMetadata = Object.fromEntries(defaultBooks.map((book) => [book.
 }]));
 
 const ACCOUNT_TIERS = {
-  lite_reader: { name: "Lite Reader", premium: false, maxBooks: 100, maxShelves: 5 },
-  book_lover: { name: "Book Lover", premium: true, maxBooks: Infinity, maxShelves: Infinity },
+  lite_reader: { name: "Lite Reader", premium: false, maxBooks: 100, maxShelves: 5, maxReading: 5 },
+  book_lover: { name: "Book Lover", premium: true, maxBooks: Infinity, maxShelves: Infinity, maxReading: Infinity },
 };
 
 function getAccountTier() {
@@ -186,13 +186,34 @@ function getAccountTier() {
 
 // The Wishlist shelf doesn't count toward the shelf limit.
 function countLimitedShelves() {
-  return state.shelves.filter((shelf) => shelf.name.trim().toLowerCase() !== "wishlist").length;
+  return state.shelves.filter((shelf) => !shelf.is_wishlist).length;
+}
+
+// Wishlist is built in: every user always has it, and it can't be renamed, deleted or recreated.
+function isReservedShelfName(name) {
+  return name.trim().toLowerCase() === "wishlist";
+}
+
+function withWishlistShelf(shelves) {
+  const list = Array.isArray(shelves) ? shelves : [];
+  const wishlist = list.find((shelf) => shelf.is_wishlist)
+    || { id: "local:wishlist", name: "Wishlist", color: "#b64d2c", is_wishlist: true };
+  return [wishlist, ...list.filter((shelf) => shelf !== wishlist && !isReservedShelfName(shelf.name))];
 }
 
 function checkShelfLimit(name) {
   const tier = getAccountTier();
-  if (name.trim().toLowerCase() === "wishlist" || countLimitedShelves() < tier.maxShelves) return true;
+  if (countLimitedShelves() < tier.maxShelves) return true;
   showToast(`${tier.name} accounts can have up to ${tier.maxShelves} shelves. Upgrade to Book Lover for more.`);
+  navigateTo("upgrade");
+  return false;
+}
+
+function checkReadingLimit(book) {
+  const tier = getAccountTier();
+  const reading = state.books.filter((item) => item.reading_status === "reading" && !item.disposition && item !== book).length;
+  if (reading < tier.maxReading) return true;
+  showToast(`${tier.name} accounts can have up to ${tier.maxReading} books in Currently Reading. Upgrade to Book Lover for more.`);
   navigateTo("upgrade");
   return false;
 }
@@ -466,14 +487,14 @@ function loadLocalShelves() {
     const saved = localStorage.getItem(shelvesStorageKey);
     if (saved) {
       const shelves = JSON.parse(saved);
-      if (Array.isArray(shelves)) return shelves;
+      if (Array.isArray(shelves)) return withWishlistShelf(shelves);
       throw new TypeError("Saved shelves must be an array.");
     }
   } catch (error) {
     console.warn("Could not read saved shelves", error);
   }
-  return [...new Set(state.books.flatMap((book) => getBookShelfNames(book)))]
-    .map((name) => ({ id: `local:${name}`, name, color: "#8b5e3c" }));
+  return withWishlistShelf([...new Set(state.books.flatMap((book) => getBookShelfNames(book)))]
+    .map((name) => ({ id: `local:${name}`, name, color: "#8b5e3c" })));
 }
 
 function getLibraryBooks() {
@@ -539,6 +560,10 @@ async function runBookSchemaRetry(operation, payload) {
 
 async function updateBookFields(book, fields) {
   const updatedFields = { ...fields };
+  const willBeReading = (updatedFields.reading_status ?? book.reading_status) === "reading"
+    && !(updatedFields.disposition ?? book.disposition);
+  const isReading = book.reading_status === "reading" && !book.disposition;
+  if (willBeReading && !isReading && !checkReadingLimit(book)) return false;
   if (("current_page" in updatedFields || "page_count" in updatedFields || "reading_status" in updatedFields)
     && !("edition_progress" in updatedFields)) {
     const progress = { ...(book.edition_progress || {}) };
@@ -756,7 +781,8 @@ async function removeBookFromLibrary(book) {
 
 async function renameShelf(shelf, name) {
   if (!name
-    || ["currently reading", "completed books"].includes(name.toLowerCase())
+    || shelf.is_wishlist
+    || ["currently reading", "completed books", "wishlist"].includes(name.toLowerCase())
     || state.shelves.some((item) => item.id !== shelf.id && item.name.toLowerCase() === name.toLowerCase())) {
     showToast("Choose a unique shelf name.");
     return;
@@ -788,6 +814,7 @@ async function renameShelf(shelf, name) {
 }
 
 async function deleteShelf(shelf) {
+  if (shelf.is_wishlist) return;
   if (state.supabase && state.session) {
     const { error: booksError } = await state.supabase.from("books")
       .update({ shelf: null })
@@ -3262,7 +3289,7 @@ function showShelfPage(shelfName) {
   addBook.textContent = "＋ Add a book";
   addBook.addEventListener("click", openDialog);
   toolbar.append(addBook);
-  if (shelf && state.session) {
+  if (shelf && state.session && !shelf.is_wishlist) {
     const rename = document.createElement("button");
     rename.type = "button";
     rename.className = "secondary-btn";
@@ -6482,6 +6509,7 @@ const UPGRADE_PRICES = { monthly: 2.99, annual: 24.99 };
 const LITE_READER_FEATURES = [
   "Up to 100 books in your library",
   "Up to 5 custom shelves",
+  "Up to 5 books in Currently Reading",
   "Library, Liked Books & Wishlist always included",
   "Track your reading progress",
   "Access to your library stats",
@@ -6490,6 +6518,7 @@ const BOOK_LOVER_FEATURES = [
   "Everything in Lite Reader",
   "Unlimited books",
   "Unlimited shelves",
+  "Unlimited Currently Reading books",
   "Export insurance-ready library reports (CSV & printable PDF)",
   "Early access to new features",
   "Support the future of Librito",
@@ -7423,7 +7452,7 @@ async function loadShelvesFromSupabase() {
     showToast("Could not load your shelves.");
     return;
   }
-  state.shelves = data || [];
+  state.shelves = [...(data || [])].sort((a, b) => Number(Boolean(b.is_wishlist)) - Number(Boolean(a.is_wishlist)));
   const { data: items, error: itemsError } = await state.supabase.from("shelf_items").select("*");
   if (itemsError) {
     console.error(itemsError);
@@ -7440,8 +7469,8 @@ async function createShelfInSupabase() {
     showToast("Name your shelf first.");
     return;
   }
-  if (["currently reading", "completed books"].includes(name.toLowerCase())) {
-    showToast(`${name} is a generated shelf. Choose another name.`);
+  if (["currently reading", "completed books", "wishlist"].includes(name.toLowerCase())) {
+    showToast(`${name} is a built-in shelf. Choose another name.`);
     return;
   }
   if (state.shelves.some((shelf) => shelf.name.toLowerCase() === name.toLowerCase())) {
@@ -7579,6 +7608,7 @@ async function saveBookToSupabase(book) {
     return false;
   }
   if (!checkBookLimit()) return false;
+  if (book.reading_status === "reading" && !checkReadingLimit(book)) return false;
 
   const payload = {
     id: book.id,
