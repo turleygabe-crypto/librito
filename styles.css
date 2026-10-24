@@ -4817,7 +4817,7 @@ body {
   width: 5.2rem;
   aspect-ratio: 2 / 3;
   transform-origin: 50% 100%;
-  animation: book-loader-bounce 1.6s linear infinite;
+  animation: book-loader-bounce 2.4s linear infinite;
 }
 
 .book-loader-slot .book-loader-art {
@@ -4860,10 +4860,10 @@ body {
   width: 3.6rem;
 }
 
-/* Two bounces per iteration. */
+/* Three bounces per iteration. */
 @keyframes book-loader-bounce {
-  0%, 50%, 100% { transform: translateY(0) scale(1.05, 0.93); animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1); }
-  25%, 75% { transform: translateY(-1.8rem) scale(1, 1.03); animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4); }
+  0%, 33.333%, 66.667%, 100% { transform: translateY(0) scale(1.05, 0.93); animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1); }
+  16.667%, 50%, 83.333% { transform: translateY(-1.8rem) scale(1, 1.03); animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4); }
 }
 
 @media (prefers-reduced-motion: reduce) {

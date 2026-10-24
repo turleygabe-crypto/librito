@@ -4725,7 +4725,7 @@ function createBookLoader({ message = "Loading…", compact = false } = {}) {
     text.textContent = lastPhrase;
   };
   showNext();
-  // Each animation iteration is two bounces; swap the book when it ends.
+  // Each animation iteration is three bounces; swap the book when it ends.
   slot.addEventListener("animationiteration", () => {
     if (!loader.isConnected) return;
     showNext();
