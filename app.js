@@ -6375,25 +6375,124 @@ function showStatsPage() {
     card.append(name, total);
     stats.append(card);
   });
-  page.append(stats);
+  page.append(stats, createLibraryExportCard(libraryBooks));
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+}
+
+function escapeCsv(value) {
+  const text = String(value ?? "");
+  // Prefix formula-like values so spreadsheets don't execute them.
+  const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  return `"${safe.replace(/"/g, '""')}"`;
+}
+
+function getLibraryReportRows(books) {
+  return books.map((book) => ({
+    title: book.title || "",
+    author: book.author || "",
+    isbn: book.isbn || "",
+    genre: book.genre || "",
+    pages: book.page_count || "",
+    shelves: getBookShelfNames(book).join("; "),
+    added: book.added || "",
+    cost: Number(book.cost || 0),
+  }));
+}
+
+function exportLibraryCsv(books) {
+  const rows = getLibraryReportRows(books);
+  const header = ["Title", "Author", "ISBN", "Genre", "Pages", "Shelves", "Date added", "Purchase price (USD)"];
+  const lines = [header, ...rows.map((row) => [row.title, row.author, row.isbn, row.genre, row.pages, row.shelves, row.added, row.cost.toFixed(2)])]
+    .map((line) => line.map(escapeCsv).join(","));
+  const total = rows.reduce((sum, row) => sum + row.cost, 0);
+  lines.push(["", "", "", "", "", "", "Total", total.toFixed(2)].map(escapeCsv).join(","));
+  const url = URL.createObjectURL(new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `librito-library-report-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function printLibraryReport(books) {
+  const rows = getLibraryReportRows(books);
+  const total = rows.reduce((sum, row) => sum + row.cost, 0);
+  const owner = escapeHtml(state.profile?.full_name || state.session?.user?.email || "");
+  const date = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  const body = rows.map((row) => `<tr><td>${escapeHtml(row.title)}</td><td>${escapeHtml(row.author)}</td><td>${escapeHtml(row.isbn)}</td><td>${escapeHtml(row.added)}</td><td class="num">${escapeHtml(formatCurrency(row.cost))}</td></tr>`).join("");
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Librito library report</title>
+<style>body{font-family:Georgia,serif;color:#222;margin:2rem}h1{margin:0 0 .25rem}p{margin:.2rem 0;color:#555}table{width:100%;border-collapse:collapse;margin-top:1.5rem;font-size:.85rem}th,td{border-bottom:1px solid #ccc;padding:.4rem;text-align:left}th{background:#f3ece3}.num{text-align:right}tfoot td{font-weight:700;border-top:2px solid #222}</style></head><body>
+<h1>Library inventory report</h1><p>Prepared for ${owner}</p><p>Generated ${escapeHtml(date)} by Librito</p><p>${rows.length} book${rows.length === 1 ? "" : "s"} &middot; Total purchase value ${escapeHtml(formatCurrency(total))}</p>
+<table><thead><tr><th>Title</th><th>Author</th><th>ISBN</th><th>Date added</th><th class="num">Purchase price</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td colspan="4">Total</td><td class="num">${escapeHtml(formatCurrency(total))}</td></tr></tfoot></table>
+<p style="margin-top:1.5rem;font-size:.75rem">Values are the purchase prices recorded in Librito and may not reflect current replacement value.</p>
+<script>window.onload=function(){window.print()}<\/script></body></html>`;
+  const win = window.open("", "_blank");
+  if (!win) {
+    showToast("Allow pop-ups to print your report.");
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
+}
+
+function createLibraryExportCard(books) {
+  const premium = getAccountTier().premium;
+  const card = document.createElement("section");
+  card.className = "export-card";
+  const heading = document.createElement("h2");
+  heading.textContent = "Library report";
+  const badge = document.createElement("span");
+  badge.className = "upgrade-badge";
+  badge.textContent = "Book Lover";
+  heading.append(badge);
+  const copy = document.createElement("p");
+  copy.textContent = "Export an itemized list of your books with ISBNs, dates added and purchase prices. It's handy for insurance claims, moving, or estate planning.";
+  const actions = document.createElement("div");
+  actions.className = "export-actions";
+  if (premium) {
+    const csv = document.createElement("button");
+    csv.type = "button";
+    csv.className = "action-btn";
+    csv.textContent = "Download CSV";
+    csv.addEventListener("click", () => exportLibraryCsv(books));
+    const print = document.createElement("button");
+    print.type = "button";
+    print.className = "action-btn";
+    print.textContent = "Print / save as PDF";
+    print.addEventListener("click", () => printLibraryReport(books));
+    actions.append(csv, print);
+  } else {
+    const upgrade = document.createElement("button");
+    upgrade.type = "button";
+    upgrade.className = "action-btn";
+    upgrade.textContent = "Upgrade to unlock";
+    upgrade.addEventListener("click", () => navigateTo("upgrade"));
+    actions.append(upgrade);
+  }
+  card.append(heading, copy, actions);
+  return card;
 }
 
 const UPGRADE_PRICES = { monthly: 9.99, annual: 89.99 };
 const LITE_READER_FEATURES = [
-  "Track your reading progress",
   "Up to 100 books in your library",
-  "Create up to 5 custom shelves",
-  "Get basic book recommendations",
-  "Access to your reading stats",
+  "Up to 5 custom shelves",
+  "Library, Liked Books & Wishlist always included",
+  "Track your reading progress",
+  "Access to your library stats",
 ];
 const BOOK_LOVER_FEATURES = [
   "Everything in Lite Reader",
-  "Unlimited books and shelves",
-  "Advanced reading insights & analytics",
-  "Personalized book recommendations",
+  "Unlimited books",
+  "Unlimited shelves",
+  "Export insurance-ready library reports (CSV & printable PDF)",
   "Early access to new features",
-  "Exclusive reading challenges & community events",
-  "Ad-free experience",
+  "Support the future of Librito",
 ];
 
 function createUpgradeFeatureList(features) {
@@ -6416,8 +6515,9 @@ function showUpgradePage() {
   let billing = "annual";
 
   const hero = document.createElement("section");
-  hero.className = "upgrade-hero";
+  hero.className = "home-hero upgrade-hero";
   const heroCopy = document.createElement("div");
+  heroCopy.className = "home-hero-copy";
   const back = document.createElement("button");
   back.type = "button";
   back.className = "text-btn page-back";
@@ -6427,7 +6527,8 @@ function showUpgradePage() {
   title.textContent = "Unlock a richer reading experience";
   const intro = document.createElement("p");
   intro.className = "page-description";
-  intro.textContent = "Upgrade to Book Lover and get more from every page — with more room for your library, deeper insights, personalized recommendations, and a more connected reading community.";
+  intro.textContent = "Go further with Book Lover: unlimited books and shelves, plus insurance-ready reports of your collection.";
+  back.classList.add("upgrade-back");
   heroCopy.append(back, title, intro);
   hero.append(heroCopy);
 
@@ -6463,7 +6564,7 @@ function showUpgradePage() {
   litePrice.className = "upgrade-price";
   litePrice.textContent = "Free";
   const liteCopy = document.createElement("p");
-  liteCopy.textContent = "A great way to get started. Track your reading, explore new books, and build your library.";
+  liteCopy.textContent = "A great way to get started. Build your library and keep track of what you read.";
   const liteStatus = document.createElement("button");
   liteStatus.type = "button";
   liteStatus.className = "upgrade-cta is-current";
@@ -6473,12 +6574,15 @@ function showUpgradePage() {
 
   const premium = document.createElement("article");
   premium.className = "upgrade-plan is-featured";
+  const popular = document.createElement("span");
+  popular.className = "upgrade-popular";
+  popular.textContent = "Most popular";
   const premiumName = document.createElement("h2");
   premiumName.textContent = "Book Lover";
   const premiumPrice = document.createElement("p");
   premiumPrice.className = "upgrade-price";
   const premiumCopy = document.createElement("p");
-  premiumCopy.textContent = "For readers who want more. Go deeper with personalized insights, exclusive features, and a richer reading community.";
+  premiumCopy.textContent = "For readers who want more. No limits on your collection, and reports you can use when it matters.";
   const cta = document.createElement("button");
   cta.type = "button";
   cta.className = "upgrade-cta";
@@ -6496,7 +6600,7 @@ function showUpgradePage() {
       showToast("Online payments are coming soon. Book Lover isn't available to purchase yet.");
     });
   }
-  premium.append(premiumName, premiumPrice, premiumCopy, createUpgradeFeatureList(BOOK_LOVER_FEATURES), cta);
+  premium.append(popular, premiumName, premiumPrice, premiumCopy, createUpgradeFeatureList(BOOK_LOVER_FEATURES), cta);
 
   function updateBilling() {
     Object.entries(buttons).forEach(([key, button]) => {
@@ -6513,7 +6617,7 @@ function showUpgradePage() {
   plans.append(lite, premium);
   const tagline = document.createElement("p");
   tagline.className = "upgrade-tagline";
-  tagline.textContent = "More books. More insights. A more connected you.";
+  tagline.textContent = "More books. More shelves. A library that's truly yours.";
   page.append(hero, toggle, plans, tagline);
 }
 

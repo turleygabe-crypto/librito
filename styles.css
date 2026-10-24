@@ -5683,13 +5683,9 @@ body {
 }
 
 /* Upgrade page */
-.upgrade-hero {
-  padding: 1.5rem;
-  border-radius: 1rem;
-  background: linear-gradient(120deg, #fffaf3 40%, #ecd9c3);
-  color: var(--ink);
-}
+.upgrade-hero .home-hero-copy { width: min(52%, 28rem); }
 .upgrade-hero h1 { max-width: 14ch; }
+.upgrade-back { padding: 0; color: #f3d7c3; }
 .upgrade-billing {
   display: flex;
   align-items: center;
@@ -5719,14 +5715,18 @@ body {
   font-weight: 700;
 }
 .upgrade-plans {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.5rem;
 }
 .upgrade-plan {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  flex: 1 1 15rem;
+  max-width: 21rem;
   padding: 1.5rem;
   border: 1px solid #e3d6c8;
   border-radius: 1rem;
@@ -5736,18 +5736,30 @@ body {
 .upgrade-plan.is-featured { border-color: var(--accent); }
 .upgrade-plan h2 { margin: 0; font-family: Georgia, serif; }
 .upgrade-plan p { margin: 0; }
-.upgrade-price { font-weight: 700; }
+.upgrade-price { font-size: 1.15rem; font-weight: 700; }
+.upgrade-popular {
+  position: absolute;
+  top: -0.7rem;
+  left: 1.5rem;
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
 .upgrade-features {
   flex: 1;
-  margin: 0;
+  margin: 0.5rem 0;
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 0.5rem;
+  align-content: start;
+  gap: 0.6rem;
 }
+.upgrade-features li { display: flex; gap: 0.6rem; }
 .upgrade-features li::before {
   content: "✓";
-  margin-right: 0.6rem;
   color: var(--accent);
   font-weight: 700;
 }
@@ -5768,4 +5780,19 @@ body {
   margin: 1.5rem 0 0;
   text-align: center;
   color: var(--muted);
+}
+.export-card {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding: 1.25rem;
+  border: 1px solid #e3d6c8;
+  border-radius: 1rem;
+  background: var(--panel);
+  color: var(--ink);
+}
+.export-card h2, .export-card p { margin: 0; }
+.export-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+@media (max-width: 600px) {
+  .upgrade-hero .home-hero-copy { width: 100%; }
 }
