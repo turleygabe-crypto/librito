@@ -1961,16 +1961,50 @@ function showSuggestedShelfPage(key) {
     page.append(createPageHeader("Suggestions · For your library", "Suggested shelf not found"));
     return;
   }
-  page.append(
-    createPageHeader("Suggestions · For your library", shelf.name, shelf.subtitle),
-    createCardRow(shelf.name, shelf.books.map((book) => ({
-      type: "book",
-      book,
-      recommendation: true,
-    })), {
-      emptyMessage: "No suggestions in this shelf right now.",
-    })
-  );
+  page.append(createPageHeader("Suggestions · For your library", shelf.name, shelf.subtitle));
+  const results = document.createElement("section");
+  results.className = "search-result-group";
+  page.append(results);
+  let currentPage = 1;
+  const render = () => {
+    const pageSize = getStoredSearchPageSize();
+    const totalPages = Math.max(1, Math.ceil(shelf.books.length / pageSize));
+    currentPage = Math.min(Math.max(1, currentPage), totalPages);
+    const first = (currentPage - 1) * pageSize;
+    const pageBooks = shelf.books.slice(first, first + pageSize);
+    results.replaceChildren();
+    if (!pageBooks.length) {
+      const empty = document.createElement("p");
+      empty.className = "genre-summary";
+      empty.textContent = "No suggestions in this shelf right now.";
+      results.append(empty);
+      return;
+    }
+    const summary = document.createElement("p");
+    summary.className = "genre-summary";
+    summary.setAttribute("aria-live", "polite");
+    summary.textContent = `Showing ${first + 1}–${first + pageBooks.length} of ${shelf.books.length} books`;
+    const barOptions = {
+      page: currentPage,
+      totalPages,
+      size: pageSize,
+      onGo: (target) => {
+        currentPage = target;
+        render();
+        page.scrollIntoView({ block: "start" });
+      },
+      onSize: (nextSize) => {
+        localStorage.setItem(searchPageSizeKey, String(nextSize));
+        currentPage = 1;
+        render();
+      },
+    };
+    const grid = document.createElement("div");
+    grid.className = "card-row expanded genre-browse-grid";
+    pageBooks.forEach((book) => grid.append(createBookCard(book, { recommendation: true })));
+    results.append(summary, createPagingBar(barOptions), grid, createPagingBar(barOptions));
+  };
+  render();
 }
 
 function bookMatchesGenre(book, genre) {
