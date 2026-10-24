@@ -2,6 +2,7 @@ import { createSupabaseClient } from "./lib/supabase-client.js";
 
 const storageKey = "librito-library-v1";
 const shelvesStorageKey = "librito-shelves-v1";
+const shelfItemsStorageKey = "librito-shelf-items-v1";
 const bookMetaKey = "librito-book-meta-v1";
 let bookMetaStore = null;
 const bookMetaPending = new Map();
@@ -177,6 +178,7 @@ const defaultBookMetadata = Object.fromEntries(defaultBooks.map((book) => [book.
 const state = {
   books: [],
   shelves: [],
+  shelfItems: [],
   session: null,
   profile: null,
   supabase: null,
@@ -774,6 +776,8 @@ async function deleteShelf(shelf) {
     }
   }
   state.shelves = state.shelves.filter((item) => item.id !== shelf.id);
+  state.shelfItems = state.shelfItems.filter((item) => item.shelf_id !== shelf.id);
+  saveShelfItemsLocally();
   state.books.forEach((book) => {
     book.shelves = getBookShelfNames(book).filter((name) => name !== shelf.name);
     if (book.shelf === shelf.name) book.shelf = book.shelves[0] || "";
@@ -1025,7 +1029,7 @@ function renderShelves() {
     ? state.shelves.map((shelf) => ({
         name: shelf.name,
         color: shelf.color || "#8b5e3c",
-        books: libraryBooks.filter((book) => getBookShelfNames(book).includes(shelf.name)),
+        books: getAllBooksOnShelf(shelf.name),
       }))
     : Object.entries(shelfCounts).map(([name]) => ({
         name,
@@ -1867,8 +1871,8 @@ function createBookCard(book, { compact = false, subtitle = "", recommendation =
   open.addEventListener("click", () => openBookProfile(book));
   card.append(open);
   const ownedBook = getLibraryBooks().find((owned) => getBookKey(owned) === getBookKey(book));
-  if (ownedBook) {
-    const shelfNames = getBookShelfNames(ownedBook);
+  const shelfNames = getAnyShelfNames(book);
+  if (ownedBook || shelfNames.length) {
     const tag = document.createElement("span");
     tag.className = `card-shelf-tag${shelfNames.length ? " is-on-shelf" : ""}`;
     tag.textContent = shelfNames.length ? `📚 ${shelfNames.join(", ")}` : "No shelf yet";
@@ -1929,44 +1933,157 @@ function createBookCard(book, { compact = false, subtitle = "", recommendation =
   return card;
 }
 
-function findOwnedBook(book) {
-  if (book.id && state.books.some((item) => item.id === book.id)) return state.books.find((item) => item.id === book.id);
-  return state.books.find((item) => getBookKey(item) === getBookKey(book));
-}
-
-async function addAnyBookToShelf(book, shelf) {
-  const owned = findOwnedBook(book);
-  if (owned) return addBookToShelf(owned, shelf);
-  if (!state.session || !state.supabase) {
-    showToast("Sign in to add books to shelves.");
-    openAuthModal();
-    return;
-  }
+function normalizeShelfRecord(book) {
   const isbn = Array.isArray(book.isbn) ? book.isbn[0] || "" : book.isbn || "";
-  const libraryBook = {
-    id: crypto.randomUUID(),
+  return {
     title: book.title || "Untitled",
-    author: Array.isArray(book.author_name) ? book.author_name.join(", ") : book.author || "Unknown author",
+    author: Array.isArray(book.author_name) ? book.author_name.join(", ") : book.author || "",
+    isbn: String(isbn || ""),
     genre: book.genre || "",
-    isbn,
     cover_url: book.cover_url
       || (book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-L.jpg?default=false` : ""),
     page_count: Number(book.page_count || book.pages || 0) || null,
-    cost: 0,
-    added: new Date().toISOString().slice(0, 10),
-    notes: "",
-    shelf: shelf.name,
-    shelves: [shelf.name],
   };
-  if (await saveBookToSupabase(libraryBook)) showToast(`“${libraryBook.title}” added to ${shelf.name} ✓`);
+}
+
+function shelfKey(book) {
+  return getBookKey(normalizeShelfRecord(book));
+}
+
+function findOwnedBook(book) {
+  if (book.id && state.books.some((item) => item.id === book.id)) return state.books.find((item) => item.id === book.id);
+  const key = shelfKey(book);
+  return state.books.find((item) => getBookKey(item) === key);
+}
+
+function saveShelfItemsLocally() {
+  if (!state.session) localStorage.setItem(shelfItemsStorageKey, JSON.stringify(state.shelfItems));
+}
+
+function loadLocalShelfItems() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(shelfItemsStorageKey) || "[]");
+    return Array.isArray(saved) ? saved : [];
+  } catch (error) {
+    console.warn("Could not read saved shelf items", error);
+    return [];
+  }
+}
+
+function getShelfItemsFor(book) {
+  const key = shelfKey(book);
+  return state.shelfItems.filter((item) => item.book_key === key);
+}
+
+function getAnyShelfNames(book) {
+  const owned = findOwnedBook(book);
+  const names = new Set(owned ? getBookShelfNames(owned) : []);
+  getShelfItemsFor(book).forEach((item) => {
+    const shelf = state.shelves.find((entry) => entry.id === item.shelf_id);
+    if (shelf) names.add(shelf.name);
+  });
+  return [...names];
+}
+
+function getShelfItemBooks(shelfName) {
+  const shelf = state.shelves.find((entry) => entry.name === shelfName);
+  if (!shelf) return [];
+  return state.shelfItems
+    .filter((item) => item.shelf_id === shelf.id)
+    .map((item) => findOwnedBook(item) || {
+      title: item.title,
+      author: item.author || "",
+      isbn: item.isbn || "",
+      genre: item.genre || "",
+      cover_url: item.cover_url || "",
+      page_count: item.page_count || null,
+    });
+}
+
+function getAllBooksOnShelf(shelfName) {
+  const books = getLibraryBooks().filter((book) => getBookShelfNames(book).includes(shelfName));
+  const seen = new Set(books.map((book) => getBookKey(book)));
+  getShelfItemBooks(shelfName).forEach((book) => {
+    const key = getBookKey(book);
+    if (seen.has(key)) return;
+    seen.add(key);
+    books.push(book);
+  });
+  return books;
+}
+
+async function addShelfItem(book, shelf) {
+  const record = normalizeShelfRecord(book);
+  const key = getBookKey(record);
+  let item = { ...record, book_key: key, shelf_id: shelf.id };
+  if (state.supabase && state.session) {
+    const { data, error } = await state.supabase.from("shelf_items")
+      .insert({ ...item, user_id: state.session.user.id })
+      .select("*")
+      .single();
+    if (error) {
+      console.error(error);
+      showToast("Could not add this book to the shelf. Run the latest Supabase migration first.");
+      return false;
+    }
+    item = data;
+  } else {
+    item.id = `local:${crypto.randomUUID()}`;
+  }
+  state.shelfItems = [...state.shelfItems, item];
+  saveShelfItemsLocally();
+  render();
+  return true;
+}
+
+async function removeShelfItem(book, shelf) {
+  const matches = getShelfItemsFor(book).filter((item) => item.shelf_id === shelf.id);
+  if (!matches.length) return false;
+  if (state.supabase && state.session) {
+    const { error } = await state.supabase.from("shelf_items")
+      .delete()
+      .in("id", matches.map((item) => item.id))
+      .eq("user_id", state.session.user.id);
+    if (error) {
+      console.error(error);
+      showToast("Could not remove this book from the shelf.");
+      return null;
+    }
+  }
+  const ids = new Set(matches.map((item) => item.id));
+  state.shelfItems = state.shelfItems.filter((item) => !ids.has(item.id));
+  saveShelfItemsLocally();
+  return true;
+}
+
+async function addAnyBookToShelf(book, shelf) {
+  if (getAnyShelfNames(book).includes(shelf.name)) {
+    showToast(`Already on ${shelf.name}.`);
+    return;
+  }
+  const owned = findOwnedBook(book);
+  if (owned) {
+    await addBookToShelf(owned, shelf);
+    return;
+  }
+  if (await addShelfItem(book, shelf)) showToast(`“${book.title}” added to ${shelf.name} ✓`);
+}
+
+async function removeAnyBookFromShelf(book, shelfName) {
+  const shelf = state.shelves.find((item) => item.name === shelfName);
+  if (!shelf) return;
+  const owned = findOwnedBook(book);
+  const removedItem = await removeShelfItem(book, shelf);
+  if (removedItem === null) return;
+  if (owned && getBookShelfNames(owned).includes(shelfName)) {
+    await removeBookFromShelf(owned, shelfName);
+    return;
+  }
+  render();
+  showToast(`Removed from ${shelf.name}`);
 }
 
 function promptAddToShelf(book) {
-  if (!state.session) {
-    showToast("Sign in to add books to shelves.");
-    openAuthModal();
-    return;
-  }
   const returnFocus = document.activeElement;
   const overlay = document.createElement("div");
   overlay.className = "dialog-overlay";
@@ -1991,8 +2108,7 @@ function promptAddToShelf(book) {
   head.append(title, x);
   const list = document.createElement("div");
   list.className = "shelf-picker-list";
-  const owned = findOwnedBook(book);
-  const current = owned ? getBookShelfNames(owned) : [];
+  const current = getAnyShelfNames(book);
   state.shelves.forEach((shelf) => {
     const on = current.includes(shelf.name);
     const option = document.createElement("button");
@@ -2065,11 +2181,10 @@ function createBookCardMenu(book, ownedBook, recommendation) {
   wireCardPopover(menu, summary, actions);
   const addToShelf = document.createElement("button");
   addToShelf.type = "button";
-  addToShelf.textContent = ownedBook && getBookShelfNames(ownedBook).length ? "Change shelves" : "Add to shelf";
+  addToShelf.textContent = getAnyShelfNames(book).length ? "Change shelves" : "Add to shelf";
   addToShelf.addEventListener("click", () => {
     menu.open = false;
-    if (ownedBook) openBookProfile(ownedBook);
-    else promptAddToShelf(book);
+    promptAddToShelf(book);
   });
   const markOwned = document.createElement("button");
   markOwned.type = "button";
@@ -2089,10 +2204,12 @@ function createBookCardMenu(book, ownedBook, recommendation) {
   });
   const remove = document.createElement("button");
   remove.type = "button";
-  remove.textContent = "Remove";
+  const onCustomShelfPage = state.view === "shelf" && state.shelves.some((item) => item.name === state.currentShelf);
+  remove.textContent = onCustomShelfPage ? "Remove from shelf" : "Remove";
   remove.addEventListener("click", () => {
     menu.open = false;
-    if (ownedBook) removeBookFromLibrary(ownedBook);
+    if (onCustomShelfPage) removeAnyBookFromShelf(book, state.currentShelf);
+    else if (ownedBook) removeBookFromLibrary(ownedBook);
     else if (recommendation) {
       state.dismissedRecommendations.add(getBookKey(book));
       renderBooks();
@@ -3092,11 +3209,15 @@ function showShelfPage(shelfName) {
         : shelfName === "Library"
           ? getBookShelfNames(book).length === 0
           : getBookShelfNames(book).includes(shelfName));
+  if (shelf) {
+    books.length = 0;
+    books.push(...getAllBooksOnShelf(shelfName));
+  }
   const totalValue = books.reduce((total, book) => total + Number(book.cost || 0), 0);
   const description = shelfName === "Currently Reading"
     ? `${books.length} ${books.length === 1 ? "book" : "books"} in progress`
     : `${books.length} books · ${formatCurrency(totalValue)} total value`;
-  const header = createPageHeader("Shelf · Your library", shelfName, description);
+  const header = createPageHeader(shelf ? "Shelf" : "Shelf · Your library", shelfName, description);
 
   const toolbar = document.createElement("div");
   toolbar.className = "page-toolbar";
@@ -3125,7 +3246,7 @@ function showShelfPage(shelfName) {
     remove.className = "secondary-btn";
     remove.textContent = "Delete shelf";
     remove.addEventListener("click", async () => {
-      const confirmed = await showAppConfirm(`Delete “${shelf.name}”? Books will stay in your library.`, {
+      const confirmed = await showAppConfirm(`Delete “${shelf.name}”? Books will stay in your library; saved wishlist items on it are removed.`, {
         title: "Delete shelf",
         confirmLabel: "Delete shelf",
         danger: true,
@@ -3852,16 +3973,7 @@ function renderBookPage(book) {
     else showToast("Add this book to your library before liking it.");
   });
   actions.append(like);
-  if (ownedBook && !isActiveLibraryBook) {
-    actions.append(createBookShelfMenu(ownedBook));
-  } else if (!ownedBook) {
-    const addShelf = document.createElement("button");
-    addShelf.type = "button";
-    addShelf.className = "secondary-btn";
-    addShelf.textContent = "＋ Add to shelf";
-    addShelf.addEventListener("click", () => promptAddToShelf(book));
-    actions.append(addShelf);
-  }
+  if (!isActiveLibraryBook) actions.append(createBookShelfMenu(book));
   if (!isActiveLibraryBook) actions.append(moreMenu);
   content.append(createShelfStatus(book, ownedBook), actions);
   if (isActiveLibraryBook) {
@@ -4199,7 +4311,7 @@ function renderBookGenreTags(container, genres) {
 }
 
 function getShelfSummaryLabel(book) {
-  const names = getBookShelfNames(book);
+  const names = getAnyShelfNames(book);
   if (!names.length) return "＋  Add to shelf";
   return names.length === 1 ? `📚  On shelf: ${names[0]}` : `📚  On ${names.length} shelves`;
 }
@@ -4209,7 +4321,7 @@ function createBookShelfMenu(book, { compact = false } = {}) {
   menu.className = `book-shelf-menu${compact ? " compact-shelf-menu" : ""}`;
   const summary = document.createElement("summary");
   summary.className = "secondary-btn";
-  const names = getBookShelfNames(book);
+  const names = getAnyShelfNames(book);
   summary.textContent = compact ? (names.length ? "📚" : "＋📚") : getShelfSummaryLabel(book);
   summary.setAttribute("aria-label", names.length
     ? `${book.title} is on ${names.join(", ")}. Change shelves`
@@ -4238,8 +4350,8 @@ function createBookShelfMenu(book, { compact = false } = {}) {
     option.append(dot, label, mark);
     option.addEventListener("click", () => {
       menu.open = false;
-      if (on) removeBookFromShelf(book, shelf.name);
-      else addBookToShelf(book, shelf);
+      if (on) removeAnyBookFromShelf(book, shelf.name);
+      else addAnyBookToShelf(book, shelf);
     });
     panel.append(option);
   });
@@ -4264,7 +4376,7 @@ function createShelfStatus(book, ownedBook) {
   const label = document.createElement("strong");
   label.className = "book-shelf-status-label";
   box.append(label);
-  const names = ownedBook ? getBookShelfNames(ownedBook) : [];
+  const names = getAnyShelfNames(book);
   if (names.length) {
     box.classList.add("is-on-shelf");
     label.textContent = names.length === 1 ? "📚 On shelf:" : "📚 On shelves:";
@@ -4281,9 +4393,7 @@ function createShelfStatus(book, ownedBook) {
     });
   } else {
     box.classList.add("is-off-shelf");
-    label.textContent = ownedBook
-      ? "Not on any shelf yet — organize it with the button below."
-      : "Not on a shelf — add it to your library, then place it on a shelf.";
+    label.textContent = "Not on any shelf yet — use the shelf button below to organize it.";
   }
   return box;
 }
@@ -6940,8 +7050,11 @@ async function initializeSupabaseOnce() {
         state.loading = false;
         state.loadError = "";
         state.books = loadBooks();
+state.shelfItems = loadLocalShelfItems();
         state.shelves = loadLocalShelves();
+        state.shelfItems = loadLocalShelfItems();
         state.shelves = loadLocalShelves();
+        state.shelfItems = loadLocalShelfItems();
         render();
       }
     });
@@ -6950,6 +7063,7 @@ async function initializeSupabaseOnce() {
       state.loading = false;
       state.books = loadBooks();
       state.shelves = loadLocalShelves();
+      state.shelfItems = loadLocalShelfItems();
       render();
       if (!authPrompted) {
         openAuthModal();
@@ -7027,6 +7141,13 @@ async function loadShelvesFromSupabase() {
     return;
   }
   state.shelves = data || [];
+  const { data: items, error: itemsError } = await state.supabase.from("shelf_items").select("*");
+  if (itemsError) {
+    console.error(itemsError);
+    state.shelfItems = [];
+  } else {
+    state.shelfItems = items || [];
+  }
 }
 
 async function createShelfInSupabase() {
@@ -7458,6 +7579,7 @@ authButton.addEventListener("click", async () => {
     state.profile = null;
     state.books = loadBooks();
     state.shelves = loadLocalShelves();
+    state.shelfItems = loadLocalShelfItems();
     render();
     updateAuthButton();
     showToast("Signed out");

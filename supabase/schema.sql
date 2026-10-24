@@ -207,3 +207,6 @@ on conflict (book_id, shelf_id) do nothing;
 
 alter table public.profiles enable row level security;
 -- See migrations/20261023140000_profiles_rls.sql for profiles policies.
+
+-- Shelf items: books saved to a shelf without being in the library (wishlists, shopping lists).
+-- See migrations/20261024180000_shelf_items.sql.
