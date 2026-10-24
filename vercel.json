@@ -7,7 +7,15 @@
       "use": "@vercel/node"
     },
     {
-      "src": "**/*",
+      "src": "*.{html,css,js,png,webmanifest}",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "robots.txt",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "lib/supabase-client.js",
       "use": "@vercel/static"
     }
   ],

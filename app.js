@@ -6535,6 +6535,45 @@ function createUpgradeFeatureList(features) {
   return list;
 }
 
+async function billingRequest(body) {
+  const session = await refreshAuthSession();
+  if (!session) throw new Error("Sign in to manage billing.");
+  const response = await fetch("/api/billing", {
+    method: body ? "POST" : "GET",
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+    cache: "no-store",
+  });
+  if (!response.headers.get("content-type")?.includes("application/json")) {
+    throw new Error("Billing requires the Vercel server. The static preview cannot process payments.");
+  }
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Billing could not be completed. Please try again.");
+  return data;
+}
+
+async function openBilling(button, body) {
+  const label = button.textContent;
+  button.disabled = true;
+  button.textContent = "Opening secure billing...";
+  try {
+    const { url } = await billingRequest(body);
+    const destination = new URL(url);
+    if (destination.protocol !== "https:" || !["checkout.stripe.com", "billing.stripe.com"].includes(destination.hostname)) {
+      throw new Error("Billing returned an invalid destination.");
+    }
+    window.location.assign(destination.href);
+  } catch (error) {
+    console.error("Could not open billing", error);
+    showToast(error.message);
+    button.disabled = false;
+    button.textContent = label;
+  }
+}
+
 function showUpgradePage() {
   updateActiveNavigation("");
   const page = showPage("upgrade");
@@ -6622,16 +6661,15 @@ function showUpgradePage() {
     cta.textContent = "Your current plan";
     cta.classList.add("is-current");
     cta.disabled = true;
-  } else {
-    cta.addEventListener("click", () => {
-      if (!state.session) {
-        showToast("Sign in to upgrade.");
-        openAuthModal();
-        return;
-      }
-      showToast("Online payments are coming soon. Book Lover isn't available to purchase yet.");
-    });
   }
+  cta.addEventListener("click", () => {
+    if (!state.session) {
+      showToast("Sign in to upgrade.");
+      openAuthModal();
+      return;
+    }
+    openBilling(cta, { action: "checkout", billing });
+  });
   premium.append(popular, cardSaveTag, premiumName, premiumPrice, premiumCopy, createUpgradeFeatureList(BOOK_LOVER_FEATURES), cta);
 
   function updateBilling() {
@@ -6643,7 +6681,7 @@ function showUpgradePage() {
       ? `${formatCurrency(UPGRADE_PRICES.annual)} / year`
       : `${formatCurrency(UPGRADE_PRICES.monthly)} / month`;
     cardSaveTag.hidden = billing !== "annual";
-    if (!isBookLover) cta.textContent = "Upgrade to Book Lover";
+    if (!cta.disabled) cta.textContent = "Upgrade to Book Lover";
   }
   updateBilling();
 
@@ -6651,7 +6689,62 @@ function showUpgradePage() {
   const tagline = document.createElement("p");
   tagline.className = "upgrade-tagline";
   tagline.textContent = "More books. More shelves. A library that's truly yours.";
-  page.append(hero, toggle, plans, tagline);
+  const billingStatus = document.createElement("p");
+  billingStatus.className = "page-description";
+  billingStatus.setAttribute("role", "status");
+  const manage = document.createElement("button");
+  manage.type = "button";
+  manage.className = "action-btn";
+  manage.textContent = "Manage billing";
+  manage.hidden = true;
+  manage.addEventListener("click", () => openBilling(manage, { action: "portal" }));
+  const refresh = document.createElement("button");
+  refresh.type = "button";
+  refresh.className = "text-btn";
+  refresh.textContent = "Refresh billing status";
+  refresh.hidden = !state.session;
+  async function loadBillingStatus() {
+    refresh.disabled = true;
+    try {
+      const userId = state.session?.user.id;
+      const status = await billingRequest();
+      const { data: profile, error } = await state.supabase.from("profiles").select("*").eq("id", userId).single();
+      if (error) throw error;
+      if (state.session?.user.id !== userId || !page.isConnected || !page.contains(manage)) return;
+      state.profile = profile;
+      updateAuthButton();
+      manage.hidden = !status.canManage;
+      const premiumAccess = getAccountTier().premium;
+      liteStatus.textContent = premiumAccess ? "Free plan" : "Your current plan";
+      cta.disabled = premiumAccess || status.hasSubscription;
+      cta.classList.toggle("is-current", premiumAccess);
+      cta.textContent = premiumAccess ? "Your current plan" : status.hasSubscription ? "Manage your existing subscription below" : "Upgrade to Book Lover";
+      billingStatus.textContent = status.cancelAtPeriodEnd
+        ? `Cancellation scheduled. Book Lover remains available until ${formatDate(status.periodEnd)}.`
+        : status.status === "past_due"
+          ? "Payment needs attention. Book Lover remains available during payment retries; update your payment method below."
+          : profile.complimentary_book_lover
+            ? "You have complimentary Book Lover access."
+            : status.status ? `Subscription: ${status.status.replaceAll("_", " ")}.`
+              : "No paid subscription yet.";
+    } catch (error) {
+      console.error("Could not load billing status", error);
+      billingStatus.textContent = error.message;
+    } finally {
+      refresh.disabled = false;
+    }
+  }
+  refresh.addEventListener("click", loadBillingStatus);
+  page.append(hero, toggle, plans, tagline, billingStatus, manage, refresh);
+  const checkout = new URLSearchParams(window.location.hash.split("?")[1] || "").get("checkout");
+  if (checkout === "success") {
+    const notice = document.createElement("p");
+    notice.textContent = "Thanks! Payment may still be processing. Access is enabled after Stripe confirms your subscription. Refresh billing status shortly.";
+    page.append(notice);
+  } else if (checkout === "canceled") {
+    billingStatus.textContent = "Checkout canceled. No plan change was made.";
+  }
+  if (state.session) loadBillingStatus();
 }
 
 function showPurchasePage(params = new URLSearchParams(window.location.hash.split("?")[1] || "")) {

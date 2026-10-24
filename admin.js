@@ -103,8 +103,8 @@ function usersPage() {
   const q = view.search.toLowerCase();
   const rows = (view.users || []).filter((u) => !q || (u.email || "").toLowerCase().includes(q));
   return `<div class="card"><div class="tools" style="margin-bottom:10px"><input id="search" type="search" placeholder="Search by email…" value="${esc(view.search)}"><span class="s">${rows.length} users</span></div>
-    <div class="tablewrap"><table><thead><tr><th>USER</th><th>JOINED</th><th>LAST ACTIVE</th><th>BOOKS</th><th>SHELVES</th><th>LIKES</th><th>ROLE</th><th>PLAN</th></tr></thead><tbody>
-    ${rows.map((u) => `<tr><td>${esc(u.email || u.id)}</td><td>${fmtDate(u.created_at)}</td><td>${fmtDate(u.last_sign_in_at)}</td><td>${u.books}</td><td>${u.shelves}</td><td>${u.likes}</td><td>${u.is_admin ? "<span class='pill warn'>Admin</span>" : "<span class='pill'>Reader</span>"}</td><td><select class="tier-select" data-user="${esc(u.id)}" aria-label="Plan for ${esc(u.email || u.id)}"><option value="lite_reader" ${u.tier === "book_lover" ? "" : "selected"}>Lite Reader</option><option value="book_lover" ${u.tier === "book_lover" ? "selected" : ""}>Book Lover</option></select></td></tr>`).join("")}
+    <div class="tablewrap"><table><thead><tr><th>USER</th><th>JOINED</th><th>LAST ACTIVE</th><th>BOOKS</th><th>SHELVES</th><th>LIKES</th><th>ROLE</th><th>PLAN</th><th>COMPLIMENTARY ACCESS</th></tr></thead><tbody>
+    ${rows.map((u) => `<tr><td>${esc(u.email || u.id)}</td><td>${fmtDate(u.created_at)}</td><td>${fmtDate(u.last_sign_in_at)}</td><td>${u.books}</td><td>${u.shelves}</td><td>${u.likes}</td><td>${u.is_admin ? "<span class='pill warn'>Admin</span>" : "<span class='pill'>Reader</span>"}</td><td>${u.tier === "book_lover" ? "Book Lover" : "Lite Reader"}</td><td><select class="tier-select" data-user="${esc(u.id)}" aria-label="Complimentary access for ${esc(u.email || u.id)}"><option value="lite_reader" ${u.complimentary_book_lover ? "" : "selected"}>None</option><option value="book_lover" ${u.complimentary_book_lover ? "selected" : ""}>Book Lover</option></select></td></tr>`).join("")}
     </tbody></table></div></div>`;
 }
 
@@ -178,7 +178,7 @@ function shell(content) {
   if (range) range.addEventListener("change", () => { view.days = Number(range.value); view.stats = null; show(); });
   root.querySelectorAll(".tier-select").forEach((select) => select.addEventListener("change", async () => {
     const user = (view.users || []).find((u) => u.id === select.dataset.user);
-    const previous = user ? user.tier : "lite_reader";
+    const previous = user?.complimentary_book_lover ? "book_lover" : "lite_reader";
     select.disabled = true;
     const { data, error } = await supabase.rpc("admin_set_tier", { target_user: select.dataset.user, new_tier: select.value });
     select.disabled = false;
@@ -187,7 +187,11 @@ function shell(content) {
       alert(`Could not change plan: ${error.message}`);
       return;
     }
-    if (user) user.tier = data;
+    if (user) {
+      user.tier = data;
+      user.complimentary_book_lover = select.value === "book_lover";
+    }
+    show();
   }));
   const search = document.getElementById("search");
   if (search) search.addEventListener("input", () => {

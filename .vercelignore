@@ -1,0 +1,6 @@
+.env
+.env.*
+.agents/
+.vscode/
+tests/
+skills-lock.json

@@ -27,7 +27,72 @@ Then open http://127.0.0.1:3000/.
 `/admin.html` is an unlinked, noindex report page (users, activity, books, shelves). Access is enforced in Supabase: run [the admin migration](supabase/migrations/20261021190000_admin_dashboard.sql) and [the v2 reports migration](supabase/migrations/20261021200000_admin_dashboard_v2.sql), then grant yourself access in SQL Editor with `insert into public.admins (user_id) select id from auth.users where email = 'you@example.com';`. Non-admins only see "Not found" and the `admin_stats` RPC rejects them. "Active" users are those with a recent `last_sign_in_at`.
 
 ## Account tiers
-Accounts are **Lite Reader** (free) or **Book Lover** (paid), stored in `profiles.tier`. Lite Reader is limited to 100 books, 5 custom shelves (Library, Liked Books and the built-in Wishlist shelf don't count) and 5 Currently Reading books; Book Lover is unlimited and can export library reports from the Stats page. Limits are enforced by database triggers as well as in the app. Users cannot change their own tier. Admins can change anyone's plan from the Users page of `/admin.html`. Run these migrations in order after the admin ones: `20261024190000_account_tiers`, `20261024200000_lite_reader_limits`, `20261024210000_lite_reader_reading_limit`, `20261024220000_admin_account_tiers` and `20261024240000_builtin_wishlist_shelf`. The last one gives every user a permanent Wishlist shelf that can't be renamed or deleted, and turns any existing user-made "Wishlist" shelf into it.
+Accounts are **Lite Reader** (free) or **Book Lover** (paid), stored in `profiles.tier`. Lite Reader is limited to 100 books, 5 custom shelves (Library, Liked Books and the built-in Wishlist shelf don't count) and 5 Currently Reading books; Book Lover is unlimited and can export library reports from the Stats page. Limits are enforced by database triggers as well as in the app. Users cannot change their own tier. Admins can grant or revoke complimentary Book Lover access from the Users page of `/admin.html`; removing a complimentary grant does not cancel a paid subscription. Run these migrations in order after the admin ones: `20261024190000_account_tiers`, `20261024200000_lite_reader_limits`, `20261024210000_lite_reader_reading_limit`, `20261024220000_admin_account_tiers` and `20261024240000_builtin_wishlist_shelf`. The last one gives every user a permanent Wishlist shelf that can't be renamed or deleted, and turns any existing user-made "Wishlist" shelf into it. Then apply [the Stripe billing migration](supabase/migrations/20261024250000_stripe_billing.sql). It preserves existing Book Lover accounts as complimentary grants and makes the effective tier the union of complimentary and Stripe access.
+
+## Stripe billing
+
+### Integration design
+
+Librito sells its own digital subscription, not books or marketplace payouts. Use Stripe Billing with hosted Checkout, one **Book Lover** Product, and two recurring USD Prices: **$2.99/month** and **$24.99/year**. Lite Reader stays free without a Stripe subscription. The Customer Portal manages payment methods, billing intervals, invoices and cancellation. No Stripe.js or publishable API key is needed for this hosted flow.
+
+The upgrade page calls authenticated Vercel functions. The server validates the Supabase access token, chooses an allowlisted Price, and verifies that the amount, currency and interval match the UI. Server-only billing tables map each Supabase user to one Stripe Customer. Per-account leases and Stripe idempotency keys prevent concurrent duplicate checkouts; an open Checkout Session is reused or expired when switching intervals.
+
+Signed webhooks reconcile current Stripe subscription state rather than trusting redirects or old event payloads. Deliveries are recorded for deduplication, and concurrent updates are serialized. Active, trialing and past-due subscriptions retain access; canceled, unpaid, paused or expired incomplete subscriptions do not. Configure Stripe's retry policy to move exhausted subscriptions to **canceled or unpaid**, not leave them past due forever. Cancellation at period end preserves access until Stripe ends the subscription. Downgrades never delete books or shelves; existing database limits apply when adding books, shelves or reading entries.
+
+### Sandbox setup
+
+1. In Stripe Dashboard, create a separate **sandbox** for development. Keep production and CI credentials/data separate. No live Stripe resources have been created by this setup.
+2. Apply all existing Supabase migrations, followed by [the billing migration](supabase/migrations/20261024250000_stripe_billing.sql), preferably in a development Supabase project first.
+3. In the sandbox, create the Book Lover Product and the two Prices above (quantity one, interval count one). Copy their `price_...` IDs. Treat these Price IDs as stable; adding replacement Prices requires planning how existing subscriptions will remain entitled.
+4. Set server environment variables using [.env.example](.env.example) as a list of names:
+   - `APP_URL`: the exact application origin, such as `https://librito.casa` or `http://localhost:3000`. HTTPS is required except on localhost.
+   - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`: match the project used by the browser's `config.js`. The service-role key must never enter browser configuration.
+   - `STRIPE_SECRET_KEY`: prefer a sandbox **restricted API key** with only the permissions needed to read/write Customers and Checkout Sessions, read Prices, Subscriptions and Charges, and create Customer Portal sessions. Adjust permissions if Stripe reports an authorization error.
+   - `STRIPE_PRICE_MONTHLY` and `STRIPE_PRICE_ANNUAL`: the sandbox Price IDs.
+   - `STRIPE_WEBHOOK_SECRET`: the endpoint's signing secret, not an API key. For local forwarding, use the signing secret printed by `stripe listen`.
+   Store secrets in Vercel's **sensitive environment variables**. For local development only, use an ignored `.env.local`; never paste keys into chat, commit them, or log them. The deployment only publishes explicitly selected browser assets.
+5. Configure the sandbox Customer Portal: allow payment-method updates and cancellation **at period end**. If enabling monthly/annual switching, allow only the two Book Lover Prices and explicitly review proration and change timing. Configure Billing payment retries and customer emails.
+6. Register a webhook endpoint at `https://YOUR_DEPLOYMENT/api/stripe-webhook`, using an event destination/API version matching the installed Stripe SDK. Subscribe to:
+   - `checkout.session.completed`
+   - `checkout.session.async_payment_succeeded`
+   - `checkout.session.async_payment_failed`
+   - `customer.subscription.created`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+   - `invoice.paid`
+   - `invoice.payment_failed`
+   - `charge.dispute.created`
+   - `charge.refunded`
+   - `radar.early_fraud_warning.created`
+7. For full local development, install dependencies with `npm install`, then use `npx vercel dev --listen 3000` (requires Vercel project setup). In another terminal, with Stripe CLI authenticated to the sandbox, run `stripe listen --forward-to localhost:3000/api/stripe-webhook` and set its printed signing secret locally. The Python/static preview still works for browsing, but cannot execute billing endpoints.
+8. Open the Upgrade page while signed in. Checkout returns to that page without granting access; use **Refresh billing status** after webhook confirmation. **Manage billing** remains available for existing Stripe Customers, even after paid access ends.
+
+### Validation and operations
+
+Run `npm test` for API/authentication, signed-webhook, checkout, concurrency and PostgreSQL migration/permission tests. No real API keys are needed for these tests.
+
+Before launch, exercise the deployed sandbox with Stripe's documented test payment methods: monthly and annual purchases, 3DS, decline and retry, duplicate clicks, abandoned checkout, asynchronous payment success/failure, renewals (using test clocks), period-end cancellation, failed-payment exhaustion, portal changes, complimentary grants, and downgrades while over free-tier limits. Replay webhook deliveries and confirm only the correct user's tier changes. Check that secrets and server files are not publicly served.
+
+Refunds do not automatically cancel subscriptions, and disputes/fraud signals need an explicit business decision. The integration persists these events in `billing_events` with `requires_review = true`, reconciles subscription state, and emits a warning without payment details or credentials. Monitor Vercel logs and Stripe Dashboard notifications. Review the queue in Supabase SQL Editor:
+
+```sql
+select event_id, event_type, user_id, created_at
+from public.billing_events
+where requires_review
+order by created_at;
+```
+
+Review the associated payment in Stripe, cancel the subscription or take other action as appropriate, and clear `requires_review` after handling it. Alert on webhook delivery failures; non-2xx responses must be retried. An expired server lease can be reclaimed after two minutes. Account deletion and billing cancellation are separate operations: cancel subscriptions before deleting Supabase accounts. Keep the event ledger for as long as delivery deduplication/audit requirements need it.
+
+**Tax:** review sales-tax/VAT/GST obligations for digital subscriptions, including Stripe Tax and product tax codes. Automatic tax is deliberately not enabled: confirm applicable active tax registrations and inclusive/exclusive price behavior first.
+
+For production, repeat Product/Price/Portal/webhook setup in live mode with separate restricted credentials, set the production `APP_URL`, and run the go-live checklist. Sandbox IDs and signing secrets cannot be reused in live mode.
+
+### Stripe agent tooling
+
+[.vscode/mcp.json](.vscode/mcp.json) configures `https://mcp.stripe.com` using OAuth. Start the `stripe` server through **MCP: List Servers**, approve Stripe authentication, then reload tools or start a new chat. Confirm `stripe_implementation_planner` is available before using it; installing server configuration alone does not authenticate the session.
+
+The Claude plugin install could not run in this environment because `claude` is unavailable. The requested fallback, `npx skills add https://docs.stripe.com`, installed Stripe's official guidance under [.agents/skills](.agents/skills), with versions recorded in [skills-lock.json](skills-lock.json). The integration design above uses that guidance; it is not output from the unavailable planner tool.
 
 ## Supabase setup
 1. Create a new Supabase project.
