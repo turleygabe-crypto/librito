@@ -4901,13 +4901,21 @@ body {
   font-size: 0.85rem;
 }
 
+.paging-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem 1.25rem;
+  margin: 0.8rem 0;
+}
+
 .genre-pager {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   gap: 0.4rem;
-  margin: 1.5rem 0 2.5rem;
 }
 
 .genre-pager-btn {

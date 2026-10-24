@@ -2388,6 +2388,22 @@ function createGenrePager(page, totalPages, onGo) {
   return nav;
 }
 
+// Prev/next pager plus the per-page selector, shown together on the right above and below results.
+function createPagingBar({ page, totalPages, size, onGo, onSize }) {
+  const bar = document.createElement("div");
+  bar.className = "paging-bar";
+  if (totalPages > 1) bar.append(createGenrePager(page, totalPages, onGo));
+  const label = document.createElement("label");
+  label.className = "genre-size-control";
+  label.append("Books per page ");
+  const select = document.createElement("select");
+  genreSizeOptions.forEach((option) => select.add(new Option(String(option), String(option), false, option === size)));
+  select.addEventListener("change", () => onSize(Number(select.value)));
+  label.append(select);
+  bar.append(label);
+  return bar;
+}
+
 let genrePageToken = 0;
 
 function showGenrePage(genre, sort = "", page = 1, requestedSize = 0) {
@@ -2421,18 +2437,7 @@ function showGenrePage(genre, sort = "", page = 1, requestedSize = 0) {
     tab.addEventListener("click", () => go({ sort: value, page: "" }));
     tabs.append(tab);
   });
-  const sizeLabel = document.createElement("label");
-  sizeLabel.className = "genre-size-control";
-  sizeLabel.append("Books per page ");
-  const sizeSelect = document.createElement("select");
-  genreSizeOptions.forEach((option) => sizeSelect.add(new Option(String(option), String(option), false, option === size)));
-  sizeSelect.addEventListener("change", () => {
-    const nextSize = Number(sizeSelect.value);
-    localStorage.setItem(genrePageSizeKey, String(nextSize));
-    go({ size: String(nextSize), page: "" });
-  });
-  sizeLabel.append(sizeSelect);
-  controls.append(tabs, sizeLabel);
+  controls.append(tabs);
 
   const summary = document.createElement("p");
   summary.className = "genre-summary";
@@ -2466,11 +2471,17 @@ function showGenrePage(genre, sort = "", page = 1, requestedSize = 0) {
     result.books.forEach((book) => grid.append(createBookCard(book, {
       recommendation: !library.some((owned) => isSameBookWork(owned, book)),
     })));
-    results.append(grid);
-    if (totalPages > 1) {
-      const pager = (target) => go({ page: target > 1 ? String(target) : "" });
-      results.append(createGenrePager(page, totalPages, pager));
-    }
+    const barOptions = {
+      page,
+      totalPages,
+      size,
+      onGo: (target) => go({ page: target > 1 ? String(target) : "" }),
+      onSize: (nextSize) => {
+        localStorage.setItem(genrePageSizeKey, String(nextSize));
+        go({ size: String(nextSize), page: "" });
+      },
+    };
+    results.append(createPagingBar(barOptions), grid, createPagingBar(barOptions));
   };
 
   const load = async () => {
@@ -5080,8 +5091,6 @@ function showSearchPage(query = "") {
   const library = getLibraryBooks();
   const rerender = () => showSearchPage(state.searchQuery);
 
-  const controls = document.createElement("div");
-  controls.className = "genre-controls";
   const summary = document.createElement("p");
   summary.className = "genre-summary";
   summary.setAttribute("aria-live", "polite");
@@ -5089,19 +5098,22 @@ function showSearchPage(query = "") {
     const first = (currentPage - 1) * pageSize + 1;
     summary.textContent = `Showing ${first}–${first + pageMatches.length - 1} of ${matches.length} books`;
   }
-  const sizeLabel = document.createElement("label");
-  sizeLabel.className = "genre-size-control";
-  sizeLabel.append("Books per page ");
-  const sizeSelect = document.createElement("select");
-  genreSizeOptions.forEach((option) => sizeSelect.add(new Option(String(option), String(option), false, option === pageSize)));
-  sizeSelect.addEventListener("change", () => {
-    localStorage.setItem(searchPageSizeKey, sizeSelect.value);
-    state.searchPage = 1;
-    rerender();
-  });
-  sizeLabel.append(sizeSelect);
-  controls.append(summary, sizeLabel);
-  books.append(controls);
+  const barOptions = {
+    page: currentPage,
+    totalPages,
+    size: pageSize,
+    onGo: (target) => {
+      state.searchPage = target;
+      rerender();
+      document.querySelector(".search-page")?.scrollIntoView({ block: "start" });
+    },
+    onSize: (nextSize) => {
+      localStorage.setItem(searchPageSizeKey, String(nextSize));
+      state.searchPage = 1;
+      rerender();
+    },
+  };
+  books.append(summary, createPagingBar(barOptions));
 
   const bookGroups = state.searchLanguage === "all"
     ? groupByLanguage(pageMatches, (book) => book.language)
@@ -5119,13 +5131,7 @@ function showSearchPage(query = "") {
     })));
     books.append(grid);
   });
-  if (totalPages > 1) {
-    books.append(createGenrePager(currentPage, totalPages, (target) => {
-      state.searchPage = target;
-      rerender();
-      document.querySelector(".search-page")?.scrollIntoView({ block: "start" });
-    }));
-  }
+  books.append(createPagingBar(barOptions));
   page.append(books);
   const authors = [...new Set(matches.map((book) => book.author).filter(Boolean))];
   if (authors.length) {
