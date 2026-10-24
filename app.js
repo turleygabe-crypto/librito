@@ -2,6 +2,9 @@ import { createSupabaseClient } from "./lib/supabase-client.js";
 
 const storageKey = "librito-library-v1";
 const shelvesStorageKey = "librito-shelves-v1";
+const bookMetaKey = "librito-book-meta-v1";
+let bookMetaStore = null;
+const bookMetaPending = new Map();
 const openLibraryLanguages = [
   ["eng", "English"],
   ["spa", "Spanish"],
@@ -438,7 +441,11 @@ function loadLocalShelves() {
 }
 
 function getLibraryBooks() {
-  return state.books.filter((book) => !book.disposition);
+  const meta = readBookMeta();
+  return state.books.filter((book) => !book.disposition).map((book) => {
+    applyBookMeta(book, meta[getBookKey(book)]);
+    return book;
+  });
 }
 
 function saveBooks() {
@@ -2514,8 +2521,9 @@ function applyBrowseControls(books, sort, filters) {
     inRange(book.first_publish_year, year)
     && inRange(book.pages || book.page_count, length)
     && inRange(book.ratings_average, rating));
+  console.log("ABC",sort,JSON.stringify(books.map(b=>[b.title,b.first_publish_year])));
   const compare = {
-    new: (a, b) => (b.first_publish_year || 0) - (a.first_publish_year || 0),
+    new: (a, b) => (b.first_publish_year || -1) - (a.first_publish_year || -1),
     old: (a, b) => (a.first_publish_year || 9999) - (b.first_publish_year || 9999),
     rating: (a, b) => (b.ratings_average || 0) - (a.ratings_average || 0),
     popular: (a, b) => (b.popularity || 0) - (a.popularity || 0),
@@ -3020,6 +3028,78 @@ const shelfSortOptions = [
   ["old", "Oldest published"],
   ["rating", "Top rated"],
 ];
+
+function readBookMeta() {
+  if (!bookMetaStore) {
+    try {
+      bookMetaStore = JSON.parse(localStorage.getItem(bookMetaKey) || "{}") || {};
+    } catch {
+      bookMetaStore = {};
+    }
+  }
+  return bookMetaStore;
+}
+
+function applyBookMeta(book, meta) {
+  if (!meta) return false;
+  let changed = false;
+  [["first_publish_year", meta.year], ["ratings_average", meta.rating], ["page_count", meta.pages]].forEach(([field, value]) => {
+    if (value && !book[field] && !(field === "page_count" && book.pages)) {
+      book[field] = value;
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+function lookupBookMeta(key, book) {
+  const store = readBookMeta();
+  if (store[key]) return Promise.resolve();
+  if (bookMetaPending.has(key)) return bookMetaPending.get(key);
+  const task = (async () => {
+    try {
+      const isbn = String(book.isbn || "").replace(/[^0-9Xx]/g, "");
+      const query = isbn ? `isbn:${isbn}` : `title:"${book.title}" author:"${String(book.author || "").split(",")[0]}"`;
+      const params = new URLSearchParams({ q: query, limit: "1", fields: "first_publish_year,ratings_average,number_of_pages_median" });
+      let doc = (await fetchOpenLibrarySearch(params)).docs?.[0];
+      if (!doc && isbn) {
+        params.set("q", `title:"${book.title}"`);
+        doc = (await fetchOpenLibrarySearch(params)).docs?.[0];
+      }
+      store[key] = {
+        year: doc?.first_publish_year || 0,
+        rating: doc?.ratings_average ? Math.round(doc.ratings_average * 100) / 100 : 0,
+        pages: doc?.number_of_pages_median || 0,
+      };
+    } catch {
+      // Leave it unresolved so a later visit can retry.
+    } finally {
+      bookMetaPending.delete(key);
+    }
+  })();
+  bookMetaPending.set(key, task);
+  return task;
+}
+
+// Library rows don't store publish year or rating, so look them up once and remember them.
+async function enrichLibraryBooks(books) {
+  const missing = [];
+  for (const book of books) {
+    const key = getBookKey(book);
+    if (!readBookMeta()[key]) missing.push([key, book]);
+  }
+  for (let i = 0; i < missing.length; i += 4) {
+    await Promise.all(missing.slice(i, i + 4).map(([key, book]) => lookupBookMeta(key, book)));
+  }
+  if (!missing.length) return false;
+  try {
+    localStorage.setItem(bookMetaKey, JSON.stringify(readBookMeta()));
+  } catch {
+    // Storage full or unavailable; the lookup just repeats next session.
+  }
+  return true;
+}
+
 const shelfBrowse = { scope: "", sort: "added", filters: {}, page: 1 };
 
 function createShelfBrowser(books, scope = `shelf:${state.currentShelf}`, extraLeading = null) {
@@ -3080,6 +3160,11 @@ function createShelfBrowser(books, scope = `shelf:${state.currentShelf}`, extraL
     if (totalPages > 1) section.append(bar());
   };
   render();
+  enrichLibraryBooks(books).then((changed) => {
+    if (!changed || !section.isConnected) return;
+    books.forEach((book) => applyBookMeta(book, readBookMeta()[getBookKey(book)]));
+    render();
+  });
   return section;
 }
 
