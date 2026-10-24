@@ -6139,7 +6139,7 @@ function showToast(message) {
   }, 1800);
 }
 
-function fillBookDetails({ title, authors = [], isbn = "", publishDate = "", genre = "", coverUrl = "" }) {
+function fillBookDetails({ title, authors = [], isbn = "", publishDate = "", genre = "", coverUrl = "", price = null }) {
   bookForm.elements.title.value = title || "";
   bookForm.elements.author.value = authors.join(", ");
   bookForm.elements.genre.value = genre;
@@ -6148,6 +6148,22 @@ function fillBookDetails({ title, authors = [], isbn = "", publishDate = "", gen
   bookForm.elements.notes.value = publishDate ? `Published ${publishDate}` : "";
   bookForm.elements.added.value = new Date().toISOString().slice(0, 10);
   showBookDetails();
+  if (!isbnLookupPanel.classList.contains("hidden")) applyScannedPrice(price);
+  else document.getElementById("costHint").classList.add("hidden");
+}
+
+function applyScannedPrice(price) {
+  const costInput = bookForm.elements.cost;
+  const hint = document.getElementById("costHint");
+  if (price !== null) {
+    costInput.value = price.toFixed(2);
+    hint.textContent = "Price captured from the barcode. Edit it if you paid something different.";
+  } else {
+    costInput.value = "";
+    hint.textContent = "No price found on the barcode. Enter what you paid for this book.";
+    costInput.focus();
+  }
+  hint.classList.remove("hidden");
 }
 
 function getBookDescription(result) {
@@ -6357,8 +6373,20 @@ async function lookupBooksByTitleOrAuthor() {
   }
 }
 
-async function lookupBookByIsbn(isbn) {
-  const normalized = (isbn || "").replace(/[^0-9Xx]/g, "").trim();
+// Book barcodes can carry a 5-digit add-on: first digit is the currency (5 = USD), the rest is the price in cents.
+function parseBarcodePrice(raw) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (digits.length !== 18 || !/^97[89]/.test(digits)) return null;
+  const addon = digits.slice(13);
+  if (addon[0] !== "5" || addon === "59999") return null;
+  const price = Number(addon.slice(1)) / 100;
+  return price > 0 ? price : null;
+}
+
+async function lookupBookByIsbn(isbn, scannedPrice = null) {
+  const rawIsbn = String(isbn || "");
+  const barcodePrice = scannedPrice ?? parseBarcodePrice(rawIsbn);
+  const normalized = rawIsbn.replace(/[^0-9Xx]/g, "").slice(0, 13).trim();
   if (!normalized) {
     showToast("Enter an ISBN first.");
     return;
@@ -6403,6 +6431,7 @@ async function lookupBookByIsbn(isbn) {
       isbn: normalized,
       publishDate: bookData.publish_date || "",
       coverUrl: bookData.cover?.large || "",
+      price: barcodePrice,
     });
     scanStatus.textContent = `Loaded ${bookData.title}`;
     showToast("Book profile filled from ISBN lookup");
