@@ -575,3 +575,97 @@ test("cancel endpoint targets the authenticated account and preserves compliment
   }, rejected);
   assert.equal(rejected.code, 403);
 });
+
+async function lifecycleFixture(id, customer, price = "price_month") {
+  await sql.query("insert into auth.users(id, email) values ($1, $2)", [id, "billing-test@example.test"]);
+  await sql.query("insert into profiles(id) values ($1)", [id]);
+  await sql.query("insert into billing_accounts(user_id, customer_id) values ($1, $2)", [id, customer]);
+  await sql.query("insert into books(user_id) values ($1)", [id]);
+  await sql.query("insert into shelves(user_id) values ($1)", [id]);
+  const db = database();
+  db.auth = { getUser: async () => ({ data: { user: { id } } }) };
+  const stripe = stripeMock();
+  const signing = new Stripe("sk_test_placeholder");
+  stripe.webhooks = signing.webhooks;
+  const secret = "whsec_lifecycle_placeholder";
+  const handler = createWebhookHandler(() => ({ db, stripe, config }), () => secret);
+  let sequence = 0;
+  return {
+    db, stripe,
+    tier: async () => (await sql.query("select tier from profiles where id = $1", [id])).rows[0].tier,
+    async deliver(type, state, eventId = `evt_${customer}_${++sequence}`) {
+      stripe.subscriptions = stripeMock([subscription(state, price)]).subscriptions;
+      const payload = JSON.stringify({
+        id: eventId, type, data: { object: { customer } },
+      });
+      const req = Readable.from([Buffer.from(payload)]);
+      req.method = "POST";
+      req.headers = { "stripe-signature": signing.webhooks.generateTestHeaderString({ payload, secret }) };
+      const res = response();
+      await handler(req, res);
+      assert.equal(res.code, 200, JSON.stringify(res.body));
+      return eventId;
+    },
+  };
+}
+
+for (const billing of ["monthly", "annual"]) {
+  test(`${billing} authenticated checkout uses the exact price and does not grant access before payment confirmation`, async () => {
+    const id = billing === "monthly" ? "22222222-2222-4222-8222-222222222222" : "33333333-3333-4333-8333-333333333333";
+    const fixture = await lifecycleFixture(id, `cus_${billing}_test`, config.prices[billing]);
+    let params;
+    fixture.stripe.checkout.sessions.create = async (value) => {
+      params = value;
+      return { id: `cs_${billing}_test`, url: "https://checkout.stripe.com/test" };
+    };
+    const res = response();
+    await createHandler(() => ({ db: fixture.db, stripe: fixture.stripe, config }))({
+      method: "POST", headers: { origin: config.origin, authorization: "Bearer valid" },
+      body: { action: "checkout", billing, price: "price_attacker", userId },
+    }, res);
+    assert.equal(res.code, 200);
+    assert.deepEqual(params.line_items, [{ price: config.prices[billing], quantity: 1 }]);
+    assert.equal(params.client_reference_id, id);
+    assert.equal(await fixture.tier(), "lite_reader");
+    // Signed confirmation, not the browser redirect, enables Book Lover.
+    await fixture.deliver("invoice.paid", "active");
+    assert.equal(await fixture.tier(), "book_lover");
+  });
+}
+
+test("signed failed-payment lifecycle denies initial access, retains access during retries, and downgrades after exhaustion without deleting library data", async () => {
+  const id = "44444444-4444-4444-8444-444444444444";
+  const fixture = await lifecycleFixture(id, "cus_failed_test");
+  await fixture.deliver("invoice.payment_failed", "incomplete");
+  assert.equal(await fixture.tier(), "lite_reader");
+  await fixture.deliver("checkout.session.async_payment_failed", "incomplete_expired");
+  assert.equal(await fixture.tier(), "lite_reader");
+  await fixture.deliver("checkout.session.async_payment_succeeded", "active");
+  assert.equal(await fixture.tier(), "book_lover");
+  await fixture.deliver("invoice.payment_failed", "past_due");
+  assert.equal(await fixture.tier(), "book_lover");
+  await fixture.deliver("customer.subscription.updated", "unpaid");
+  assert.equal(await fixture.tier(), "lite_reader");
+  await fixture.deliver("invoice.paid", "active");
+  assert.equal(await fixture.tier(), "book_lover");
+  await fixture.deliver("customer.subscription.deleted", "canceled");
+  assert.equal(await fixture.tier(), "lite_reader");
+  for (const table of ["books", "shelves"]) {
+    assert.equal(Number((await sql.query(`select count(*) as count from ${table} where user_id = $1`, [id])).rows[0].count), 1);
+  }
+});
+
+test("signed period-end cancellation keeps access until ended and never changes another user's tier", async () => {
+  const id = "55555555-5555-4555-8555-555555555555";
+  const fixture = await lifecycleFixture(id, "cus_end_test");
+  const otherTier = (await sql.query("select tier from profiles where id = $1", [userId])).rows[0].tier;
+  await fixture.deliver("customer.subscription.updated", "active");
+  assert.equal(await fixture.tier(), "book_lover");
+  const record = (await sql.query("select cancel_at_period_end from billing_accounts where user_id = $1", [id])).rows[0];
+  assert.equal(record.cancel_at_period_end, true);
+  const eventId = await fixture.deliver("customer.subscription.deleted", "canceled");
+  assert.equal(await fixture.tier(), "lite_reader");
+  await fixture.deliver("customer.subscription.deleted", "canceled", eventId);
+  assert.equal(Number((await sql.query("select count(*) as count from billing_events where event_id = $1", [eventId])).rows[0].count), 1);
+  assert.equal((await sql.query("select tier from profiles where id = $1", [userId])).rows[0].tier, otherTier);
+});

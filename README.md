@@ -85,6 +85,8 @@ In-app banners remind signed-in readers when canceled access ends or automatic r
 
 Run `npm test` for API/authentication, signed-webhook, checkout, concurrency and PostgreSQL migration/permission tests. No real API keys are needed for these tests.
 
+The automated lifecycle scenarios exercise authenticated monthly/annual Checkout requests, signed webhook delivery through the real signature verifier, failed initial payments, asynchronous failure/success, renewal retries, retry exhaustion, payment recovery, period-end cancellation, duplicate delivery, library preservation and user isolation. Stripe API responses are simulated; these tests do not charge cards or validate the Dashboard's live configuration, real payment authentication, tax settings, or sandbox/live data separation.
+
 If billing logs report PostgreSQL `42703` (missing column), check that the Stripe billing migration was applied to the Supabase project configured on the server. Earlier account-tier migrations do not create the billing tables or complimentary-access field. The upgrade page hides billing-management details for readers without a billing account; failed status requests show a friendly, centered retry message rather than raw server errors.
 
 Before launch, exercise the deployed sandbox with Stripe's documented test payment methods: monthly and annual purchases, 3DS, decline and retry, duplicate clicks, abandoned checkout, asynchronous payment success/failure, renewals (using test clocks), period-end cancellation, failed-payment exhaustion, portal changes, complimentary grants, and downgrades while over free-tier limits. Replay webhook deliveries and confirm only the correct user's tier changes. Check that secrets and server files are not publicly served.
