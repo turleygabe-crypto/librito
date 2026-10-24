@@ -6478,7 +6478,7 @@ function createLibraryExportCard(books) {
   return card;
 }
 
-const UPGRADE_PRICES = { monthly: 9.99, annual: 89.99 };
+const UPGRADE_PRICES = { monthly: 2.99, annual: 26.91 };
 const LITE_READER_FEATURES = [
   "Up to 100 books in your library",
   "Up to 5 custom shelves",
@@ -6549,9 +6549,9 @@ function showUpgradePage() {
     toggle.append(button);
   });
   const saveBadge = document.createElement("span");
-  saveBadge.className = "upgrade-badge";
+  saveBadge.className = "upgrade-save-tag";
   saveBadge.textContent = `Save ${annualSavings}%`;
-  toggle.append(saveBadge);
+  buttons.annual.append(saveBadge);
 
   const plans = document.createElement("div");
   plans.className = "upgrade-plans";
@@ -6577,6 +6577,9 @@ function showUpgradePage() {
   const popular = document.createElement("span");
   popular.className = "upgrade-popular";
   popular.textContent = "Most popular";
+  const cardSaveTag = document.createElement("span");
+  cardSaveTag.className = "upgrade-save-tag";
+  cardSaveTag.textContent = `Save ${annualSavings}%`;
   const premiumName = document.createElement("h2");
   premiumName.textContent = "Book Lover";
   const premiumPrice = document.createElement("p");
@@ -6600,7 +6603,7 @@ function showUpgradePage() {
       showToast("Online payments are coming soon. Book Lover isn't available to purchase yet.");
     });
   }
-  premium.append(popular, premiumName, premiumPrice, premiumCopy, createUpgradeFeatureList(BOOK_LOVER_FEATURES), cta);
+  premium.append(popular, cardSaveTag, premiumName, premiumPrice, premiumCopy, createUpgradeFeatureList(BOOK_LOVER_FEATURES), cta);
 
   function updateBilling() {
     Object.entries(buttons).forEach(([key, button]) => {
@@ -6610,6 +6613,7 @@ function showUpgradePage() {
     premiumPrice.textContent = billing === "annual"
       ? `${formatCurrency(UPGRADE_PRICES.annual)} / year`
       : `${formatCurrency(UPGRADE_PRICES.monthly)} / month`;
+    cardSaveTag.hidden = billing !== "annual";
     if (!isBookLover) cta.textContent = "Upgrade to Book Lover";
   }
   updateBilling();
