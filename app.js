@@ -1977,7 +1977,10 @@ function createShelfCard(shelf, { compact = false } = {}) {
     : `${shelf.count} books`;
   open.append(cover, title, subtitle);
   open.addEventListener("click", () => {
-    if (isSuggestion) navigateTo("suggested-shelf", { key: shelf.key });
+    if (isSuggestion) {
+      setSpotlight(`suggested-shelf:${shelf.key}`);
+      navigateTo("suggested-shelf", { key: shelf.key });
+    }
     else navigateTo("shelf", { name });
   });
   card.append(open);
@@ -2005,6 +2008,7 @@ function showSuggestedShelfPage(key) {
     return;
   }
   page.append(createPageHeader("Suggestions · For your library", shelf.name, shelf.subtitle));
+  shelf.books = withSpotlight(shelf.books, takeSpotlight(`suggested-shelf:${shelf.key}`));
   const results = document.createElement("section");
   results.className = "search-result-group";
   page.append(results);
@@ -2069,6 +2073,31 @@ function getGenreBooks(genre, libraryBooks, recommendations = []) {
 const genreCoverCache = new Map();
 const coverCycleIndex = new Map();
 const coverCycleLastChange = new Map();
+// Last few covers each cycle displayed (newest last), so a click can surface what caught the eye.
+const coverCycleRecent = new Map();
+let pendingSpotlight = null;
+
+function rememberCycleBook(key, book) {
+  const recent = (coverCycleRecent.get(key) || []).filter((item) => getBookKey(item) !== getBookKey(book));
+  recent.push(book);
+  coverCycleRecent.set(key, recent.slice(-3));
+}
+
+// Called on click: the shown book first, then up to two before it.
+function setSpotlight(key) {
+  const books = [...(coverCycleRecent.get(key) || [])].reverse();
+  pendingSpotlight = books.length ? { key, books } : null;
+}
+
+function takeSpotlight(key) {
+  return pendingSpotlight?.key === key ? pendingSpotlight.books : [];
+}
+
+function withSpotlight(books, spotlight) {
+  if (!spotlight.length) return books;
+  const pinned = new Set(spotlight.map(getBookKey));
+  return [...spotlight, ...books.filter((book) => !pinned.has(getBookKey(book)))];
+}
 const coverCycleInterval = 14000;
 const coverFadeMs = 1200;
 
@@ -2142,6 +2171,7 @@ function startCoverCycle(container, { key, getBooks, className = "", interval = 
       if (!container.isConnected) break;
       if (cover) {
         shownKey = getBookKey(book);
+        rememberCycleBook(key, book);
         coverCycleLastChange.set(key, Date.now());
         if (container.children.length) swapIn(cover);
         else container.append(cover);
@@ -2161,6 +2191,7 @@ function startCoverCycle(container, { key, getBooks, className = "", interval = 
   };
   if (initial) {
     shownKey = getBookKey(initial);
+    rememberCycleBook(key, initial);
     container.append(createBookCover(initial, className));
   }
   show();
@@ -2275,12 +2306,16 @@ function createGenreCard(genre) {
     getBooks: () => [...(genre.books || []), ...(genreCoverCache.get(genreKey)?.books || [])],
   });
   loadGenreCovers(genre.title).then(cycle.refresh);
-  button.addEventListener("click", () => navigateTo("genre", { name: genre.title }));
+  button.addEventListener("click", () => {
+    setSpotlight(`genre:${genreKey}`);
+    navigateTo("genre", { name: genre.title });
+  });
   card.append(button);
   return card;
 }
 
 function showHomePage() {
+  pendingSpotlight = null;
   state.view = "home";
   state.currentShelf = "";
   state.currentBook = null;
@@ -2669,6 +2704,7 @@ function showGenrePage(genre, sort = "", page = 1, requestedSize = 0, filters = 
     view.append(createPageHeader("Browse by genre", "Genre not found"));
     return;
   }
+  const spotlight = page === 1 && !sort && !countActiveFilters(filters) ? takeSpotlight(`genre:${displayGenre.toLowerCase()}`) : [];
   const size = genreSizeOptions.includes(requestedSize) ? requestedSize : getStoredGenrePageSize();
   const go = (values) => navigateTo("genre", { name: displayGenre, sort, size: String(size), ...filters, ...values });
 
@@ -2712,7 +2748,7 @@ function showGenrePage(genre, sort = "", page = 1, requestedSize = 0, filters = 
     const library = getLibraryBooks();
     const grid = document.createElement("div");
     grid.className = "card-row expanded genre-browse-grid";
-    result.books.forEach((book) => grid.append(createBookCard(book, {
+    withSpotlight(result.books, spotlight).slice(0, Math.max(size, result.books.length)).forEach((book) => grid.append(createBookCard(book, {
       recommendation: !library.some((owned) => isSameBookWork(owned, book)),
     })));
     const barOptions = {
