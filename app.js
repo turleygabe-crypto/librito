@@ -183,6 +183,7 @@ const state = {
   searchQuery: "",
   searchResults: null,
   searchLanguage: "default",
+  searchPage: 1,
   searchMessage: "",
   searchLoading: false,
   loading: true,
@@ -2245,6 +2246,12 @@ const genreSortOptions = [
 ];
 const genreSizeOptions = [25, 50, 75, 100];
 const genrePageSizeKey = "librito-genre-page-size";
+const searchPageSizeKey = "librito-search-page-size";
+
+function getStoredSearchPageSize() {
+  const size = Number(localStorage.getItem(searchPageSizeKey));
+  return genreSizeOptions.includes(size) ? size : 25;
+}
 const genrePreviewStoreKey = "librito-genre-previews-v1";
 const genrePreviewTtl = 24 * 60 * 60 * 1000;
 const genrePageCache = new Map();
@@ -3617,7 +3624,7 @@ function googleVolumeToBook(volume, genre = "") {
 }
 
 // Google Books tolerates misspellings, so it backs up Open Library when that is slow, down, or finds nothing.
-async function fetchGoogleCatalogBooks(query, { genre = "", language = "", max = 24, startIndex = 0 } = {}) {
+async function fetchGoogleCatalogBooks(query, { genre = "", language = "", max = 40, startIndex = 0 } = {}) {
   const params = new URLSearchParams({
     q: genre ? `subject:${JSON.stringify(genre)}` : query,
     maxResults: String(Math.min(max, 40)),
@@ -5065,12 +5072,60 @@ function showSearchPage(query = "") {
   }
   const books = document.createElement("section");
   books.className = "search-result-group";
-  const bookGroups = state.searchLanguage === "all"
-    ? groupByLanguage(matches, (book) => book.language)
-    : [["Books", matches]];
-  bookGroups.forEach(([label, group]) => {
-    books.append(createCardRow(label, group.map((book) => ({ type: "book", book })), { emptyMessage: "No books found." }));
+  const pageSize = getStoredSearchPageSize();
+  const totalPages = Math.max(1, Math.ceil(matches.length / pageSize));
+  const currentPage = Math.min(Math.max(1, state.searchPage || 1), totalPages);
+  state.searchPage = currentPage;
+  const pageMatches = matches.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const library = getLibraryBooks();
+  const rerender = () => showSearchPage(state.searchQuery);
+
+  const controls = document.createElement("div");
+  controls.className = "genre-controls";
+  const summary = document.createElement("p");
+  summary.className = "genre-summary";
+  summary.setAttribute("aria-live", "polite");
+  if (matches.length) {
+    const first = (currentPage - 1) * pageSize + 1;
+    summary.textContent = `Showing ${first}–${first + pageMatches.length - 1} of ${matches.length} books`;
+  }
+  const sizeLabel = document.createElement("label");
+  sizeLabel.className = "genre-size-control";
+  sizeLabel.append("Books per page ");
+  const sizeSelect = document.createElement("select");
+  genreSizeOptions.forEach((option) => sizeSelect.add(new Option(String(option), String(option), false, option === pageSize)));
+  sizeSelect.addEventListener("change", () => {
+    localStorage.setItem(searchPageSizeKey, sizeSelect.value);
+    state.searchPage = 1;
+    rerender();
   });
+  sizeLabel.append(sizeSelect);
+  controls.append(summary, sizeLabel);
+  books.append(controls);
+
+  const bookGroups = state.searchLanguage === "all"
+    ? groupByLanguage(pageMatches, (book) => book.language)
+    : [["Books", pageMatches]];
+  bookGroups.forEach(([label, group]) => {
+    if (bookGroups.length > 1) {
+      const heading = document.createElement("h2");
+      heading.textContent = label;
+      books.append(heading);
+    }
+    const grid = document.createElement("div");
+    grid.className = "card-row expanded genre-browse-grid";
+    group.forEach((book) => grid.append(createBookCard(book, {
+      recommendation: !library.some((owned) => isSameBookWork(owned, book)),
+    })));
+    books.append(grid);
+  });
+  if (totalPages > 1) {
+    books.append(createGenrePager(currentPage, totalPages, (target) => {
+      state.searchPage = target;
+      rerender();
+      document.querySelector(".search-page")?.scrollIntoView({ block: "start" });
+    }));
+  }
   page.append(books);
   const authors = [...new Set(matches.map((book) => book.author).filter(Boolean))];
   if (authors.length) {
@@ -5167,6 +5222,7 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
   state.searchLanguage = globalSearchLanguage.value;
   const selectedLanguage = resolveSearchLanguage(state.searchLanguage);
   const languageName = selectedLanguage ? getOpenLibraryLanguageName(selectedLanguage) : "any language";
+  if (state.searchQuery !== query.trim()) state.searchPage = 1;
   state.searchQuery = query.trim();
   state.searchMessage = "";
   state.searchLoading = false;
@@ -5193,7 +5249,7 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
       const params = new URLSearchParams({
         q: selectedLanguage ? `${catalogQuery} language:${selectedLanguage}` : catalogQuery,
         fields: `key,title,author_name,isbn,cover_i,subject,language,number_of_pages_median,${OPEN_LIBRARY_EDITION_FIELDS}`,
-        limit: "24",
+        limit: "100",
         offset: String(searchOffset),
       });
       if (selectedLanguage) params.set("lang", selectedLanguage);
