@@ -5018,3 +5018,103 @@ body {
 .cc-small { font-size: 0.8rem; opacity: 0.8; }
 .cc-card .cc-actions { justify-content: flex-end; }
 @media (max-width: 700px) { .cc-banner { flex-direction: column; align-items: stretch; } .cc-actions { justify-content: space-between; } }
+
+.browse-bar {
+  margin: 0 0 1.2rem;
+  border: 1px solid rgba(60, 40, 30, 0.2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.browse-bar-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.9rem;
+}
+
+.browse-sort {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.browse-sort select {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid rgba(60, 40, 30, 0.3);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.browse-toggle {
+  padding: 0.4rem 0.95rem;
+  border: 1px solid rgba(60, 40, 30, 0.3);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.browse-toggle::after {
+  content: " ▾";
+}
+
+.browse-toggle[aria-expanded="true"]::after {
+  content: " ▴";
+}
+
+.browse-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem 1.5rem;
+  padding: 0.9rem;
+  border-top: 1px solid rgba(60, 40, 30, 0.15);
+}
+
+.browse-panel[hidden] {
+  display: none;
+}
+
+.browse-group-label {
+  margin: 0 0 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.browse-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.browse-chip {
+  padding: 0.3rem 0.75rem;
+  border: 1px solid rgba(60, 40, 30, 0.3);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.browse-chip.active {
+  border-color: transparent;
+  background: #a9421c;
+  color: #fff;
+}
+
+.browse-clear {
+  align-self: end;
+  justify-self: start;
+}

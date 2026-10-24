@@ -184,6 +184,8 @@ const state = {
   searchResults: null,
   searchLanguage: "default",
   searchPage: 1,
+  searchSort: "relevance",
+  searchFilters: {},
   searchMessage: "",
   searchLoading: false,
   loading: true,
@@ -377,7 +379,12 @@ function restoreRouteFromLocation() {
       showSuggestedShelfPage(params.get("key") || "");
       break;
     case "/genre":
-      showGenrePage(params.get("name") || "", params.get("sort") || "", Math.max(1, Number(params.get("page")) || 1), Number(params.get("size")) || 0);
+      showGenrePage(params.get("name") || "", params.get("sort") || "", Math.max(1, Number(params.get("page")) || 1), Number(params.get("size")) || 0, {
+        year: params.get("year") || "",
+        len: params.get("len") || "",
+        rating: params.get("rating") || "",
+        lang: params.get("lang") || "",
+      });
       break;
     case "/search":
       runNaturalSearch(params.get("q") || "", {
@@ -2321,12 +2328,144 @@ async function fetchOpenLibrarySearch(params, timeout = 15000) {
   return refresh();
 }
 
-const genreSortOptions = [
+const browseSortOptions = [
   ["relevance", "Most relevant", ""],
   ["new", "Newest", "new"],
   ["", "Popular", "readinglog"],
   ["rating", "Top rated", "rating"],
+  ["old", "Oldest", "old"],
+  ["title", "Title A–Z", "title"],
 ];
+const browseFilterGroups = [
+  { key: "year", label: "Published", options: [
+    ["2020", "2020 – now", 2020, 9999],
+    ["2010", "2010s", 2010, 2019],
+    ["2000", "2000s", 2000, 2009],
+    ["1900", "1900s", 1900, 1999],
+    ["pre1900", "Before 1900", 0, 1899],
+  ] },
+  { key: "len", label: "Length", options: [
+    ["short", "Short (under 200 pages)", 1, 199],
+    ["medium", "Medium (200–399)", 200, 399],
+    ["long", "Long (400+)", 400, 99999],
+  ] },
+  { key: "rating", label: "Rating", options: [
+    ["4", "4★ & up", 4, 5],
+    ["3", "3★ & up", 3, 5],
+    ["2", "2★ & up", 2, 5],
+  ] },
+];
+let browsePanelOpen = false;
+
+function countActiveFilters(filters) {
+  return browseFilterGroups.filter((group) => filters[group.key]).length + (filters.lang ? 1 : 0);
+}
+
+function findFilterRange(key, value) {
+  const option = browseFilterGroups.find((group) => group.key === key)?.options.find(([id]) => id === value);
+  return option ? [option[2], option[3]] : null;
+}
+
+// Client-side filter and sort for result lists that are already loaded.
+function applyBrowseControls(books, sort, filters) {
+  const year = findFilterRange("year", filters.year);
+  const length = findFilterRange("len", filters.len);
+  const rating = findFilterRange("rating", filters.rating);
+  const inRange = (value, range) => range === null || (Number(value) >= range[0] && Number(value) <= range[1]);
+  const visible = books.filter((book) =>
+    inRange(book.first_publish_year, year)
+    && inRange(book.pages || book.page_count, length)
+    && inRange(book.ratings_average, rating));
+  const compare = {
+    new: (a, b) => (b.first_publish_year || 0) - (a.first_publish_year || 0),
+    old: (a, b) => (a.first_publish_year || 9999) - (b.first_publish_year || 9999),
+    rating: (a, b) => (b.ratings_average || 0) - (a.ratings_average || 0),
+    "": (a, b) => (b.popularity || 0) - (a.popularity || 0),
+    title: (a, b) => String(a.title || "").localeCompare(String(b.title || "")),
+  }[sort];
+  return compare ? [...visible].sort(compare) : visible;
+}
+
+function createBrowseControls({ sort, filters, languages = false, onChange }) {
+  const bar = document.createElement("section");
+  bar.className = "browse-bar";
+  bar.setAttribute("aria-label", "Sort and filter");
+  const main = document.createElement("div");
+  main.className = "browse-bar-main";
+
+  const sortLabel = document.createElement("label");
+  sortLabel.className = "browse-sort";
+  sortLabel.append("Sort by ");
+  const select = document.createElement("select");
+  browseSortOptions.forEach(([value, label]) => select.add(new Option(label, value, false, value === sort)));
+  select.addEventListener("change", () => onChange({ sort: select.value, filters }));
+  sortLabel.append(select);
+
+  const activeCount = countActiveFilters(filters);
+  const panelId = `browsePanel${Math.random().toString(36).slice(2, 8)}`;
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "browse-toggle";
+  toggle.setAttribute("aria-controls", panelId);
+  toggle.setAttribute("aria-expanded", String(browsePanelOpen));
+  toggle.textContent = activeCount ? `Filters (${activeCount})` : "Filters";
+  const panel = document.createElement("div");
+  panel.id = panelId;
+  panel.className = "browse-panel";
+  panel.hidden = !browsePanelOpen;
+  toggle.addEventListener("click", () => {
+    browsePanelOpen = !browsePanelOpen;
+    panel.hidden = !browsePanelOpen;
+    toggle.setAttribute("aria-expanded", String(browsePanelOpen));
+  });
+  main.append(sortLabel, toggle);
+
+  const chip = (label, active, onClick) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = `browse-chip${active ? " active" : ""}`;
+    item.setAttribute("aria-pressed", String(active));
+    item.textContent = label;
+    item.addEventListener("click", onClick);
+    return item;
+  };
+  const setFilter = (key, value) => onChange({ sort, filters: { ...filters, [key]: filters[key] === value ? "" : value } });
+  const groups = browseFilterGroups.map((group) => ({
+    key: group.key,
+    label: group.label,
+    options: group.options.map(([id, label]) => [id, label]),
+  }));
+  if (languages) {
+    groups.unshift({
+      key: "lang",
+      label: "Language",
+      options: [...openLibraryLanguages.map(([code, name]) => [code, name]), ["all", "Any language"]],
+    });
+  }
+  groups.forEach((group) => {
+    const fieldset = document.createElement("div");
+    fieldset.className = "browse-group";
+    const legend = document.createElement("p");
+    legend.className = "browse-group-label";
+    legend.textContent = group.label;
+    const options = document.createElement("div");
+    options.className = "browse-options";
+    group.options.forEach(([id, label]) => options.append(chip(label, filters[group.key] === id, () => setFilter(group.key, id))));
+    fieldset.append(legend, options);
+    panel.append(fieldset);
+  });
+  if (activeCount) {
+    const clear = document.createElement("button");
+    clear.type = "button";
+    clear.className = "text-btn browse-clear";
+    clear.textContent = "Clear filters";
+    clear.addEventListener("click", () => onChange({ sort, filters: {} }));
+    panel.append(clear);
+  }
+  bar.append(main, panel);
+  return bar;
+}
+
 const genreSizeOptions = [25, 50, 75, 100];
 const genrePageSizeKey = "librito-genre-page-size";
 const searchPageSizeKey = "librito-search-page-size";
@@ -2369,17 +2508,25 @@ function readGenrePreview(genre) {
 }
 
 // The single place that pulls a page of a genre's catalog. Home previews and genre pages share its cache.
-function fetchGenreCatalogPage(genre, { sort = "", page = 1, size = 25, background = false } = {}) {
-  const cacheKey = `${genre.toLowerCase()}|${sort}|${size}|${page}`;
+function fetchGenreCatalogPage(genre, { sort = "", page = 1, size = 25, background = false, filters = {} } = {}) {
+  const cacheKey = `${genre.toLowerCase()}|${sort}|${size}|${page}|${JSON.stringify(filters)}`;
   if (genrePageCache.has(cacheKey)) return genrePageCache.get(cacheKey);
   const load = async () => {
+    const language = filters.lang === "all" ? "" : filters.lang || getDefaultBookLanguage();
+    const clauses = [`subject:${JSON.stringify(genre)}`, language && `language:${language}`, "cover_i:[1 TO *]"];
+    const yearRange = findFilterRange("year", filters.year);
+    const lengthRange = findFilterRange("len", filters.len);
+    const ratingRange = findFilterRange("rating", filters.rating);
+    if (yearRange) clauses.push(`first_publish_year:[${yearRange[0]} TO ${yearRange[1]}]`);
+    if (lengthRange) clauses.push(`number_of_pages_median:[${lengthRange[0]} TO ${lengthRange[1]}]`);
+    if (ratingRange) clauses.push(`ratings_average:[${ratingRange[0]} TO *]`);
     const params = new URLSearchParams({
-      q: `subject:${JSON.stringify(genre)} language:${getDefaultBookLanguage()} cover_i:[1 TO *]`,
+      q: clauses.filter(Boolean).join(" "),
       fields: "key,title,author_name,isbn,cover_i,subject,number_of_pages_median,first_publish_year",
       limit: String(size),
       offset: String((page - 1) * size),
     });
-    const apiSort = genreSortOptions.find(([value]) => value === sort)?.[2];
+    const apiSort = browseSortOptions.find(([value]) => value === sort)?.[2];
     if (apiSort) params.set("sort", apiSort);
     let lastError;
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -2487,7 +2634,7 @@ function createPagingBar({ page, totalPages, size, onGo, onSize }) {
 
 let genrePageToken = 0;
 
-function showGenrePage(genre, sort = "", page = 1, requestedSize = 0) {
+function showGenrePage(genre, sort = "", page = 1, requestedSize = 0, filters = {}) {
   const token = ++genrePageToken;
   updateActiveNavigation("Discover");
   const view = showPage("genre");
@@ -2499,26 +2646,18 @@ function showGenrePage(genre, sort = "", page = 1, requestedSize = 0) {
     return;
   }
   const size = genreSizeOptions.includes(requestedSize) ? requestedSize : getStoredGenrePageSize();
-  const go = (values) => navigateTo("genre", { name: displayGenre, sort, size: String(size), ...values });
+  const go = (values) => navigateTo("genre", { name: displayGenre, sort, size: String(size), ...filters, ...values });
 
   view.append(createPageHeader("Browse by genre", displayGenre, "Browse everything in the catalog."));
 
   const controls = document.createElement("div");
   controls.className = "genre-controls";
-  const tabs = document.createElement("div");
-  tabs.className = "genre-sort-tabs";
-  tabs.setAttribute("role", "tablist");
-  genreSortOptions.forEach(([value, label]) => {
-    const tab = document.createElement("button");
-    tab.type = "button";
-    tab.className = `genre-sort-tab${value === sort ? " active" : ""}`;
-    tab.setAttribute("role", "tab");
-    tab.setAttribute("aria-selected", String(value === sort));
-    tab.textContent = label;
-    tab.addEventListener("click", () => go({ sort: value, page: "" }));
-    tabs.append(tab);
-  });
-  controls.append(tabs);
+  controls.append(createBrowseControls({
+    sort,
+    filters,
+    languages: true,
+    onChange: (next) => go({ sort: next.sort, year: "", len: "", rating: "", lang: "", ...next.filters, page: "" }),
+  }));
 
   const summary = document.createElement("p");
   summary.className = "genre-summary";
@@ -2542,7 +2681,7 @@ function showGenrePage(genre, sort = "", page = 1, requestedSize = 0) {
     if (!result.books.length) {
       const empty = document.createElement("p");
       empty.className = "row-empty-state";
-      empty.textContent = `No ${displayGenre} books found.`;
+      empty.textContent = countActiveFilters(filters) ? `No ${displayGenre} books match these filters.` : `No ${displayGenre} books found.`;
       results.append(empty);
       return;
     }
@@ -2567,7 +2706,7 @@ function showGenrePage(genre, sort = "", page = 1, requestedSize = 0) {
 
   const load = async () => {
     try {
-      const result = await fetchGenreCatalogPage(displayGenre, { sort, page, size });
+      const result = await fetchGenreCatalogPage(displayGenre, { sort, page, size, filters });
       if (token !== genrePageToken) return;
       render(result);
       view.scrollIntoView({ block: "start" });
@@ -5186,21 +5325,34 @@ function showSearchPage(query = "") {
   }
   const books = document.createElement("section");
   books.className = "search-result-group";
+  const visibleMatches = applyBrowseControls(matches, state.searchSort, state.searchFilters);
   const pageSize = getStoredSearchPageSize();
-  const totalPages = Math.max(1, Math.ceil(matches.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(visibleMatches.length / pageSize));
   const currentPage = Math.min(Math.max(1, state.searchPage || 1), totalPages);
   state.searchPage = currentPage;
-  const pageMatches = matches.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const pageMatches = visibleMatches.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const library = getLibraryBooks();
   const rerender = () => showSearchPage(state.searchQuery);
 
   const summary = document.createElement("p");
   summary.className = "genre-summary";
   summary.setAttribute("aria-live", "polite");
-  if (matches.length) {
+  if (visibleMatches.length) {
     const first = (currentPage - 1) * pageSize + 1;
-    summary.textContent = `Showing ${first}–${first + pageMatches.length - 1} of ${matches.length} books`;
+    summary.textContent = `Showing ${first}–${first + pageMatches.length - 1} of ${visibleMatches.length} books`;
+  } else if (matches.length) {
+    summary.textContent = "No books match these filters. Books missing year, page, or rating data are hidden when filtering by them.";
   }
+  const controls = createBrowseControls({
+    sort: state.searchSort,
+    filters: state.searchFilters,
+    onChange: ({ sort, filters }) => {
+      state.searchSort = sort;
+      state.searchFilters = filters;
+      state.searchPage = 1;
+      rerender();
+    },
+  });
   const barOptions = {
     page: currentPage,
     totalPages,
@@ -5216,7 +5368,8 @@ function showSearchPage(query = "") {
       rerender();
     },
   };
-  books.append(summary, createPagingBar(barOptions));
+  books.append(controls, summary);
+  if (pageMatches.length) books.append(createPagingBar(barOptions));
 
   const bookGroups = state.searchLanguage === "all"
     ? groupByLanguage(pageMatches, (book) => book.language)
@@ -5234,7 +5387,7 @@ function showSearchPage(query = "") {
     })));
     books.append(grid);
   });
-  books.append(createPagingBar(barOptions));
+  if (pageMatches.length) books.append(createPagingBar(barOptions));
   page.append(books);
   const authors = [...new Set(matches.map((book) => book.author).filter(Boolean))];
   if (authors.length) {
@@ -5331,7 +5484,11 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
   state.searchLanguage = globalSearchLanguage.value;
   const selectedLanguage = resolveSearchLanguage(state.searchLanguage);
   const languageName = selectedLanguage ? getOpenLibraryLanguageName(selectedLanguage) : "any language";
-  if (state.searchQuery !== query.trim()) state.searchPage = 1;
+  if (state.searchQuery !== query.trim()) {
+    state.searchPage = 1;
+    state.searchSort = "relevance";
+    state.searchFilters = {};
+  }
   state.searchQuery = query.trim();
   state.searchMessage = "";
   state.searchLoading = false;
@@ -5357,7 +5514,7 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
     const fetchWorks = async (searchOffset) => {
       const params = new URLSearchParams({
         q: selectedLanguage ? `${catalogQuery} language:${selectedLanguage}` : catalogQuery,
-        fields: `key,title,author_name,isbn,cover_i,subject,language,number_of_pages_median,${OPEN_LIBRARY_EDITION_FIELDS}`,
+        fields: `key,title,author_name,isbn,cover_i,subject,language,number_of_pages_median,first_publish_year,ratings_average,readinglog_count,${OPEN_LIBRARY_EDITION_FIELDS}`,
         limit: "100",
         offset: String(searchOffset),
       });
@@ -5389,6 +5546,9 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
           language: selectedLanguage || pickResultLanguage(work.language),
           pages: work.number_of_pages_median,
           page_count: work.number_of_pages_median,
+          first_publish_year: work.first_publish_year,
+          ratings_average: work.ratings_average,
+          popularity: work.readinglog_count,
         };
         return !parsed.pageLimit || (book.pages && book.pages <= parsed.pageLimit) ? [book] : [];
       });
@@ -5411,6 +5571,9 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
             language: edition.language,
             pages,
             page_count: pages,
+            first_publish_year: work.first_publish_year,
+            ratings_average: work.ratings_average,
+            popularity: work.readinglog_count,
           };
         });
       }));
@@ -5440,6 +5603,9 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
           language: selectedLanguage,
           pages: work.number_of_pages_median,
           page_count: work.number_of_pages_median,
+          first_publish_year: work.first_publish_year,
+          ratings_average: work.ratings_average,
+          popularity: work.readinglog_count,
         };
       }));
       externalBooks = editionResults.flatMap((result) => {
