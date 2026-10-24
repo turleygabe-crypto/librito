@@ -4817,7 +4817,7 @@ body {
   width: 5.2rem;
   aspect-ratio: 2 / 3;
   transform-origin: 50% 100%;
-  animation: book-loader-bounce 2.4s linear infinite;
+  animation: book-loader-bounce 2.7s linear infinite;
 }
 
 .book-loader-slot .book-loader-art {
