@@ -883,6 +883,85 @@ function fillLanguageSelect(select, allLabel = "All languages") {
 function initializeBookLanguageOptions() {
   fillLanguageSelect(lookupLanguage, "Any language");
   fillLanguageSelect(globalSearchLanguage);
+  buildGlobalSearchLanguageMenu();
+}
+
+let syncGlobalSearchLanguageMenu = () => {};
+
+// Replaces the native select UI with the same menu used by the edition language finder.
+function buildGlobalSearchLanguageMenu() {
+  const menu = document.createElement("div");
+  menu.className = "edition-language-menu global-language-menu";
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.className = "edition-language-trigger";
+  trigger.setAttribute("aria-haspopup", "listbox");
+  trigger.setAttribute("aria-expanded", "false");
+  trigger.setAttribute("aria-label", "Search language");
+  const triggerText = document.createElement("span");
+  trigger.append(triggerText);
+  const list = document.createElement("div");
+  list.className = "edition-language-list";
+  list.setAttribute("role", "listbox");
+  list.hidden = true;
+
+  const addGroup = (title, options) => {
+    const groupTitle = document.createElement("div");
+    groupTitle.className = "edition-language-group";
+    groupTitle.textContent = title;
+    list.append(groupTitle);
+    options.forEach((source) => {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "edition-language-option";
+      option.setAttribute("role", "option");
+      option.dataset.value = source.value;
+      option.textContent = source.textContent;
+      list.append(option);
+    });
+  };
+  const sourceOptions = [...globalSearchLanguage.options];
+  addGroup("Any language", sourceOptions.filter((o) => o.value === "all"));
+  addGroup("Your language", sourceOptions.filter((o) => o.value === "default"));
+  addGroup("Specific language", sourceOptions.filter((o) => o.value !== "all" && o.value !== "default"));
+
+  syncGlobalSearchLanguageMenu = () => {
+    const selected = globalSearchLanguage.selectedOptions[0];
+    triggerText.textContent = selected ? selected.textContent : "Language";
+    list.querySelectorAll(".edition-language-option").forEach((option) => {
+      option.setAttribute("aria-selected", String(option.dataset.value === globalSearchLanguage.value));
+    });
+  };
+  const setOpen = (open) => {
+    list.hidden = !open;
+    trigger.setAttribute("aria-expanded", String(open));
+    if (open) list.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
+  };
+  trigger.addEventListener("click", () => setOpen(list.hidden));
+  list.addEventListener("click", (event) => {
+    const option = event.target.closest(".edition-language-option");
+    if (!option) return;
+    globalSearchLanguage.value = option.dataset.value;
+    globalSearchLanguage.dispatchEvent(new Event("change"));
+    setOpen(false);
+    trigger.focus();
+  });
+  menu.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !list.hidden) {
+      setOpen(false);
+      trigger.focus();
+    }
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (!menu.contains(event.target)) setOpen(false);
+  });
+  globalSearchLanguage.addEventListener("change", syncGlobalSearchLanguageMenu);
+
+  globalSearchLanguage.hidden = true;
+  globalSearchLanguage.tabIndex = -1;
+  menu.append(trigger, list);
+  globalSearchLanguage.after(menu);
+  syncGlobalSearchLanguageMenu();
 }
 
 // Returns "" when searching every language.
@@ -5784,6 +5863,7 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
   }
   globalSearchLanguage.value = languageValue || "default";
   if (globalSearchLanguage.value !== (languageValue || "default")) globalSearchLanguage.value = "default";
+  syncGlobalSearchLanguageMenu();
   state.searchLanguage = globalSearchLanguage.value;
   const selectedLanguage = resolveSearchLanguage(state.searchLanguage);
   const languageName = selectedLanguage ? getOpenLibraryLanguageName(selectedLanguage) : "any language";
