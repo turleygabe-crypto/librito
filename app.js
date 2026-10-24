@@ -4727,19 +4727,34 @@ async function loadBookProfileEditions(book, section, knownVolumes = null) {
   }
 }
 
+const editionLanguageResults = new Map();
+
+// Fetches editions once per book+language; in-flight requests are shared so switching back to a pending language reuses it.
+function fetchBookEditionsInLanguage(book, language) {
+  const key = `${normalizeBookIsbn(book.isbn) || `${book.title}|${book.author}`}|${language}`;
+  const entry = editionLanguageResults.get(key) || { editions: null, promise: null };
+  editionLanguageResults.set(key, entry);
+  const refresh = () => {
+    if (!entry.promise) {
+      entry.promise = getOpenLibraryEditionsForBook(book, language)
+        .then((editions) => { entry.editions = editions; return editions; })
+        .finally(() => { entry.promise = null; });
+    }
+    return entry.promise;
+  };
+  return { cached: entry.editions, refresh };
+}
+
 async function loadBookProfileEditionsInLanguage(book, section, language) {
   if (!language) return;
   const status = section.querySelector(".edition-picker-status");
   const buttons = section.querySelectorAll(".edition-picker-button");
   const requestId = (section.languageRequestId = (section.languageRequestId || 0) + 1);
-  const isCurrent = () => section.languageRequestId === requestId;
+  const isCurrent = () => section.languageRequestId === requestId
+    && state.view === "book" && state.currentBook === book && section.isConnected;
   const languageName = language === "all" ? "all-language" : getOpenLibraryLanguageName(language);
-  buttons.forEach((button) => { button.disabled = true; });
-  setBookProfileLoadingStatus(status, `Finding ${languageName} editions…`);
-  section.dataset.status = "loading";
-  try {
-    const editions = await getOpenLibraryEditionsForBook(book, language);
-    if (!isCurrent() || state.view !== "book" || state.currentBook !== book || !section.isConnected) return;
+  const editionSignature = (editions) => editions.map((edition) => `${edition.isbn}:${edition.coverUrl}`).join("|");
+  const show = (editions) => {
     if (!editions.length) {
       section.querySelector(".edition-cover-choices").replaceChildren();
       status.textContent = `No ${languageName} editions with covers were found for this book. Try another language.`;
@@ -4766,8 +4781,21 @@ async function loadBookProfileEditionsInLanguage(book, section, language) {
       const count = section.querySelectorAll(".edition-cover-choice").length;
       status.textContent = `${count} ${languageName} edition${count === 1 ? "" : "s"}. Select one to update your book.`;
     }
-  } catch (error) {
+  };
+
+  const { cached, refresh } = fetchBookEditionsInLanguage(book, language);
+  if (cached) show(cached);
+  else {
+    buttons.forEach((button) => { button.disabled = true; });
+    setBookProfileLoadingStatus(status, `Finding ${languageName} editions…`);
+    section.dataset.status = "loading";
+  }
+  try {
+    const editions = await refresh();
     if (!isCurrent()) return;
+    if (!cached || editionSignature(cached) !== editionSignature(editions)) show(editions);
+  } catch (error) {
+    if (!isCurrent() || cached) return;
     console.error("Could not load editions in another language", error);
     status.textContent = `Could not search for ${languageName} editions. Try again.`;
     section.dataset.status = "error";
