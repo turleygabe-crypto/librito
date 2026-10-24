@@ -3130,6 +3130,13 @@ function showShelvesPage() {
   const tiles = [
     {
       type: "shelf",
+      name: "Library",
+      count: libraryBooks.filter((book) => !getBookShelfNames(book).length).length,
+      color: "#8b5e3c",
+      book: libraryBooks.find((book) => !getBookShelfNames(book).length),
+    },
+    {
+      type: "shelf",
       name: "Liked Books",
       count: libraryBooks.filter((book) => book.liked).length,
       color: "#704052",
@@ -3148,13 +3155,6 @@ function showShelvesPage() {
       count: state.books.filter((book) => book.reading_status === "completed").length,
       color: "#8b5e3c",
       book: state.books.find((book) => book.reading_status === "completed"),
-    },
-    {
-      type: "shelf",
-      name: "Library",
-      count: libraryBooks.filter((book) => !getBookShelfNames(book).length).length,
-      color: "#8b5e3c",
-      book: libraryBooks.find((book) => !getBookShelfNames(book).length),
     },
     ...state.shelves.map((shelf) => ({
       type: "shelf",
