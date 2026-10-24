@@ -52,6 +52,7 @@ test("upgrade page displays canceled countdown and resume action, then resubscri
       showPage: () => page, createUpgradeFeatureList: () => new Element(),
       formatCurrency: (value) => `$${value}`, formatDate: (value) => value,
       billingRequest: async () => status, openBilling() {}, refreshSubscriptionReminder() {},
+      showBookLoverWelcome() {},
       resumeBilling: (button, current) => { resumeClicked = current === status; },
       cancelBilling: (button, current) => { cancelClicked = current === status; },
     };

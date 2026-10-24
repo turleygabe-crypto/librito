@@ -16,6 +16,7 @@ class Element {
   addEventListener(name, handler) { this.events[name] = handler; }
   focus() {}
   reset() {}
+  replaceChildren(...children) { this.children = children; }
   querySelector(selector) {
     const matches = (element) => selector.startsWith(".")
       ? element.className?.split(" ").includes(selector.slice(1))
@@ -100,6 +101,10 @@ test("resume control uses Librito confirmation and never calls a browser prompt"
     showAppConfirm: async (message, value) => { confirmationMessage = message; options = value; await value.onConfirm(); return true; },
     billingRequest: async (body) => { request = body; },
     formatDate: () => "October 24, 2027", showToast() {}, console,
+    showAppDialog: async (value) => {
+      assert.match(value.title, /glad you're staying/);
+      assert.equal(value.cancelLabel, null);
+    },
   };
   runInNewContext(`${functionSource}\nthis.resume = resumeBilling;`, context);
   const button = { disabled: false };
@@ -122,8 +127,17 @@ test("cancel confirmation is explicit and a successful change is not reported as
   let options;
   let message;
   let request;
+  let successOptions;
+  let confirmations = 0;
   const context = {
     showAppConfirm: async (text, value) => {
+      confirmations++;
+      if (confirmations % 2 === 0) {
+        successOptions = value;
+        assert.match(text, /cancellation is confirmed/);
+        assert.match(text, /Changed your mind/);
+        return false;
+      }
       message = text;
       options = value;
       await value.onConfirm();
@@ -142,9 +156,46 @@ test("cancel confirmation is explicit and a successful change is not reported as
   assert.equal(options.cancelLabel, "Keep subscription");
   assert.match(message, /continue until October 24, 2027/);
   assert.match(message, /books and shelves will stay saved/);
-  assert.equal(toasts.length, 2);
-  assert.match(toasts[1], /Your change was saved/);
+  assert.equal(toasts.length, 1);
+  assert.match(toasts[0], /Your change was saved/);
+  assert.equal(successOptions.confirmLabel, "Renew subscription");
   assert.equal(button.disabled, false);
   await context.cancel(button, {}, true, async () => {});
   assert.match(message, /complimentary Book Lover access will remain unchanged/);
+});
+
+test("Book Lover welcome waits for confirmed access, lists benefits, and appears only once", async () => {
+  const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
+  const functionSource = source.slice(source.indexOf("function showBookLoverWelcome("), source.indexOf("\nlet reminderRequest"));
+  const storage = new Map([["librito-book-lover-welcome:reader", "pending"]]);
+  const dialogs = [];
+  let navigated;
+  const context = {
+    sessionStorage: {
+      getItem: (key) => storage.get(key),
+      removeItem: (key) => storage.delete(key),
+    },
+    appDialogResolver: null,
+    state: { session: { user: { id: "reader" } } },
+    showAppDialog: async (options) => { dialogs.push(options); return true; },
+    navigateTo: (route) => { navigated = route; },
+  };
+  runInNewContext(`${functionSource}\nthis.welcome = showBookLoverWelcome;`, context);
+  context.welcome({ status: "incomplete", hasSubscription: true }, { tier: "lite_reader" }, "reader");
+  context.welcome({ status: "active", hasSubscription: true }, { tier: "lite_reader" }, "reader");
+  assert.equal(dialogs.length, 0);
+  context.appDialogResolver = () => {};
+  context.welcome({ status: "active", hasSubscription: true }, { tier: "book_lover" }, "reader");
+  assert.equal(dialogs.length, 0);
+  context.appDialogResolver = null;
+  context.welcome({ status: "active", hasSubscription: true }, { tier: "book_lover" }, "reader");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(dialogs.length, 1);
+  assert.equal(dialogs[0].title, "Welcome to Book Lover!");
+  assert.equal(dialogs[0].features.length, 5);
+  assert.match(dialogs[0].features.join(" "), /Unlimited books.*Unlimited custom shelves.*CSV/);
+  assert.equal(dialogs[0].cancelLabel, null);
+  assert.equal(navigated, "home");
+  context.welcome({ status: "active", hasSubscription: true }, { tier: "book_lover" }, "reader");
+  assert.equal(dialogs.length, 1);
 });

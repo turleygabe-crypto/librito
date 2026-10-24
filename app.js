@@ -4974,7 +4974,10 @@ function ensureAppDialog() {
       [confirm, cancel, close].forEach((button) => { button.disabled = false; });
     }
   });
-  dialog.append(header, message, errorMessage, form);
+  const features = document.createElement("ul");
+  features.className = "app-dialog-features";
+  features.hidden = true;
+  dialog.append(header, message, features, errorMessage, form);
   overlay.append(dialog);
   overlay.addEventListener("click", (event) => {
     if (event.target === overlay) settleAppDialog(null);
@@ -5005,6 +5008,7 @@ function showAppDialog({
   danger = false,
   input = null,
   onConfirm = null,
+  features = [],
 }) {
   if (appDialogBusy) return Promise.resolve(null);
   if (appDialogResolver) settleAppDialog(null);
@@ -5023,6 +5027,15 @@ function showAppDialog({
   dialog.setAttribute("aria-labelledby", `appDialogTitle`);
   heading.id = "appDialogTitle";
   cancel.textContent = cancelLabel;
+  cancel.hidden = cancelLabel === null;
+  const featureList = overlay.querySelector(".app-dialog-features");
+  featureList.replaceChildren();
+  features.forEach((text) => {
+    const item = document.createElement("li");
+    item.textContent = text;
+    featureList.append(item);
+  });
+  featureList.hidden = features.length === 0;
   confirm.textContent = confirmLabel;
   confirm.classList.toggle("danger-action", danger);
   inputNode.hidden = !input;
@@ -6613,6 +6626,9 @@ async function openBilling(button, body) {
     if (destination.protocol !== "https:" || !["checkout.stripe.com", "billing.stripe.com"].includes(destination.hostname)) {
       throw new Error("Billing returned an invalid destination.");
     }
+    if (body.action === "checkout") {
+      sessionStorage.setItem(`librito-book-lover-welcome:${state.session.user.id}`, "pending");
+    }
     window.location.assign(destination.href);
   } catch (error) {
     console.error("Could not open billing", error);
@@ -6635,8 +6651,13 @@ async function resumeBilling(button, status, onSuccess) {
       },
     );
     if (!confirmed) return;
-    showToast("Automatic renewal resumed.");
     await refreshAfterBillingChange(onSuccess);
+    await showAppDialog({
+      title: "So glad you're staying!",
+      message: `Your Book Lover subscription has been renewed. Automatic renewal is back on, with your next scheduled billing date on ${formatDate(status.periodEnd)}. Thank you for making Librito part of your reading life.`,
+      confirmLabel: "Done",
+      cancelLabel: null,
+    });
   } catch (error) {
     console.error("Could not resume renewal", error);
     showToast(error.message);
@@ -6671,11 +6692,41 @@ async function cancelBilling(button, status, complimentary, onSuccess) {
       },
     );
     if (!confirmed) return;
-    showToast("Cancellation scheduled. Automatic renewal is off.");
     await refreshAfterBillingChange(onSuccess);
+    const renew = await showAppConfirm(
+      `Your cancellation is confirmed and automatic renewal is off. ${access} We're sorry to see you go, and grateful for the time you've spent with Librito. Changed your mind? You can renew your subscription now or return any time before your access ends.`,
+      {
+        title: "Sorry to see you go",
+        confirmLabel: "Renew subscription",
+        cancelLabel: "Done",
+      },
+    );
+    if (renew) await resumeBilling(button, status, onSuccess);
   } finally {
     button.disabled = false;
   }
+}
+
+function showBookLoverWelcome(status, profile, userId) {
+  const key = `librito-book-lover-welcome:${userId}`;
+  if (sessionStorage.getItem(key) !== "pending" || !["active", "trialing"].includes(status.status)
+    || !status.hasSubscription || profile.tier !== "book_lover" || appDialogResolver) return;
+  sessionStorage.removeItem(key);
+  showAppDialog({
+    title: "Welcome to Book Lover!",
+    message: "Thank you for supporting Librito. We're so happy to be part of your reading life. Make yourself at home: your library now has room for every book you love, and every story still waiting to be discovered.",
+    features: [
+      "Unlimited books in your library",
+      "Unlimited custom shelves",
+      "Unlimited books in Currently Reading",
+      "Library inventory reports to export as CSV or print/save as PDF",
+      "Early access to new features",
+    ],
+    confirmLabel: "Explore my library",
+    cancelLabel: null,
+  }).then((confirmed) => {
+    if (confirmed && state.session?.user.id === userId) navigateTo("home");
+  });
 }
 
 let reminderRequest = null;
@@ -6947,6 +6998,7 @@ function showUpgradePage() {
                 : status.canManage ? "Your subscription has ended. You can still view your billing history."
                   : checkout === "success" ? "Your payment is being confirmed. Refresh your status shortly."
                     : checkout === "canceled" ? "Checkout canceled. No plan change was made." : "";
+      if (checkout === "success") showBookLoverWelcome(status, profile, userId);
     } catch (error) {
       console.error("Could not load billing status", error);
       currentBillingStatus = null;
@@ -6971,6 +7023,7 @@ function showUpgradePage() {
     billingPanel.hidden = false;
     refresh.hidden = !state.session;
   } else if (checkout === "canceled") {
+    if (state.session) sessionStorage.removeItem(`librito-book-lover-welcome:${state.session.user.id}`);
     billingPanel.hidden = false;
     billingStatus.textContent = "Checkout canceled. No plan change was made.";
   }
