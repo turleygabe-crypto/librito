@@ -2336,13 +2336,14 @@ function showPage(view) {
 
 function updateActiveNavigation(label) {
   const libraryNav = document.getElementById("libraryNavBtn");
-  if (libraryNav) libraryNav.classList.toggle("active", label.toLowerCase() === "your library");
-  document.getElementById("libraryNavBtn").addEventListener("click", () => {
-  if (window.matchMedia("(max-width: 899px)").matches) setLibraryDrawerOpen(false);
-  navigateTo("library");
-});
+  const libraryActive = label.toLowerCase() === "your library";
+  if (libraryNav) {
+    libraryNav.classList.toggle("active", libraryActive);
+    if (libraryActive) libraryNav.setAttribute("aria-current", "page");
+    else libraryNav.removeAttribute("aria-current");
+  }
 
-document.querySelectorAll(".nav-pill").forEach((item) => {
+  document.querySelectorAll(".nav-pill").forEach((item) => {
     const active = item.textContent.trim().toLowerCase() === label.toLowerCase();
     item.classList.toggle("active", active);
     if (active) item.setAttribute("aria-current", "page");
@@ -6856,6 +6857,11 @@ globalSearchForm.addEventListener("submit", async (event) => {
 document.getElementById("topHomeBtn").addEventListener("click", () => {
   navigateTo("home");
   window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
+document.getElementById("libraryNavBtn").addEventListener("click", () => {
+  if (window.matchMedia("(max-width: 899px)").matches) setLibraryDrawerOpen(false);
+  navigateTo("library");
 });
 
 document.getElementById("sidebarAddBookBtn").addEventListener("click", () => {
