@@ -2640,18 +2640,6 @@ function createBrowseControls({ scope, sort, filters, languages = false, sortOpt
   return bar;
 }
 
-// Puts the sort/filter controls to the right of a page header.
-function placeBesideHeader(header, controls) {
-  const host = document.createElement("div");
-  host.className = "shelf-controls";
-  host.append(controls);
-  const wrap = document.createElement("div");
-  wrap.className = "shelf-head";
-  if (header.parentNode) header.replaceWith(wrap);
-  wrap.append(header, host);
-  return wrap;
-}
-
 const genreSizeOptions = [25, 50, 75, 100];
 const genrePageSizeKey = "librito-genre-page-size";
 const searchPageSizeKey = "librito-search-page-size";
@@ -2803,9 +2791,13 @@ function createGenrePager(page, totalPages, onGo) {
 }
 
 // Prev/next pager plus the per-page selector, shown together on the right above and below results.
-function createPagingBar({ page, totalPages, size, onGo, onSize }) {
+function createPagingBar({ page, totalPages, size, onGo, onSize, leading = null }) {
   const bar = document.createElement("div");
   bar.className = "paging-bar";
+  if (leading) {
+    leading.classList.add("paging-leading");
+    bar.append(leading);
+  }
   if (totalPages > 1) bar.append(createGenrePager(page, totalPages, onGo));
   const label = document.createElement("label");
   label.className = "genre-size-control";
@@ -2842,7 +2834,7 @@ function showGenrePage(genre, sort = "", page = 1, requestedSize = 0, filters = 
     languages: true,
     onChange: (next) => go({ sort: next.sort, year: "", len: "", rating: "", lang: "", ...next.filters, page: "" }),
   });
-  view.append(placeBesideHeader(createPageHeader("Browse by genre", displayGenre, "Browse everything in the catalog."), genreControls));
+  view.append(createPageHeader("Browse by genre", displayGenre, "Browse everything in the catalog."));
 
   const summary = document.createElement("p");
   summary.className = "genre-summary";
@@ -2867,7 +2859,11 @@ function showGenrePage(genre, sort = "", page = 1, requestedSize = 0, filters = 
       const empty = document.createElement("p");
       empty.className = "row-empty-state";
       empty.textContent = countActiveFilters(filters) ? `No ${displayGenre} books match these filters.` : `No ${displayGenre} books found.`;
-      results.append(empty);
+      const bar = document.createElement("div");
+      bar.className = "paging-bar";
+      genreControls.classList.add("paging-leading");
+      bar.append(genreControls);
+      results.append(bar, empty);
       return;
     }
     const library = getLibraryBooks();
@@ -2886,7 +2882,7 @@ function showGenrePage(genre, sort = "", page = 1, requestedSize = 0, filters = 
         go({ size: String(nextSize), page: "" });
       },
     };
-    results.append(createPagingBar(barOptions), grid, createPagingBar(barOptions));
+    results.append(createPagingBar({ ...barOptions, leading: genreControls }), grid, createPagingBar(barOptions));
   };
 
   const load = async () => {
@@ -3004,7 +3000,6 @@ function showShelfPage(shelfName) {
   const shelfBrowser = shelfName !== "Currently Reading" && shelfName !== "Completed Books" && books.length
     ? createShelfBrowser(books)
     : null;
-  const headBlock = shelfBrowser ? placeBesideHeader(header, shelfBrowser.controls) : header;
   if (shelfName === "Currently Reading") {
     page.append(header, toolbar, createCurrentlyReadingList(books));
     return;
@@ -3013,7 +3008,7 @@ function showShelfPage(shelfName) {
     page.append(header, createCompletedBooksList(books));
     return;
   }
-  page.append(headBlock, toolbar, shelfBrowser || createBookTable(books));
+  page.append(header, toolbar, shelfBrowser || createBookTable(books));
 }
 
 const shelfSortOptions = [
@@ -3027,15 +3022,12 @@ const shelfSortOptions = [
 ];
 const shelfBrowse = { scope: "", sort: "added", filters: {}, page: 1 };
 
-function createShelfBrowser(books, scope = `shelf:${state.currentShelf}`) {
+function createShelfBrowser(books, scope = `shelf:${state.currentShelf}`, extraLeading = null) {
   if (shelfBrowse.scope !== scope) {
     Object.assign(shelfBrowse, { scope, sort: "added", filters: {}, page: 1 });
   }
   const section = document.createElement("section");
   section.className = "search-result-group";
-  const controlsHost = document.createElement("div");
-  controlsHost.className = "shelf-controls-slot";
-  section.controls = controlsHost;
   const render = () => {
     const visible = applyBrowseControls(books, shelfBrowse.sort, shelfBrowse.filters);
     const size = getStoredSearchPageSize();
@@ -3060,7 +3052,12 @@ function createShelfBrowser(books, scope = `shelf:${state.currentShelf}`) {
     summary.textContent = pageBooks.length
       ? `Showing ${start + 1}–${start + pageBooks.length} of ${visible.length} books`
       : "No books match these filters. Books missing year, page, or rating data are hidden when filtering by them.";
-    const bar = () => createPagingBar({
+    const leading = document.createElement("div");
+    leading.className = "browse-leading";
+    if (extraLeading) leading.append(extraLeading);
+    leading.append(controls);
+    const bar = (lead = null) => createPagingBar({
+      leading: lead,
       page: shelfBrowse.page,
       totalPages,
       size,
@@ -3078,9 +3075,8 @@ function createShelfBrowser(books, scope = `shelf:${state.currentShelf}`) {
     const grid = document.createElement("div");
     grid.className = "card-row expanded genre-browse-grid";
     pageBooks.forEach((book) => grid.append(createBookCard(book)));
-    controlsHost.replaceChildren(controls);
-    section.replaceChildren(summary);
-    if (pageBooks.length) section.append(bar(), grid);
+    section.replaceChildren(summary, bar(leading));
+    if (pageBooks.length) section.append(grid);
     if (totalPages > 1) section.append(bar());
   };
   render();
@@ -3371,8 +3367,6 @@ function showLibraryPage() {
   search.placeholder = "Search title, author, or genre…";
   search.setAttribute("aria-label", "Search your library");
   search.value = state.library.query;
-  const slot = document.createElement("div");
-  slot.className = "library-controls";
   const results = document.createElement("div");
   results.className = "library-results";
 
@@ -3382,18 +3376,16 @@ function showLibraryPage() {
       .filter((book) => !query || [book.title, book.author, book.genre].some((v) => String(v || "").toLowerCase().includes(query)));
     results.replaceChildren();
     if (!books.length) {
-      slot.replaceChildren(search);
+      results.append(search);
       const empty = document.createElement("p");
       empty.className = "row-empty-state";
       empty.textContent = query ? "No books match your search." : "Books you add will appear here.";
       results.append(empty);
       return;
     }
-    const browser = createShelfBrowser(books, "library");
-    slot.replaceChildren(search, browser.controls);
-    results.append(browser);
+    results.append(createShelfBrowser(books, "library", search));
   };
-  page.append(placeBesideHeader(header, slot), results);
+  page.append(header, results);
   search.addEventListener("input", () => {
     state.library.query = search.value;
     shelfBrowse.page = 1;
@@ -5643,11 +5635,7 @@ function showSearchPage(query = "") {
       rerender();
     },
   };
-  const searchHeader = page.querySelector(".search-header");
-  if (searchHeader) placeBesideHeader(searchHeader, controls);
-  else books.append(controls);
-  books.append(summary);
-  if (pageMatches.length) books.append(createPagingBar(barOptions));
+  books.append(summary, createPagingBar({ ...barOptions, leading: controls }));
 
   const bookGroups = state.searchLanguage === "all"
     ? groupByLanguage(pageMatches, (book) => book.language)
