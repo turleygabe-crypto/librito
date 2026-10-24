@@ -4677,7 +4677,22 @@ const loaderClassics = [
   { title: "Little Women", author: "Louisa May Alcott", cover_i: 8775559 },
 ];
 
-// Universal loading animation: one classic cover at a time bounces twice, then the next one takes over.
+const loaderPhrases = [
+  "Dusting off the shelves…",
+  "Flipping to the good part…",
+  "Sniffing that old-book smell…",
+  "Alphabetizing the universe…",
+  "Convincing the librarian to hurry…",
+  "Smoothing out dog-eared pages…",
+  "Hunting for a cozy reading nook…",
+  "Wrangling stray bookmarks…",
+  "Skimming the last chapter (no spoilers)…",
+  "Stacking the to-read pile…",
+  "Shushing the noisy footnotes…",
+  "Fetching a fresh pot of tea…",
+];
+
+// Universal loading animation: covers bounce in random order, each paired with a random quip.
 function createBookLoader({ message = "Loading…", compact = false } = {}) {
   const loader = document.createElement("div");
   loader.className = `book-loader${compact ? " book-loader-compact" : ""}`;
@@ -4694,12 +4709,20 @@ function createBookLoader({ message = "Loading…", compact = false } = {}) {
   text.textContent = message;
   loader.append(stage, text);
 
-  const order = shuffleBooks(loaderClassics);
-  let index = 0;
+  let order = [];
+  let lastBook = null;
+  let lastPhrase = "";
   const showNext = () => {
-    const cover = createBookCover(order[index % order.length], "book-loader-art");
-    index += 1;
-    slot.replaceChildren(cover);
+    // Reshuffle each pass, avoiding an immediate repeat across the seam.
+    if (!order.length) {
+      order = shuffleBooks(loaderClassics);
+      if (order.length > 1 && order[order.length - 1] === lastBook) order.unshift(order.pop());
+    }
+    lastBook = order.pop();
+    slot.replaceChildren(createBookCover(lastBook, "book-loader-art"));
+    const phrases = loaderPhrases.filter((phrase) => phrase !== lastPhrase);
+    lastPhrase = phrases[Math.floor(Math.random() * phrases.length)];
+    text.textContent = lastPhrase;
   };
   showNext();
   // Each animation iteration is two bounces; swap the book when it ends.
