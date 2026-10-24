@@ -6478,7 +6478,7 @@ function createLibraryExportCard(books) {
   return card;
 }
 
-const UPGRADE_PRICES = { monthly: 2.99, annual: 26.91 };
+const UPGRADE_PRICES = { monthly: 2.99, annual: 24.99 };
 const LITE_READER_FEATURES = [
   "Up to 100 books in your library",
   "Up to 5 custom shelves",
