@@ -2453,7 +2453,7 @@ function createBrowseControls({ sort, filters, languages = false, sortOptions = 
   const bar = document.createElement("section");
   bar.className = `browse-bar${popover ? " browse-popover" : ""}`;
   bar.setAttribute("aria-label", "Sort and filter");
-  const panelOpen = popover ? shelfBrowse.panelOpen : browsePanelOpen;
+  const panelOpen = popover ? shelfBrowse.openPanel === "filters" : browsePanelOpen;
   const main = document.createElement("div");
   main.className = "browse-bar-main";
 
@@ -2479,12 +2479,55 @@ function createBrowseControls({ sort, filters, languages = false, sortOptions = 
   panel.hidden = !panelOpen;
   toggle.addEventListener("click", () => {
     const open = panel.hidden;
-    if (popover) shelfBrowse.panelOpen = open;
-    else browsePanelOpen = open;
+    if (popover) {
+      shelfBrowse.openPanel = open ? "filters" : "";
+      sortToggle?.setAttribute("aria-expanded", "false");
+      if (sortPanel) sortPanel.hidden = true;
+    } else {
+      browsePanelOpen = open;
+    }
     panel.hidden = !open;
     toggle.setAttribute("aria-expanded", String(open));
   });
-  main.append(sortLabel, toggle);
+  let sortToggle = null;
+  let sortPanel = null;
+  if (popover) {
+    const sortOpen = shelfBrowse.openPanel === "sort";
+    sortToggle = document.createElement("button");
+    sortToggle.type = "button";
+    sortToggle.className = "browse-toggle browse-sort-toggle";
+    sortToggle.setAttribute("aria-expanded", String(sortOpen));
+    sortToggle.textContent = `Sort: ${sortOptions.find(([value]) => value === sort)?.[1] || "Most relevant"}`;
+    sortPanel = document.createElement("div");
+    sortPanel.className = "browse-panel browse-sort-panel";
+    sortPanel.hidden = !sortOpen;
+    const sortChips = document.createElement("div");
+    sortChips.className = "browse-options";
+    sortOptions.forEach(([value, label]) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = `browse-chip${value === sort ? " active" : ""}`;
+      item.setAttribute("aria-pressed", String(value === sort));
+      item.textContent = label;
+      item.addEventListener("click", () => {
+        shelfBrowse.openPanel = "";
+        onChange({ sort: value, filters });
+      });
+      sortChips.append(item);
+    });
+    sortPanel.append(sortChips);
+    sortToggle.addEventListener("click", () => {
+      const open = sortPanel.hidden;
+      shelfBrowse.openPanel = open ? "sort" : "";
+      sortPanel.hidden = !open;
+      sortToggle.setAttribute("aria-expanded", String(open));
+      panel.hidden = true;
+      toggle.setAttribute("aria-expanded", "false");
+    });
+    main.append(sortToggle, toggle);
+  } else {
+    main.append(sortLabel, toggle);
+  }
 
   const chip = (label, active, onClick) => {
     const item = document.createElement("button");
@@ -2529,6 +2572,7 @@ function createBrowseControls({ sort, filters, languages = false, sortOptions = 
     panel.append(clear);
   }
   bar.append(main, panel);
+  if (sortPanel) bar.append(sortPanel);
   return bar;
 }
 
@@ -2912,11 +2956,11 @@ const shelfSortOptions = [
   ["old", "Oldest published"],
   ["rating", "Top rated"],
 ];
-const shelfBrowse = { shelf: "", sort: "added", filters: {}, page: 1, panelOpen: false };
+const shelfBrowse = { shelf: "", sort: "added", filters: {}, page: 1, openPanel: "" };
 
 function createShelfBrowser(books) {
   if (shelfBrowse.shelf !== state.currentShelf) {
-    Object.assign(shelfBrowse, { shelf: state.currentShelf, sort: "added", filters: {}, page: 1, panelOpen: false });
+    Object.assign(shelfBrowse, { shelf: state.currentShelf, sort: "added", filters: {}, page: 1, openPanel: "" });
   }
   const section = document.createElement("section");
   section.className = "search-result-group";
