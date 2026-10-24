@@ -5174,8 +5174,9 @@ body {
   gap: 1rem;
 }
 
-.shelf-head .page-header {
+.shelf-head > :first-child {
   flex: 0 1 auto;
+  min-width: 0;
 }
 
 .shelf-controls {
@@ -5305,4 +5306,15 @@ body {
   .global-search .edition-language-trigger {
     max-width: 6rem;
   }
+}
+
+.library-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.library-controls .library-search {
+  flex: 0 1 16rem;
 }

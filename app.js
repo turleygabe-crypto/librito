@@ -197,7 +197,7 @@ const state = {
   catalogLoading: false,
   catalogError: "",
   recommendationPool: [],
-  library: { query: "", sort: "title-asc", pageSize: 25, page: 1 },
+  library: { query: "" },
   shelfSort: { key: "added", direction: "desc" },
 };
 
@@ -2494,7 +2494,6 @@ const browseFilterGroups = [
     ["2", "2★ & up", 2, 5],
   ] },
 ];
-let browsePanelOpen = false;
 
 function countActiveFilters(filters) {
   return browseFilterGroups.filter((group) => filters[group.key]).length + (filters.lang ? 1 : 0);
@@ -2528,86 +2527,41 @@ function applyBrowseControls(books, sort, filters) {
   return compare ? [...visible].sort(compare) : visible;
 }
 
-function createBrowseControls({ sort, filters, languages = false, sortOptions = browseSortOptions, popover = false, onChange }) {
+const browseUi = { scope: "", open: "" };
+
+// Sort and filter pills that open one floating panel at a time.
+function createBrowseControls({ scope, sort, filters, languages = false, sortOptions = browseSortOptions, onChange }) {
+  if (browseUi.scope !== scope) Object.assign(browseUi, { scope, open: "" });
   const bar = document.createElement("section");
-  bar.className = `browse-bar${popover ? " browse-popover" : ""}`;
+  bar.className = "browse-bar browse-popover";
   bar.setAttribute("aria-label", "Sort and filter");
-  const panelOpen = popover ? shelfBrowse.openPanel === "filters" : browsePanelOpen;
   const main = document.createElement("div");
   main.className = "browse-bar-main";
 
-  const sortLabel = document.createElement("label");
-  sortLabel.className = "browse-sort";
-  sortLabel.append("Sort by ");
-  const select = document.createElement("select");
-  sortOptions.forEach(([value, label]) => select.add(new Option(label, value, false, value === sort)));
-  select.addEventListener("change", () => onChange({ sort: select.value, filters }));
-  sortLabel.append(select);
-
-  const activeCount = countActiveFilters(filters);
-  const panelId = `browsePanel${Math.random().toString(36).slice(2, 8)}`;
-  const toggle = document.createElement("button");
-  toggle.type = "button";
-  toggle.className = "browse-toggle";
-  toggle.setAttribute("aria-controls", panelId);
-  toggle.setAttribute("aria-expanded", String(panelOpen));
-  toggle.textContent = activeCount ? `Filters (${activeCount})` : "Filters";
-  const panel = document.createElement("div");
-  panel.id = panelId;
-  panel.className = "browse-panel";
-  panel.hidden = !panelOpen;
-  toggle.addEventListener("click", () => {
-    const open = panel.hidden;
-    if (popover) {
-      shelfBrowse.openPanel = open ? "filters" : "";
-      sortToggle?.setAttribute("aria-expanded", "false");
-      if (sortPanel) sortPanel.hidden = true;
-    } else {
-      browsePanelOpen = open;
-    }
-    panel.hidden = !open;
-    toggle.setAttribute("aria-expanded", String(open));
-  });
-  let sortToggle = null;
-  let sortPanel = null;
-  if (popover) {
-    const sortOpen = shelfBrowse.openPanel === "sort";
-    sortToggle = document.createElement("button");
-    sortToggle.type = "button";
-    sortToggle.className = "browse-toggle browse-sort-toggle";
-    sortToggle.setAttribute("aria-expanded", String(sortOpen));
-    sortToggle.textContent = `Sort: ${sortOptions.find(([value]) => value === sort)?.[1] || "Most relevant"}`;
-    sortPanel = document.createElement("div");
-    sortPanel.className = "browse-panel browse-sort-panel";
-    sortPanel.hidden = !sortOpen;
-    const sortChips = document.createElement("div");
-    sortChips.className = "browse-options";
-    sortOptions.forEach(([value, label]) => {
-      const item = document.createElement("button");
-      item.type = "button";
-      item.className = `browse-chip${value === sort ? " active" : ""}`;
-      item.setAttribute("aria-pressed", String(value === sort));
-      item.textContent = label;
-      item.addEventListener("click", () => {
-        shelfBrowse.openPanel = "";
-        onChange({ sort: value, filters });
-      });
-      sortChips.append(item);
+  const panels = {};
+  const toggles = {};
+  const syncPanels = () => {
+    Object.keys(panels).forEach((key) => {
+      panels[key].hidden = browseUi.open !== key;
+      toggles[key].setAttribute("aria-expanded", String(browseUi.open === key));
     });
-    sortPanel.append(sortChips);
-    sortToggle.addEventListener("click", () => {
-      const open = sortPanel.hidden;
-      shelfBrowse.openPanel = open ? "sort" : "";
-      sortPanel.hidden = !open;
-      sortToggle.setAttribute("aria-expanded", String(open));
-      panel.hidden = true;
-      toggle.setAttribute("aria-expanded", "false");
+  };
+  const addPanel = (key, label) => {
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "browse-toggle";
+    toggle.textContent = label;
+    const panel = document.createElement("div");
+    panel.className = "browse-panel";
+    toggle.addEventListener("click", () => {
+      browseUi.open = browseUi.open === key ? "" : key;
+      syncPanels();
     });
-    main.append(sortToggle, toggle);
-  } else {
-    main.append(sortLabel, toggle);
-  }
-
+    toggles[key] = toggle;
+    panels[key] = panel;
+    main.append(toggle);
+    return panel;
+  };
   const chip = (label, active, onClick) => {
     const item = document.createElement("button");
     item.type = "button";
@@ -2617,6 +2571,18 @@ function createBrowseControls({ sort, filters, languages = false, sortOptions = 
     item.addEventListener("click", onClick);
     return item;
   };
+
+  const sortPanel = addPanel("sort", `Sort: ${sortOptions.find(([value]) => value === sort)?.[1] || sortOptions[0][1]}`);
+  const sortChips = document.createElement("div");
+  sortChips.className = "browse-options";
+  sortOptions.forEach(([value, label]) => sortChips.append(chip(label, value === sort, () => {
+    browseUi.open = "";
+    onChange({ sort: value, filters });
+  })));
+  sortPanel.append(sortChips);
+
+  const activeCount = countActiveFilters(filters);
+  const panel = addPanel("filters", activeCount ? `Filters (${activeCount})` : "Filters");
   const setFilter = (key, value) => onChange({ sort, filters: { ...filters, [key]: filters[key] === value ? "" : value } });
   const groups = browseFilterGroups.map((group) => ({
     key: group.key,
@@ -2650,32 +2616,40 @@ function createBrowseControls({ sort, filters, languages = false, sortOptions = 
     clear.addEventListener("click", () => onChange({ sort, filters: {} }));
     panel.append(clear);
   }
-  bar.append(main, panel);
-  if (sortPanel) bar.append(sortPanel);
-  if (popover) {
-    const closeAll = () => {
-      shelfBrowse.openPanel = "";
-      panel.hidden = true;
-      toggle.setAttribute("aria-expanded", "false");
-      sortPanel.hidden = true;
-      sortToggle.setAttribute("aria-expanded", "false");
-    };
-    const onOutside = (event) => {
-      if (!bar.isConnected) return stop();
-      if (!bar.contains(event.target)) closeAll();
-    };
-    const onKey = (event) => {
-      if (!bar.isConnected) return stop();
-      if (event.key === "Escape") closeAll();
-    };
-    const stop = () => {
-      document.removeEventListener("pointerdown", onOutside);
-      document.removeEventListener("keydown", onKey);
-    };
-    document.addEventListener("pointerdown", onOutside);
-    document.addEventListener("keydown", onKey);
-  }
+  bar.append(main, sortPanel, panel);
+  syncPanels();
+
+  const closeAll = () => {
+    browseUi.open = "";
+    syncPanels();
+  };
+  const stop = () => {
+    document.removeEventListener("pointerdown", onOutside);
+    document.removeEventListener("keydown", onKey);
+  };
+  const onOutside = (event) => {
+    if (!bar.isConnected) return stop();
+    if (!bar.contains(event.target)) closeAll();
+  };
+  const onKey = (event) => {
+    if (!bar.isConnected) return stop();
+    if (event.key === "Escape") closeAll();
+  };
+  document.addEventListener("pointerdown", onOutside);
+  document.addEventListener("keydown", onKey);
   return bar;
+}
+
+// Puts the sort/filter controls to the right of a page header.
+function placeBesideHeader(header, controls) {
+  const host = document.createElement("div");
+  host.className = "shelf-controls";
+  host.append(controls);
+  const wrap = document.createElement("div");
+  wrap.className = "shelf-head";
+  if (header.parentNode) header.replaceWith(wrap);
+  wrap.append(header, host);
+  return wrap;
 }
 
 const genreSizeOptions = [25, 50, 75, 100];
@@ -2861,23 +2835,21 @@ function showGenrePage(genre, sort = "", page = 1, requestedSize = 0, filters = 
   const size = genreSizeOptions.includes(requestedSize) ? requestedSize : getStoredGenrePageSize();
   const go = (values) => navigateTo("genre", { name: displayGenre, sort, size: String(size), ...filters, ...values });
 
-  view.append(createPageHeader("Browse by genre", displayGenre, "Browse everything in the catalog."));
-
-  const controls = document.createElement("div");
-  controls.className = "genre-controls";
-  controls.append(createBrowseControls({
+  const genreControls = createBrowseControls({
+    scope: `genre:${displayGenre.toLowerCase()}`,
     sort,
     filters,
     languages: true,
     onChange: (next) => go({ sort: next.sort, year: "", len: "", rating: "", lang: "", ...next.filters, page: "" }),
-  }));
+  });
+  view.append(placeBesideHeader(createPageHeader("Browse by genre", displayGenre, "Browse everything in the catalog."), genreControls));
 
   const summary = document.createElement("p");
   summary.className = "genre-summary";
   summary.setAttribute("aria-live", "polite");
   const results = document.createElement("div");
   results.className = "genre-results";
-  view.append(controls, summary, results);
+  view.append(summary, results);
   results.append(createBookLoader({ message: `Loading ${displayGenre} books…` }));
 
   const render = (result) => {
@@ -3032,12 +3004,7 @@ function showShelfPage(shelfName) {
   const shelfBrowser = shelfName !== "Currently Reading" && shelfName !== "Completed Books" && books.length
     ? createShelfBrowser(books)
     : null;
-  let headBlock = header;
-  if (shelfBrowser) {
-    headBlock = document.createElement("div");
-    headBlock.className = "shelf-head";
-    headBlock.append(header, shelfBrowser.controlsHost);
-  }
+  const headBlock = shelfBrowser ? placeBesideHeader(header, shelfBrowser.controls) : header;
   if (shelfName === "Currently Reading") {
     page.append(header, toolbar, createCurrentlyReadingList(books));
     return;
@@ -3058,17 +3025,17 @@ const shelfSortOptions = [
   ["old", "Oldest published"],
   ["rating", "Top rated"],
 ];
-const shelfBrowse = { shelf: "", sort: "added", filters: {}, page: 1, openPanel: "" };
+const shelfBrowse = { scope: "", sort: "added", filters: {}, page: 1 };
 
-function createShelfBrowser(books) {
-  if (shelfBrowse.shelf !== state.currentShelf) {
-    Object.assign(shelfBrowse, { shelf: state.currentShelf, sort: "added", filters: {}, page: 1, openPanel: "" });
+function createShelfBrowser(books, scope = `shelf:${state.currentShelf}`) {
+  if (shelfBrowse.scope !== scope) {
+    Object.assign(shelfBrowse, { scope, sort: "added", filters: {}, page: 1 });
   }
   const section = document.createElement("section");
   section.className = "search-result-group";
   const controlsHost = document.createElement("div");
-  controlsHost.className = "shelf-controls";
-  section.controlsHost = controlsHost;
+  controlsHost.className = "shelf-controls-slot";
+  section.controls = controlsHost;
   const render = () => {
     const visible = applyBrowseControls(books, shelfBrowse.sort, shelfBrowse.filters);
     const size = getStoredSearchPageSize();
@@ -3078,10 +3045,10 @@ function createShelfBrowser(books) {
     const pageBooks = visible.slice(start, start + size);
 
     const controls = createBrowseControls({
+      scope,
       sort: shelfBrowse.sort,
       filters: shelfBrowse.filters,
       sortOptions: shelfSortOptions,
-      popover: true,
       onChange: ({ sort, filters }) => {
         Object.assign(shelfBrowse, { sort, filters, page: 1 });
         render();
@@ -3390,14 +3357,6 @@ function showShelvesPage() {
   page.append(createCardRow("Collections", tiles));
 }
 
-const librarySortOptions = {
-  "title-asc": ["Title (A–Z)", (a, b) => compareText(a.title, b.title)],
-  "title-desc": ["Title (Z–A)", (a, b) => compareText(b.title, a.title)],
-  "author-asc": ["Author (A–Z)", (a, b) => compareText(a.author, b.author) || compareText(a.title, b.title)],
-  "added-desc": ["Recently added", (a, b) => String(b.added || "").localeCompare(String(a.added || "")) || compareText(a.title, b.title)],
-  "added-asc": ["Oldest added", (a, b) => String(a.added || "").localeCompare(String(b.added || "")) || compareText(a.title, b.title)],
-};
-
 function compareText(a, b) {
   return String(a || "").localeCompare(String(b || ""), undefined, { sensitivity: "base", numeric: true });
 }
@@ -3405,109 +3364,42 @@ function compareText(a, b) {
 function showLibraryPage() {
   updateActiveNavigation("Your Library");
   const page = showPage("library");
-  const prefs = state.library;
   const header = createPageHeader("", "Your Library", "Every book you've added, all in one place.");
-
-  const toolbar = document.createElement("div");
-  toolbar.className = "page-toolbar library-toolbar";
   const search = document.createElement("input");
   search.type = "search";
   search.className = "library-search";
   search.placeholder = "Search title, author, or genre…";
   search.setAttribute("aria-label", "Search your library");
-  search.value = prefs.query;
-  const sort = document.createElement("select");
-  sort.setAttribute("aria-label", "Sort books");
-  Object.entries(librarySortOptions).forEach(([value, [label]]) => {
-    sort.append(new Option(label, value, false, value === prefs.sort));
-  });
-  const size = document.createElement("select");
-  size.setAttribute("aria-label", "Books per page");
-  [10, 25, 50, 100].forEach((n) => size.append(new Option(`${n} per page`, String(n), false, n === prefs.pageSize)));
-  const wrap = (label, control) => {
-    const field = document.createElement("label");
-    field.className = "library-control";
-    const text = document.createElement("span");
-    text.textContent = label;
-    field.append(text, control);
-    return field;
-  };
-  toolbar.append(search, wrap("Sort", sort), wrap("Show", size));
-
+  search.value = state.library.query;
+  const slot = document.createElement("div");
+  slot.className = "library-controls";
   const results = document.createElement("div");
   results.className = "library-results";
-  page.append(header, toolbar, results);
 
-  const renderResults = () => {
-    const query = prefs.query.trim().toLowerCase();
+  const build = () => {
+    const query = state.library.query.trim().toLowerCase();
     const books = getLibraryBooks()
-      .filter((book) => !query || [book.title, book.author, book.genre].some((v) => String(v || "").toLowerCase().includes(query)))
-      .sort(librarySortOptions[prefs.sort][1]);
-    const pages = Math.max(1, Math.ceil(books.length / prefs.pageSize));
-    prefs.page = Math.min(Math.max(1, prefs.page), pages);
-    const start = (prefs.page - 1) * prefs.pageSize;
-    const visible = books.slice(start, start + prefs.pageSize);
+      .filter((book) => !query || [book.title, book.author, book.genre].some((v) => String(v || "").toLowerCase().includes(query)));
     results.replaceChildren();
-
-    const summary = document.createElement("p");
-    summary.className = "library-summary";
-    summary.textContent = books.length
-      ? `Showing ${start + 1}–${start + visible.length} of ${books.length} ${books.length === 1 ? "book" : "books"}`
-      : "";
-    results.append(summary);
-
     if (!books.length) {
+      slot.replaceChildren(search);
       const empty = document.createElement("p");
       empty.className = "row-empty-state";
       empty.textContent = query ? "No books match your search." : "Books you add will appear here.";
       results.append(empty);
       return;
     }
-    const grid = document.createElement("div");
-    grid.className = "library-grid";
-    visible.forEach((book) => grid.append(createBookCard(book)));
-    results.append(grid);
-
-    if (pages > 1) {
-      const nav = document.createElement("nav");
-      nav.className = "library-pagination";
-      nav.setAttribute("aria-label", "Library pages");
-      const go = (label, target, disabled) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "secondary-btn";
-        button.textContent = label;
-        button.disabled = disabled;
-        button.addEventListener("click", () => {
-          prefs.page = target;
-          renderResults();
-          page.scrollIntoView({ block: "start" });
-        });
-        return button;
-      };
-      const status = document.createElement("span");
-      status.textContent = `Page ${prefs.page} of ${pages}`;
-      nav.append(go("‹ Previous", prefs.page - 1, prefs.page === 1), status, go("Next ›", prefs.page + 1, prefs.page === pages));
-      results.append(nav);
-    }
+    const browser = createShelfBrowser(books, "library");
+    slot.replaceChildren(search, browser.controls);
+    results.append(browser);
   };
-
+  page.append(placeBesideHeader(header, slot), results);
   search.addEventListener("input", () => {
-    prefs.query = search.value;
-    prefs.page = 1;
-    renderResults();
+    state.library.query = search.value;
+    shelfBrowse.page = 1;
+    build();
   });
-  sort.addEventListener("change", () => {
-    prefs.sort = sort.value;
-    prefs.page = 1;
-    renderResults();
-  });
-  size.addEventListener("change", () => {
-    prefs.pageSize = Number(size.value);
-    prefs.page = 1;
-    renderResults();
-  });
-  renderResults();
+  build();
 }
 
 function createBookTable(books) {
@@ -5726,6 +5618,7 @@ function showSearchPage(query = "") {
     summary.textContent = "No books match these filters. Books missing year, page, or rating data are hidden when filtering by them.";
   }
   const controls = createBrowseControls({
+    scope: "search",
     sort: state.searchSort,
     filters: state.searchFilters,
     onChange: ({ sort, filters }) => {
@@ -5750,7 +5643,10 @@ function showSearchPage(query = "") {
       rerender();
     },
   };
-  books.append(controls, summary);
+  const searchHeader = page.querySelector(".search-header");
+  if (searchHeader) placeBesideHeader(searchHeader, controls);
+  else books.append(controls);
+  books.append(summary);
   if (pageMatches.length) books.append(createPagingBar(barOptions));
 
   const bookGroups = state.searchLanguage === "all"
