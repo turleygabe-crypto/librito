@@ -1,5 +1,5 @@
 import {
-  authenticate, billingDependencies, BillingError, checked, respondError, resumeRenewal, startCheckout, withAccount,
+  authenticate, billingDependencies, BillingError, checked, respondError, resumeRenewal, startCheckout, subscriptionSnapshot, withAccount,
 } from "../lib/server/billing.js";
 
 export function createHandler(dependencies = billingDependencies) {
@@ -17,9 +17,15 @@ export function createHandler(dependencies = billingDependencies) {
       }
       const user = await authenticate(req, db);
       if (req.method === "GET") {
-        const account = checked(await db.from("billing_accounts")
+        let account = checked(await db.from("billing_accounts")
           .select("customer_id, has_subscription, subscription_status, cancel_at_period_end, period_end")
           .eq("user_id", user.id).maybeSingle());
+        if (account?.customer_id) {
+          account = await withAccount(db, user.id, async (current, save) => {
+            await save(await subscriptionSnapshot(stripe, current.customer_id, config));
+            return current;
+          });
+        }
         return res.status(200).json({
           canManage: Boolean(account?.customer_id),
           hasSubscription: account?.has_subscription || false,

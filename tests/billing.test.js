@@ -361,7 +361,7 @@ test("webhook processing failures return non-2xx so Stripe retries, and unconfig
 test("billing endpoint rejects methods, cross-origin requests and missing auth; provides portal and safe setup errors", async () => {
   const db = database();
   db.auth = { getUser: async () => ({ data: { user } }) };
-  const stripe = { billingPortal: { sessions: { create: async (params) => {
+  const stripe = { ...stripeMock(), billingPortal: { sessions: { create: async (params) => {
     assert.equal(params.customer, "cus_reader");
     return { url: "https://billing.stripe.com/test" };
   } } } };
@@ -384,6 +384,36 @@ test("billing endpoint rejects methods, cross-origin requests and missing auth; 
   await createHandler(() => { throw new BillingError(503, "Billing is not configured yet."); })({ method: "GET", headers: {} }, res);
   assert.equal(res.code, 503);
   assert.equal(res.body.error, "Billing is not configured yet.");
+});
+
+test("status refresh replaces a stale renewal flag with Stripe cancellation even without webhook delivery", async () => {
+  const db = database();
+  db.auth = { getUser: async () => ({ data: { user } }) };
+  await sql.exec("update billing_accounts set cancel_at_period_end = false, has_subscription = true, subscription_status = 'active'");
+  const sub = { ...subscription("active"), cancel_at_period_end: false, cancel_at: 1800000000 };
+  const stripe = stripeMock([sub]);
+  const req = { method: "GET", headers: { authorization: "Bearer valid" } };
+  const res = response();
+  await createHandler(() => ({ db, stripe, config }))(req, res);
+  assert.equal(res.code, 200);
+  assert.equal(res.body.cancelAtPeriodEnd, true);
+  assert.equal(res.body.hasSubscription, true);
+  assert.equal(new Date(res.body.periodEnd).toISOString(), new Date(sub.cancel_at * 1000).toISOString());
+  assert.equal((await sql.query("select cancel_at_period_end from billing_accounts")).rows[0].cancel_at_period_end, true);
+  assert.equal((await sql.query("select tier from profiles")).rows[0].tier, "book_lover");
+});
+
+test("status refresh does not return stale renewal information if Stripe is unavailable", async () => {
+  const db = database();
+  db.auth = { getUser: async () => ({ data: { user } }) };
+  const stripe = { subscriptions: { list() { throw new Error("Stripe unavailable"); } } };
+  const res = response();
+  await createHandler(() => ({ db, stripe, config }))({
+    method: "GET", headers: { authorization: "Bearer valid" },
+  }, res);
+  assert.equal(res.code, 500);
+  assert.equal(res.body.cancelAtPeriodEnd, undefined);
+  assert.equal((await sql.query("select lock_owner from billing_accounts")).rows[0].lock_owner, null);
 });
 
 test("resume endpoint uses the authenticated Customer and rejects cross-origin mutations", async () => {

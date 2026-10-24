@@ -6536,7 +6536,20 @@ function createUpgradeFeatureList(features) {
   return list;
 }
 
-async function billingRequest(body) {
+let billingStatusRequest = null;
+function billingRequest(body) {
+  if (body) return performBillingRequest(body);
+  const userId = state.session?.user.id;
+  if (billingStatusRequest?.userId === userId) return billingStatusRequest.promise;
+  const request = { userId, promise: null };
+  request.promise = performBillingRequest().finally(() => {
+    if (billingStatusRequest === request) billingStatusRequest = null;
+  });
+  billingStatusRequest = request;
+  return request.promise;
+}
+
+async function performBillingRequest(body) {
   const session = await refreshAuthSession();
   if (!session) throw new Error("Sign in to manage billing.");
   const response = await fetch("/api/billing", {
@@ -6843,6 +6856,8 @@ function showUpgradePage() {
                     : checkout === "canceled" ? "Checkout canceled. No plan change was made." : "";
     } catch (error) {
       console.error("Could not load billing status", error);
+      currentBillingStatus = null;
+      resume.hidden = true;
       billingPanel.hidden = false;
       refresh.hidden = false;
       billingStatus.textContent = "We couldn't load your subscription details. Please try again.";
