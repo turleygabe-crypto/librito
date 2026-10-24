@@ -3312,12 +3312,12 @@ function createBookEditionPicker(book) {
   loadButton.className = "secondary-btn edition-picker-button";
   loadButton.textContent = "Refresh editions";
   header.append(copy, loadButton);
-  const status = document.createElement("p");
+  const status = document.createElement("div");
   status.className = "edition-picker-status";
   status.setAttribute("role", "status");
   const choices = document.createElement("div");
   choices.className = "edition-cover-choices";
-  status.textContent = "Finding available editions…";
+  setBookProfileLoadingStatus(status, "Finding available editions…");
 
   const languageFinder = document.createElement("div");
   languageFinder.className = "edition-language-finder";
@@ -3373,9 +3373,10 @@ function createProfileRecommendationSection(title, message) {
   header.className = "book-profile-recommendation-heading";
   const heading = document.createElement("h2");
   heading.textContent = title;
-  const status = document.createElement("p");
+  const status = document.createElement("div");
   status.className = "book-recommendation-status";
-  status.textContent = message;
+  status.setAttribute("role", "status");
+  setBookProfileLoadingStatus(status, message);
   header.append(heading);
   wrapper.append(header, status);
   return { section: wrapper, status };
@@ -4365,7 +4366,7 @@ async function loadBookProfileEditions(book, section, knownVolumes = null) {
   const button = section.querySelector(".edition-picker-button");
   const choices = section.querySelector(".edition-cover-choices");
   button.disabled = true;
-  status.textContent = "Finding available editions…";
+  setBookProfileLoadingStatus(status, "Finding available editions…");
   section.dataset.status = "loading";
   try {
     let volumes = knownVolumes;
@@ -4413,7 +4414,7 @@ async function loadBookProfileEditionsInLanguage(book, section, language) {
   const buttons = section.querySelectorAll(".edition-picker-button");
   const languageName = language === "all" ? "all-language" : getOpenLibraryLanguageName(language);
   buttons.forEach((button) => { button.disabled = true; });
-  status.textContent = `Finding ${languageName} editions…`;
+  setBookProfileLoadingStatus(status, `Finding ${languageName} editions…`);
   section.dataset.status = "loading";
   try {
     const editions = await getOpenLibraryEditionsForBook(book, language);
@@ -4799,9 +4800,9 @@ function preloadLoaderCovers() {
 }
 preloadLoaderCovers();
 
-function createBookLoader({ message = "Loading…", compact = false } = {}) {
+function createBookLoader({ message = "Loading…", compact = false, mini = false } = {}) {
   const loader = document.createElement("div");
-  loader.className = `book-loader${compact ? " book-loader-compact" : ""}`;
+  loader.className = `book-loader${compact ? " book-loader-compact" : ""}${mini ? " book-loader-mini" : ""}`;
   loader.setAttribute("role", "status");
   loader.setAttribute("aria-live", "polite");
   const stage = document.createElement("div");
@@ -4826,9 +4827,11 @@ function createBookLoader({ message = "Loading…", compact = false } = {}) {
     }
     lastBook = order.pop();
     slot.replaceChildren(createBookCover(lastBook, "book-loader-art"));
-    const phrases = loaderPhrases.filter((phrase) => phrase !== lastPhrase);
-    lastPhrase = phrases[Math.floor(Math.random() * phrases.length)];
-    text.textContent = lastPhrase;
+    if (!mini) {
+      const phrases = loaderPhrases.filter((phrase) => phrase !== lastPhrase);
+      lastPhrase = phrases[Math.floor(Math.random() * phrases.length)];
+      text.textContent = lastPhrase;
+    }
   };
   showNext();
   // Each animation iteration is three bounces; swap the book when it ends.
@@ -4837,6 +4840,15 @@ function createBookLoader({ message = "Loading…", compact = false } = {}) {
     showNext();
   });
   return loader;
+}
+
+function setBookProfileLoadingStatus(status, message) {
+  const loader = createBookLoader({ message, mini: true });
+  loader.setAttribute("aria-hidden", "true");
+  const announcement = document.createElement("span");
+  announcement.className = "visually-hidden";
+  announcement.textContent = message;
+  status.replaceChildren(loader, announcement);
 }
 
 function createSearchLoading() {

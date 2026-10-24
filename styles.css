@@ -4860,10 +4860,39 @@ body {
   width: 3.6rem;
 }
 
+.book-loader-mini {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.55rem;
+  width: auto;
+  padding: 0;
+  text-align: left;
+}
+
+.book-loader-mini .book-loader-stage {
+  height: 2.1rem;
+  padding-top: 0.4rem;
+}
+
+.book-loader-mini .book-loader-slot {
+  width: 1.2rem;
+  animation-name: book-loader-bounce-mini;
+}
+
+.book-loader-mini .book-loader-message {
+  font-size: 0.78rem;
+}
+
 /* Three bounces per iteration. */
 @keyframes book-loader-bounce {
   0%, 33.333%, 66.667%, 100% { transform: translateY(0) scale(1.05, 0.93); animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1); }
   16.667%, 50%, 83.333% { transform: translateY(-1.8rem) scale(1, 1.03); animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4); }
+}
+
+@keyframes book-loader-bounce-mini {
+  0%, 33.333%, 66.667%, 100% { transform: translateY(0) scale(1.05, 0.93); animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1); }
+  16.667%, 50%, 83.333% { transform: translateY(-0.55rem) scale(1, 1.03); animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4); }
 }
 
 @media (prefers-reduced-motion: reduce) {
