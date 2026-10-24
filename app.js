@@ -294,6 +294,7 @@ let selectedTitleResult = null;
 let bookEntryMode = "";
 let dialogReturnFocus = null;
 let shelfReturnFocus = null;
+let pendingShelfBook = null;
 let authReturnFocus = null;
 let bookProfileReturnFocus = null;
 let editionDialogOverlay = null;
@@ -648,7 +649,8 @@ async function addBookToShelf(book, shelf) {
   if (state.session) render();
   else saveBooks();
   if (state.view === "shelf") showShelfPage(state.currentShelf);
-  showToast(`Added to ${shelf.name}`);
+  else if (state.view === "book") renderBookRoute();
+  showToast(`“${book.title}” added to ${shelf.name} ✓`);
 }
 
 async function removeBookFromShelf(book, shelfName) {
@@ -1865,6 +1867,16 @@ function createBookCard(book, { compact = false, subtitle = "", recommendation =
   open.addEventListener("click", () => openBookProfile(book));
   card.append(open);
   const ownedBook = getLibraryBooks().find((owned) => getBookKey(owned) === getBookKey(book));
+  if (ownedBook) {
+    const shelfNames = getBookShelfNames(ownedBook);
+    const tag = document.createElement("span");
+    tag.className = `card-shelf-tag${shelfNames.length ? " is-on-shelf" : ""}`;
+    tag.textContent = shelfNames.length ? `📚 ${shelfNames.join(", ")}` : "No shelf yet";
+    open.append(tag);
+    const shelfMenu = createBookShelfMenu(ownedBook, { compact: true });
+    shelfMenu.classList.add("card-shelf-button");
+    card.append(shelfMenu);
+  }
   if (!ownedBook) {
     const addMenu = document.createElement("details");
     addMenu.className = "card-add-menu";
@@ -1894,7 +1906,14 @@ function createBookCard(book, { compact = false, subtitle = "", recommendation =
           || (book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-L.jpg?default=false` : ""),
       });
     });
-    choices.append(addToLibrary, purchase);
+    const addToShelfFirst = document.createElement("button");
+    addToShelfFirst.type = "button";
+    addToShelfFirst.textContent = "Add to Library & shelf";
+    addToShelfFirst.addEventListener("click", () => {
+      addMenu.open = false;
+      markBookAsOwned(book, { focusShelf: true });
+    });
+    choices.append(addToLibrary, addToShelfFirst, purchase);
     addMenu.append(action, choices);
     wireCardPopover(addMenu, action, choices);
     card.append(addMenu);
@@ -1913,9 +1932,10 @@ function createBookCard(book, { compact = false, subtitle = "", recommendation =
   return card;
 }
 
-function markBookAsOwned(book) {
+function markBookAsOwned(book, { focusShelf = false } = {}) {
   openDialog();
   if (!state.session) return;
+  if (focusShelf) window.setTimeout(() => bookForm.elements.shelf?.focus(), 50);
   startManualEntry();
   bookForm.elements.title.value = book.title || "";
   bookForm.elements.author.value = Array.isArray(book.author_name)
@@ -1943,11 +1963,11 @@ function createBookCardMenu(book, ownedBook, recommendation) {
   wireCardPopover(menu, summary, actions);
   const addToShelf = document.createElement("button");
   addToShelf.type = "button";
-  addToShelf.textContent = "Add to shelf";
+  addToShelf.textContent = ownedBook && getBookShelfNames(ownedBook).length ? "Change shelves" : "Add to shelf";
   addToShelf.addEventListener("click", () => {
     menu.open = false;
     if (ownedBook) openBookProfile(ownedBook);
-    else markBookAsOwned(book);
+    else markBookAsOwned(book, { focusShelf: true });
   });
   const markOwned = document.createElement("button");
   markOwned.type = "button";
@@ -3392,7 +3412,7 @@ function showShelvesPage() {
   createShelf.type = "button";
   createShelf.className = "action-btn";
   createShelf.textContent = "＋ Create shelf";
-  createShelf.addEventListener("click", openShelfDrawer);
+  createShelf.addEventListener("click", () => openShelfDrawer());
   const toolbar = document.createElement("div");
   toolbar.className = "page-toolbar";
   toolbar.append(createShelf);
@@ -3723,8 +3743,18 @@ function renderBookPage(book) {
     else showToast("Add this book to your library before liking it.");
   });
   actions.append(like);
+  if (ownedBook && !isActiveLibraryBook) {
+    actions.append(createBookShelfMenu(ownedBook));
+  } else if (!ownedBook) {
+    const addShelf = document.createElement("button");
+    addShelf.type = "button";
+    addShelf.className = "secondary-btn";
+    addShelf.textContent = "＋ Add to shelf";
+    addShelf.addEventListener("click", () => markBookAsOwned(book, { focusShelf: true }));
+    actions.append(addShelf);
+  }
   if (!isActiveLibraryBook) actions.append(moreMenu);
-  content.append(actions);
+  content.append(createShelfStatus(book, ownedBook), actions);
   if (isActiveLibraryBook) {
     const readingActions = document.createElement("div");
     readingActions.className = "reading-actions";
@@ -4059,37 +4089,94 @@ function renderBookGenreTags(container, genres) {
   });
 }
 
-function createBookShelfMenu(book) {
+function getShelfSummaryLabel(book) {
+  const names = getBookShelfNames(book);
+  if (!names.length) return "＋  Add to shelf";
+  return names.length === 1 ? `📚  On shelf: ${names[0]}` : `📚  On ${names.length} shelves`;
+}
+
+function createBookShelfMenu(book, { compact = false } = {}) {
   const menu = document.createElement("details");
-  menu.className = "book-shelf-menu";
+  menu.className = `book-shelf-menu${compact ? " compact-shelf-menu" : ""}`;
   const summary = document.createElement("summary");
   summary.className = "secondary-btn";
-  summary.textContent = "＋  Add to shelf";
+  const names = getBookShelfNames(book);
+  summary.textContent = compact ? (names.length ? "📚" : "＋📚") : getShelfSummaryLabel(book);
+  summary.setAttribute("aria-label", names.length
+    ? `${book.title} is on ${names.join(", ")}. Change shelves`
+    : `Add ${book.title} to a shelf`);
+  summary.title = names.length ? `On: ${names.join(", ")}` : "Not on a shelf yet";
   const panel = document.createElement("div");
   panel.className = "card-add-actions";
-  const shelfNames = getBookShelfNames(book);
+  const heading = document.createElement("p");
+  heading.className = "shelf-menu-heading";
+  heading.textContent = state.shelves.length ? "Tap a shelf to add or remove" : "You have no shelves yet";
+  panel.append(heading);
   state.shelves.forEach((shelf) => {
+    const on = names.includes(shelf.name);
     const option = document.createElement("button");
     option.type = "button";
-    option.textContent = shelfNames.includes(shelf.name) ? `✓ ${shelf.name}` : shelf.name;
-    option.disabled = shelfNames.includes(shelf.name);
+    option.className = on ? "is-on-shelf" : "";
+    option.setAttribute("aria-pressed", String(on));
+    const dot = document.createElement("span");
+    dot.className = "shelf-dot";
+    dot.style.background = shelf.color || "#8b5e3c";
+    const label = document.createElement("span");
+    label.textContent = shelf.name;
+    const mark = document.createElement("span");
+    mark.className = "shelf-check";
+    mark.textContent = on ? "✓ Added" : "";
+    option.append(dot, label, mark);
     option.addEventListener("click", () => {
       menu.open = false;
-      addBookToShelf(book, shelf);
+      if (on) removeBookFromShelf(book, shelf.name);
+      else addBookToShelf(book, shelf);
     });
     panel.append(option);
   });
   const create = document.createElement("button");
   create.type = "button";
-  create.textContent = "＋ New shelf";
+  create.className = "shelf-create-option";
+  create.textContent = "＋ New shelf & add this book";
   create.addEventListener("click", () => {
     menu.open = false;
-    openShelfDrawer();
+    openShelfDrawer(book);
   });
   panel.append(create);
   menu.append(summary, panel);
   wireCardPopover(menu, summary, panel);
   return menu;
+}
+
+function createShelfStatus(book, ownedBook) {
+  const box = document.createElement("div");
+  box.className = "book-shelf-status";
+  box.setAttribute("aria-live", "polite");
+  const label = document.createElement("strong");
+  label.className = "book-shelf-status-label";
+  box.append(label);
+  const names = ownedBook ? getBookShelfNames(ownedBook) : [];
+  if (names.length) {
+    box.classList.add("is-on-shelf");
+    label.textContent = names.length === 1 ? "📚 On shelf:" : "📚 On shelves:";
+    names.forEach((name) => {
+      const shelf = state.shelves.find((item) => item.name === name);
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "book-shelf-chip";
+      chip.textContent = name;
+      if (shelf?.color) chip.style.setProperty("--shelf-color", shelf.color);
+      chip.setAttribute("aria-label", `Open shelf ${name}`);
+      chip.addEventListener("click", () => navigateTo("shelf", { name }));
+      box.append(chip);
+    });
+  } else {
+    box.classList.add("is-off-shelf");
+    label.textContent = ownedBook
+      ? "Not on any shelf yet — organize it with the button below."
+      : "Not on a shelf — add it to your library, then place it on a shelf.";
+  }
+  return box;
 }
 
 function createBookMoreMenu(book, ownedBook) {
@@ -6256,7 +6343,11 @@ function closeDialog() {
   dialogReturnFocus = null;
 }
 
-function openShelfDrawer() {
+function openShelfDrawer(book = null) {
+  pendingShelfBook = book && book.title ? book : null;
+  document.getElementById("shelfDrawerTitle").textContent = pendingShelfBook
+    ? `New shelf for “${pendingShelfBook.title}”`
+    : "Create a new shelf";
   if (window.matchMedia("(max-width: 899px)").matches && sidebar.classList.contains("is-open")) {
     setLibraryDrawerOpen(false);
   }
@@ -6266,6 +6357,7 @@ function openShelfDrawer() {
 }
 
 function closeShelfDrawer() {
+  pendingShelfBook = null;
   shelfDrawerOverlay.classList.add("hidden");
   shelfForm.reset();
   if (shelfColorInput) shelfColorInput.value = "#8b5e3c";
@@ -6828,6 +6920,7 @@ async function loadShelvesFromSupabase() {
 }
 
 async function createShelfInSupabase() {
+  const bookToAdd = pendingShelfBook;
   const name = newShelfInput.value.trim();
   if (!name) {
     showToast("Name your shelf first.");
@@ -6853,7 +6946,8 @@ async function createShelfInSupabase() {
     if (shelfColorInput) shelfColorInput.value = "#8b5e3c";
     render();
     closeShelfDrawer();
-    showToast("Shelf created");
+    if (bookToAdd) await addBookToShelf(bookToAdd, shelf);
+    else showToast(`Shelf “${name}” created`);
     return;
   }
   let session;
@@ -6887,7 +6981,8 @@ async function createShelfInSupabase() {
   if (shelfColorInput) shelfColorInput.value = "#8b5e3c";
   render();
   closeShelfDrawer();
-  showToast("Shelf created");
+  if (bookToAdd) await addBookToShelf(bookToAdd, data);
+  else showToast(`Shelf “${name}” created`);
 }
 
 async function loadFromSupabase() {
@@ -7059,7 +7154,7 @@ document.getElementById("sidebarAddBookBtn").addEventListener("click", () => {
   if (window.matchMedia("(max-width: 899px)").matches) setLibraryDrawerOpen(false);
   openDialog();
 });
-document.getElementById("sidebarCreateShelfBtn").addEventListener("click", openShelfDrawer);
+document.getElementById("sidebarCreateShelfBtn").addEventListener("click", () => openShelfDrawer());
 
 window.addEventListener("popstate", restoreRouteFromLocation);
 window.addEventListener("scroll", trackRecommendationScroll, { capture: true, passive: true });
