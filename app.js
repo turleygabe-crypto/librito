@@ -2573,6 +2573,29 @@ function createBrowseControls({ sort, filters, languages = false, sortOptions = 
   }
   bar.append(main, panel);
   if (sortPanel) bar.append(sortPanel);
+  if (popover) {
+    const closeAll = () => {
+      shelfBrowse.openPanel = "";
+      panel.hidden = true;
+      toggle.setAttribute("aria-expanded", "false");
+      sortPanel.hidden = true;
+      sortToggle.setAttribute("aria-expanded", "false");
+    };
+    const onOutside = (event) => {
+      if (!bar.isConnected) return stop();
+      if (!bar.contains(event.target)) closeAll();
+    };
+    const onKey = (event) => {
+      if (!bar.isConnected) return stop();
+      if (event.key === "Escape") closeAll();
+    };
+    const stop = () => {
+      document.removeEventListener("pointerdown", onOutside);
+      document.removeEventListener("keydown", onKey);
+    };
+    document.addEventListener("pointerdown", onOutside);
+    document.addEventListener("keydown", onKey);
+  }
   return bar;
 }
 
