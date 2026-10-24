@@ -3562,7 +3562,7 @@ function createBookEditionPicker(book) {
 
   const languageFinder = document.createElement("div");
   languageFinder.className = "edition-language-finder";
-  const languageLabel = document.createElement("label");
+  const languageLabel = document.createElement("div");
   languageLabel.className = "edition-language-label";
   languageLabel.textContent = "Find in another language";
   const languageSelect = document.createElement("select");
@@ -3575,7 +3575,87 @@ function createBookEditionPicker(book) {
   specificLanguagesGroup.label = "Specific language";
   openLibraryLanguages.forEach(([code, name]) => specificLanguagesGroup.append(new Option(name, code)));
   languageSelect.append(allLanguagesGroup, specificLanguagesGroup);
-  languageLabel.append(languageSelect);
+  languageSelect.hidden = true;
+  languageSelect.tabIndex = -1;
+
+  const languageMenu = document.createElement("div");
+  languageMenu.className = "edition-language-menu";
+  const languageTrigger = document.createElement("button");
+  languageTrigger.type = "button";
+  languageTrigger.className = "edition-language-trigger";
+  languageTrigger.setAttribute("aria-haspopup", "listbox");
+  languageTrigger.setAttribute("aria-expanded", "false");
+  const languageTriggerText = document.createElement("span");
+  languageTrigger.append(languageTriggerText);
+  const languageList = document.createElement("div");
+  languageList.className = "edition-language-list";
+  languageList.setAttribute("role", "listbox");
+  languageList.hidden = true;
+
+  const languageOptionButtons = [];
+  const addLanguageGroup = (title, items) => {
+    if (title) {
+      const groupTitle = document.createElement("div");
+      groupTitle.className = "edition-language-group";
+      groupTitle.textContent = title;
+      languageList.append(groupTitle);
+    }
+    items.forEach(([code, name]) => {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "edition-language-option";
+      option.setAttribute("role", "option");
+      option.dataset.value = code;
+      option.textContent = name;
+      languageOptionButtons.push(option);
+      languageList.append(option);
+    });
+  };
+  addLanguageGroup("Any language", [["all", "All languages"]]);
+  addLanguageGroup("Specific language", openLibraryLanguages);
+
+  const syncLanguageMenu = () => {
+    const selected = languageSelect.selectedOptions[0];
+    languageTriggerText.textContent = selected ? selected.textContent : "Choose a language";
+    languageOptionButtons.forEach((option) => {
+      option.setAttribute("aria-selected", String(option.dataset.value === languageSelect.value));
+    });
+  };
+  const setLanguageMenuOpen = (open) => {
+    languageList.hidden = !open;
+    languageTrigger.setAttribute("aria-expanded", String(open));
+    if (open) {
+      const current = languageList.querySelector('[aria-selected="true"]');
+      if (current) current.scrollIntoView({ block: "nearest" });
+    }
+  };
+  languageTrigger.addEventListener("click", () => setLanguageMenuOpen(languageList.hidden));
+  languageList.addEventListener("click", (event) => {
+    const option = event.target.closest(".edition-language-option");
+    if (!option) return;
+    languageSelect.value = option.dataset.value;
+    languageSelect.dispatchEvent(new Event("change"));
+    setLanguageMenuOpen(false);
+    languageTrigger.focus();
+  });
+  languageMenu.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !languageList.hidden) {
+      setLanguageMenuOpen(false);
+      languageTrigger.focus();
+    }
+  });
+  const closeOnOutsideClick = (event) => {
+    if (!languageMenu.isConnected) {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+    } else if (!languageMenu.contains(event.target)) {
+      setLanguageMenuOpen(false);
+    }
+  };
+  document.addEventListener("pointerdown", closeOnOutsideClick);
+  languageSelect.addEventListener("change", syncLanguageMenu);
+  syncLanguageMenu();
+  languageMenu.append(languageTrigger, languageList, languageSelect);
+  languageLabel.append(languageMenu);
   const languageButton = document.createElement("button");
   languageButton.type = "button";
   languageButton.className = "secondary-btn edition-picker-button edition-language-button";
@@ -3592,6 +3672,7 @@ function createBookEditionPicker(book) {
 
   loadButton.addEventListener("click", () => {
     languageSelect.value = "";
+    syncLanguageMenu();
     languageButton.disabled = true;
     loadBookProfileEditions(book, section);
   });
