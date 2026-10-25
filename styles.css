@@ -2076,15 +2076,17 @@ body {
 .sidebar {
   gap: 0.85rem;
   color: #49301e;
-  padding: 1.5rem 3.5rem 1.5rem 1.5rem;
+  padding: 1.5rem 2.75rem 1.5rem 1rem;
+  font-family: Georgia, "Times New Roman", serif;
   border-radius: 1px 5px 5px 1px;
-  background: url("/assets/sidebar-book-panel.png") center / 100% 100% no-repeat;
+  background: url("/assets/sidebar-book-panel.png") right center / calc(100% + 1rem) 100% no-repeat;
   filter: drop-shadow(3px 4px 4px rgba(44, 28, 17, 0.3));
   box-shadow: none;
 }
 
 .sidebar .nav-pill,
 .sidebar .shelf-item,
+.sidebar .shelf-item-copy strong,
 .sidebar .shelf-item-count,
 .sidebar .shelf-item::after,
 .sidebar .sidebar-empty,
@@ -2094,12 +2096,25 @@ body {
   color: #49301e;
 }
 
+.sidebar button {
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+.sidebar .nav-pill {
+  border-radius: 2px;
+}
+
+.sidebar .nav-pill.active {
+  box-shadow: inset 2px 0 #91643d;
+}
+
 .sidebar .nav-pill:hover,
 .sidebar .nav-pill.active,
 .sidebar .shelf-item:hover,
 .sidebar .shelf-item:focus-visible,
 .sidebar .sidebar-create-shelf:hover {
-  background: rgba(119, 70, 32, 0.14);
+  background: rgba(119, 70, 32, 0.09);
   color: #352113;
 }
 
@@ -2487,16 +2502,16 @@ body {
 
 @media (min-width: 900px) {
   .app-shell {
-    grid-template-columns: clamp(19rem, 26vw, 28rem) minmax(0, 1fr);
+    grid-template-columns: clamp(15rem, 18vw, 19rem) minmax(0, 1fr);
     gap: 0;
   }
 
   .sidebar {
     top: 1rem;
     height: calc(100dvh - 2rem);
-    margin: 1rem 0 1rem 0.75rem;
+    margin: 1rem 0;
     gap: 0.85rem;
-    padding: 1.5rem clamp(3.5rem, 4.7vw, 5rem) 1.5rem 1.5rem;
+    padding: 1.5rem 2.75rem 1.5rem 1rem;
     border: 0;
   }
 
@@ -2606,7 +2621,7 @@ body {
   .sidebar {
     top: 1rem;
     bottom: 1rem;
-    left: 0.75rem;
+    left: 0;
     height: calc(100dvh - 2rem);
     max-width: calc(100vw - 1.5rem);
   }

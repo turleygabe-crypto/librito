@@ -49,7 +49,8 @@ test("sidebar branding fills the available width without stretching the logo or 
 
 test("sidebar provides room for the parchment artwork and readable navigation and shelf text", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
-  assert.match(css, /grid-template-columns: clamp\(19rem, 26vw, 28rem\) minmax\(0, 1fr\)/);
+  assert.match(css, /grid-template-columns: clamp\(15rem, 18vw, 19rem\) minmax\(0, 1fr\)/);
+  assert.match(css, /\.sidebar button\s*\{[^}]*font-family: inherit/);
   assert.match(css, /\.sidebar \.nav-pill,\s*\.sidebar \.shelf-item-copy strong,\s*\.sidebar \.sidebar-empty\s*\{\s*font-size: 1rem/);
   assert.match(css, /\.sidebar-library-nav \.nav-pill\s*\{[^}]*font-size: 1rem/);
   assert.match(css, /\.sidebar-shelf-heading h2\s*\{[^}]*font-size: 0\.9rem !important/);
@@ -63,14 +64,15 @@ test("sidebar uses the prepared book image without simulated page overlays", asy
   const sidebarRules = [...css.matchAll(/\.sidebar\s*\{([^}]+)\}/g)];
   const bookCover = sidebarRules.find((rule) => rule[1].includes("/assets/sidebar-book-panel.png"));
   assert.ok(bookCover, "the sidebar uses the leather book image");
-  assert.match(bookCover[1], /center \/ 100% 100% no-repeat/);
+  assert.match(bookCover[1], /right center \/ calc\(100% \+ 1rem\) 100% no-repeat/);
+  assert.match(bookCover[1], /font-family: Georgia, "Times New Roman", serif/);
   assert.ok(sidebarRules.slice(sidebarRules.indexOf(bookCover) + 1).every((rule) => !/background:/.test(rule[1])),
     "responsive rules must preserve the book cover");
   assert.doesNotMatch(css, /\.sidebar::(?:before|after)/);
-  assert.match(bookCover[1], /padding: 1\.5rem 3\.5rem 1\.5rem 1\.5rem/);
+  assert.match(bookCover[1], /padding: 1\.5rem 2\.75rem 1\.5rem 1rem/);
   assert.match(bookCover[1], /color: #49301e/);
   assert.match(css, /height: calc\(100dvh - 2rem\)/);
-  assert.match(css, /margin: 1rem 0 1rem 0\.75rem/);
+  assert.match(css, /margin: 1rem 0;/);
   const panel = await readFile(new URL("../assets/sidebar-book-panel.png", import.meta.url));
   assert.equal(panel.subarray(1, 4).toString(), "PNG");
   assert.equal(panel[25], 6, "the prepared panel must support transparent corners");
