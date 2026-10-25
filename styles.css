@@ -2114,6 +2114,16 @@ body {
   font-weight: 400;
 }
 
+.sidebar .nav-pill,
+.sidebar .shelf-item-copy strong,
+.sidebar .sidebar-empty {
+  font-size: 1rem;
+}
+
+.sidebar .shelf-item-copy > span {
+  font-size: 0.95rem;
+}
+
 .sidebar-nav {
   padding-bottom: 0.8rem;
   border-bottom: 1px solid rgba(245, 221, 201, 0.12);
@@ -2150,7 +2160,7 @@ body {
 
 .sidebar-library-nav .nav-pill {
   padding: 0.55rem 0.5rem;
-  font-size: 0.82rem;
+  font-size: 1rem;
 }
 
 .sidebar-library-nav .nav-pill:first-child::before {
@@ -2168,7 +2178,7 @@ body {
 
 .sidebar-shelf-heading h2 {
   color: #c6a58e !important;
-  font-size: 0.72rem !important;
+  font-size: 0.9rem !important;
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -2204,7 +2214,7 @@ body {
 .shelf-item-count {
   margin-left: auto;
   color: #c6a58e;
-  font-size: 0.75rem;
+  font-size: 0.95rem;
 }
 
 .main-stage {
@@ -2455,7 +2465,7 @@ body {
 
   .sidebar .brand {
     gap: 0.55rem;
-    padding: 0 0.3rem 0.65rem;
+    padding: 0 0 0.65rem;
     border: 0;
   }
 
@@ -2493,7 +2503,7 @@ body {
 
   #libraryHeading {
     color: #c6a58e;
-    font-size: 0.72rem !important;
+    font-size: 0.9rem !important;
     font-weight: 500;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -2525,7 +2535,6 @@ body {
   }
 
   .sidebar .shelf-item-copy strong {
-    font-size: 0.8rem;
     font-weight: 500;
   }
 

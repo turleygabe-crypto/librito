@@ -47,6 +47,17 @@ test("sidebar branding fills the available width without stretching the logo or 
   assert.match(css, /\.sidebar \.brand \.mobile-sidebar-close\s*\{[^}]*position: absolute/);
 });
 
+test("sidebar preserves its width and uses readable navigation and shelf text", async () => {
+  const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  assert.match(css, /grid-template-columns: clamp\(13rem, 15vw, 17\.5rem\) minmax\(0, 1fr\)/);
+  assert.match(css, /\.sidebar \.nav-pill,\s*\.sidebar \.shelf-item-copy strong,\s*\.sidebar \.sidebar-empty\s*\{\s*font-size: 1rem/);
+  assert.match(css, /\.sidebar-library-nav \.nav-pill\s*\{[^}]*font-size: 1rem/);
+  assert.match(css, /\.sidebar-shelf-heading h2\s*\{[^}]*font-size: 0\.9rem !important/);
+  assert.match(css, /\.shelf-item-count\s*\{[^}]*font-size: 0\.95rem/);
+  const shelfNameRules = [...css.matchAll(/\.sidebar \.shelf-item-copy strong\s*\{([^}]+)\}/g)];
+  assert.doesNotMatch(shelfNameRules.at(-1)[1], /font-size:/);
+});
+
 test("startup keeps the library pending until account initialization", () => {
   const startup = source.slice(source.lastIndexOf("\ninitializeBookLanguageOptions();"));
   assert.doesNotMatch(startup, /state\.loading\s*=\s*false/);
