@@ -22,14 +22,14 @@ test("the sidebar logo is included in the Vercel static deployment", async () =>
   assert.ok(config.builds.some((build) => build.src === "assets/**" && build.use === "@vercel/static"));
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const logoPath = html.match(/class="brand-mark" src="([^"]+)"/)[1];
-  assert.equal(logoPath, "/assets/Librito%20Cozy%20Bookshop%20Emblem.png");
+  assert.equal(logoPath, "/assets/Librito%20Digital%20Home%20Library%20Emblem.png");
   await access(new URL(`..${decodeURIComponent(logoPath)}`, import.meta.url));
   const logo = await readFile(new URL(`..${decodeURIComponent(logoPath)}`, import.meta.url));
   assert.equal(logo.subarray(1, 4).toString(), "PNG");
   assert.equal(logo[25], 6, "the displayed logo must be an RGBA PNG");
 });
 
-test("sidebar branding centers a larger transparent logo without duplicate brand text", async () => {
+test("sidebar branding fills the available width without stretching the logo or duplicating brand text", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const brand = html.slice(html.indexOf('<div class="brand">'), html.indexOf('<nav class="sidebar-nav"'));
   assert.match(brand, /alt="Librito"/);
@@ -40,8 +40,9 @@ test("sidebar branding centers a larger transparent logo without duplicate brand
   assert.match(brandRules.at(-2)[1], /text-align: center/);
   const logoRules = [...css.matchAll(/\.sidebar \.brand-mark\s*\{([^}]+)\}/g)];
   const logoStyles = logoRules.at(-1)[1];
-  assert.match(logoStyles, /width: min\(9rem, 100%\)/);
+  assert.match(logoStyles, /width: 100%/);
   assert.match(logoStyles, /height: auto/);
+  assert.match(logoStyles, /object-fit: contain/);
   assert.match(logoStyles, /background: transparent/);
   assert.match(css, /\.sidebar \.brand \.mobile-sidebar-close\s*\{[^}]*position: absolute/);
 });
