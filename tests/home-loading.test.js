@@ -22,6 +22,7 @@ test("the sidebar logo is included in the Vercel static deployment", async () =>
   assert.ok(config.builds.some((build) => build.src === "assets/**" && build.use === "@vercel/static"));
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const logoPath = html.match(/class="brand-mark" src="([^"]+)"/)[1];
+  assert.equal(logoPath, "/assets/Librito%20Cozy%20Bookshop%20Emblem.png");
   await access(new URL(`..${decodeURIComponent(logoPath)}`, import.meta.url));
   const logo = await readFile(new URL(`..${decodeURIComponent(logoPath)}`, import.meta.url));
   assert.equal(logo.subarray(1, 4).toString(), "PNG");
