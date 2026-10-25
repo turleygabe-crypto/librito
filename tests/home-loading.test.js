@@ -67,7 +67,9 @@ test("sidebar has a decorative book cover and layered page edge without blocking
   assert.ok(sidebarRules.slice(sidebarRules.indexOf(bookCover) + 1).every((rule) => !/background:/.test(rule[1])),
     "responsive rules must preserve the book cover");
   assert.match(css, /\.sidebar::before,\s*\.sidebar::after\s*\{[^}]*pointer-events: none/);
-  assert.match(css, /\.sidebar::after\s*\{[^}]*width: 0\.65rem;[^}]*repeating-linear-gradient\(90deg/);
+  assert.match(bookCover[1], /padding-right: 1\.5rem/);
+  assert.match(css, /\.sidebar::before\s*\{[^}]*border-radius: 0 5px 7px 0/);
+  assert.match(css, /\.sidebar::after\s*\{[^}]*width: 0\.7rem;[^}]*clip-path: polygon\([^;]+;[^}]*repeating-linear-gradient\(90deg/);
 });
 
 test("startup keeps the library pending until account initialization", () => {
