@@ -242,3 +242,7 @@ test("book loader renders immediately and rotates covers after bounce iterations
   assert.match(css, /@keyframes book-loader-bounce\s*\{/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.book-loader-slot \{ animation: none; \}/);
 });
+test("Your Library has a distinct open-book icon instead of the Home icon", async () => {
+  const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  assert.match(css, /\.library-heading-btn::before\s*\{[^}]*background: url\("data:image\/svg\+xml/);
+});

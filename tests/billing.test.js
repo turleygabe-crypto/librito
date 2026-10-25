@@ -503,7 +503,7 @@ test("billing endpoint rejects methods, cross-origin requests and missing auth; 
     [{ method: "GET", headers: {} }, 401],
     [{ method: "GET", headers: { authorization: "Bearer valid" } }, 200],
     [{ method: "POST", headers: { authorization: "Bearer valid", origin: config.origin }, body: { action: "portal" } }, 200],
-    [{ method: "POST", headers: { authorization: "Bearer valid", origin: config.origin }, body: { action: "checkout", billing: "monthly" } }, 409],
+    [{ method: "POST", headers: { authorization: "Bearer valid", origin: config.origin }, body: { action: "checkout", billing: "monthly" } }, 503],
   ]) {
     const res = response();
     await handler(req, res);
@@ -634,23 +634,31 @@ async function lifecycleFixture(id, customer, price = "price_month") {
   };
 }
 
+test("checkout pause works without Stripe configuration or authentication and never loads dependencies", async () => {
+  const handler = createHandler(() => assert.fail("Paused checkout must not contact Stripe or Supabase."));
+  for (const billing of ["monthly", "annual", "invalid", undefined]) {
+    const res = response();
+    await handler({ method: "POST", headers: {}, body: { action: "checkout", billing } }, res);
+    assert.equal(res.code, 503);
+    assert.match(res.body.error, /Book Lover is coming soon/);
+    assert.equal(res.headers["Cache-Control"], "no-store");
+    assert.equal(res.body.url, undefined);
+  }
+});
+
 for (const billing of ["monthly", "annual"]) {
-  test(`${billing} authenticated checkout uses the exact price and does not grant access before payment confirmation`, async () => {
+  test(`${billing} authenticated checkout is blocked without changing access; existing signed webhooks still grant access`, async () => {
     const id = billing === "monthly" ? "22222222-2222-4222-8222-222222222222" : "33333333-3333-4333-8333-333333333333";
     const fixture = await lifecycleFixture(id, `cus_${billing}_test`, config.prices[billing]);
-    let params;
-    fixture.stripe.checkout.sessions.create = async (value) => {
-      params = value;
-      return { id: `cs_${billing}_test`, url: "https://checkout.stripe.com/test" };
-    };
+    fixture.stripe.checkout.sessions.create = async () => assert.fail("Checkout is paused.");
     const res = response();
     await createHandler(() => ({ db: fixture.db, stripe: fixture.stripe, config }))({
       method: "POST", headers: { origin: config.origin, authorization: "Bearer valid" },
       body: { action: "checkout", billing, price: "price_attacker", userId },
     }, res);
-    assert.equal(res.code, 200);
-    assert.deepEqual(params.line_items, [{ price: config.prices[billing], quantity: 1 }]);
-    assert.equal(params.client_reference_id, id);
+    assert.equal(res.code, 503);
+    assert.match(res.body.error, /coming soon/);
+    assert.equal(res.body.url, undefined);
     assert.equal(await fixture.tier(), "lite_reader");
     // Signed confirmation, not the browser redirect, enables Book Lover.
     await fixture.deliver("invoice.paid", "active");
@@ -778,7 +786,12 @@ test("switching to live preserves sandbox history and grants, isolates checkout 
     stripe.prices.retrieve = async (price) => ({ ...await retrieve(price), livemode: true });
     const checkout = response();
     await handler(req, checkout);
-    assert.equal(checkout.code, 200);
+    assert.equal(checkout.code, 503);
+    assert.match(checkout.body.error, /coming soon/);
+    assert.equal(creates, 0);
+    // Retained checkout internals still isolate modes, but the public route is paused.
+    await withAccount(fixture.db, id, (account, save) =>
+      startCheckout(deps, { id, email: user.email }, account, save, "monthly"), true);
     assert.equal(creates, 1);
     assert.equal(await fixture.tier(), "lite_reader");
     assert.equal(Number((await sql.query("select count(*) as count from billing_accounts where user_id = $1", [id])).rows[0].count), 2);
@@ -954,7 +967,7 @@ test("Stripe failure retains the account and library, persists the deletion barr
     method: "POST", headers: { origin: config.origin, authorization: "Bearer valid" },
     body: { action: "checkout", billing: "monthly" },
   }, checkout);
-  assert.equal(checkout.code, 409);
+  assert.equal(checkout.code, 503);
   fixture.failCancellation(false);
   assert.equal((await fixture.request()).code, 200);
 });

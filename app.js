@@ -205,7 +205,7 @@ function withWishlistShelf(shelves) {
 function checkShelfLimit(name) {
   const tier = getAccountTier();
   if (countLimitedShelves() < tier.maxShelves) return true;
-  showToast(`${tier.name} accounts can have up to ${tier.maxShelves} shelves. Upgrade to Book Lover for more.`);
+  showToast(`${tier.name} accounts can have up to ${tier.maxShelves} shelves. Book Lover upgrades are coming soon.`);
   navigateTo("upgrade");
   return false;
 }
@@ -214,7 +214,7 @@ function checkReadingLimit(book) {
   const tier = getAccountTier();
   const reading = state.books.filter((item) => item.reading_status === "reading" && !item.disposition && item !== book).length;
   if (reading < tier.maxReading) return true;
-  showToast(`${tier.name} accounts can have up to ${tier.maxReading} books in Currently Reading. Upgrade to Book Lover for more.`);
+  showToast(`${tier.name} accounts can have up to ${tier.maxReading} books in Currently Reading. Book Lover upgrades are coming soon.`);
   navigateTo("upgrade");
   return false;
 }
@@ -222,7 +222,7 @@ function checkReadingLimit(book) {
 function checkBookLimit() {
   const tier = getAccountTier();
   if (state.books.length < tier.maxBooks) return true;
-  showToast(`${tier.name} accounts can hold up to ${tier.maxBooks} books. Upgrade to Book Lover for more.`);
+  showToast(`${tier.name} accounts can hold up to ${tier.maxBooks} books. Book Lover upgrades are coming soon.`);
   navigateTo("upgrade");
   return false;
 }
@@ -786,59 +786,55 @@ async function removeBookFromLibrary(book) {
 }
 
 async function renameShelf(shelf, name) {
+  name = name.trim();
   if (!name
     || shelf.is_wishlist
     || ["currently reading", "completed books", "wishlist"].includes(name.toLowerCase())
     || state.shelves.some((item) => item.id !== shelf.id && item.name.toLowerCase() === name.toLowerCase())) {
-    showToast("Choose a unique shelf name.");
-    return;
+    throw new Error("Choose a unique shelf name. Built-in shelf names are reserved.");
   }
+  if (name === shelf.name) return;
+  if (state.session && !state.supabase) throw new Error("Your account connection is unavailable. Try again.");
   if (state.supabase && state.session) {
     const { error } = await state.supabase.from("shelves")
       .update({ name })
       .eq("id", shelf.id)
-      .eq("user_id", state.session.user.id);
+      .eq("user_id", state.session.user.id)
+      .select("id")
+      .single();
     if (error) {
       console.error(error);
-      showToast("Could not rename shelf.");
-      return;
+      throw new Error("Could not rename shelf. Please try again.");
     }
   }
   const oldName = shelf.name;
   shelf.name = name;
   state.books.forEach((book) => {
-    if (book.shelf === oldName) book.shelf = name;
     book.shelves = getBookShelfNames(book).map((item) => item === oldName ? name : item);
+    if (book.shelf === oldName) book.shelf = name;
   });
   if (!state.session) {
     localStorage.setItem(shelvesStorageKey, JSON.stringify(state.shelves));
     localStorage.setItem(storageKey, JSON.stringify(state.books));
   }
   navigateTo("shelf", { name });
-  renderShelves();
+  render();
   showToast("Shelf renamed");
 }
 
 async function deleteShelf(shelf) {
-  if (shelf.is_wishlist) return;
+  if (shelf.is_wishlist) throw new Error("The built-in Wishlist cannot be deleted.");
+  if (state.session && !state.supabase) throw new Error("Your account connection is unavailable. Try again.");
   if (state.supabase && state.session) {
-    const { error: booksError } = await state.supabase.from("books")
-      .update({ shelf: null })
-      .eq("shelf", shelf.name)
-      .eq("user_id", state.session.user.id);
-    if (booksError) {
-      console.error(booksError);
-      showToast("Could not detach books from this shelf.");
-      return;
-    }
     const { error } = await state.supabase.from("shelves")
       .delete()
       .eq("id", shelf.id)
-      .eq("user_id", state.session.user.id);
+      .eq("user_id", state.session.user.id)
+      .select("id")
+      .single();
     if (error) {
       console.error(error);
-      showToast("Could not delete shelf.");
-      return;
+      throw new Error("Could not delete shelf. Please try again.");
     }
   }
   state.shelves = state.shelves.filter((item) => item.id !== shelf.id);
@@ -935,13 +931,21 @@ function updateAuthButton() {
 }
 
 async function updateAdminLink() {
-  const link = document.getElementById("adminLink");
-  if (!link) return;
-  link.hidden = true;
+  const links = document.querySelectorAll("[data-admin-link]");
+  links.forEach((link) => { link.hidden = true; });
+  if (!links.length) return;
   if (!state.supabase || !state.session) return;
   const userId = state.session.user.id;
-  const { data } = await state.supabase.rpc("is_admin");
-  if (data === true && state.session?.user.id === userId) link.hidden = false;
+  const supabase = state.supabase;
+  try {
+    const { data, error } = await supabase.rpc("is_admin");
+    if (error) throw error;
+    if (data === true && state.session?.user.id === userId && state.supabase === supabase) {
+      links.forEach((link) => { link.hidden = false; });
+    }
+  } catch (error) {
+    console.error("Could not verify admin access", error);
+  }
 }
 
 function getDefaultBookLanguage() {
@@ -3300,31 +3304,31 @@ function showShelfPage(shelfName) {
   addBook.textContent = "＋ Add a book";
   addBook.addEventListener("click", openDialog);
   toolbar.append(addBook);
-  if (shelf && state.session && !shelf.is_wishlist) {
+  if (shelf && !shelf.is_wishlist) {
     const rename = document.createElement("button");
     rename.type = "button";
     rename.className = "secondary-btn";
     rename.textContent = "Rename shelf";
     rename.addEventListener("click", async () => {
-      const nextName = (await showAppPrompt("Rename shelf", {
+      await showAppPrompt("Choose a new name for this shelf.", {
         title: "Rename shelf",
+        confirmLabel: "Save name",
         value: shelf.name,
         placeholder: "Shelf name",
-      }))?.trim();
-      if (!nextName || nextName === shelf.name) return;
-      await renameShelf(shelf, nextName);
+        onConfirm: (name) => renameShelf(shelf, name),
+      });
     });
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "secondary-btn";
     remove.textContent = "Delete shelf";
     remove.addEventListener("click", async () => {
-      const confirmed = await showAppConfirm(`Delete “${shelf.name}”? Books will stay in your library; saved wishlist items on it are removed.`, {
+      await showAppConfirm(`Delete “${shelf.name}”? Books will stay in your library and on other shelves. Items saved only to this shelf will be removed. This cannot be undone.`, {
         title: "Delete shelf",
         confirmLabel: "Delete shelf",
         danger: true,
+        onConfirm: () => deleteShelf(shelf),
       });
-      if (confirmed) await deleteShelf(shelf);
     });
     toolbar.append(rename, remove);
   }
@@ -6554,7 +6558,7 @@ function createLibraryExportCard(books) {
     const upgrade = document.createElement("button");
     upgrade.type = "button";
     upgrade.className = "action-btn";
-    upgrade.textContent = "Upgrade to unlock";
+    upgrade.textContent = "Book Lover - coming soon";
     upgrade.addEventListener("click", () => navigateTo("upgrade"));
     actions.append(upgrade);
   }
@@ -6562,7 +6566,6 @@ function createLibraryExportCard(books) {
   return card;
 }
 
-const UPGRADE_PRICES = { monthly: 2.99, annual: 24.99 };
 const LITE_READER_FEATURES = [
   "Up to 100 books in your library",
   "Up to 5 custom shelves",
@@ -7019,6 +7022,7 @@ function showAccountPage(requestedSection = "overview") {
     welcome.append(createAccountLink("Edit account settings", createRouteHash("account", { section: "settings" })));
     const admin = createAccountLink("Admin dashboard", "/admin.html");
     admin.id = "adminLink";
+    admin.setAttribute("data-admin-link", "");
     admin.hidden = true;
     welcome.append(admin);
     const plan = createAccountCard("Your plan", `Current access: ${getAccountTier().name}.`);
@@ -7040,48 +7044,19 @@ function showUpgradePage() {
   const page = showPage("upgrade");
   page.classList.add("upgrade-page");
   const isBookLover = getAccountTier().premium;
-  const annualSavings = Math.round((1 - UPGRADE_PRICES.annual / (UPGRADE_PRICES.monthly * 12)) * 100);
-  let billing = "annual";
   let currentBillingStatus = null;
 
   const hero = document.createElement("section");
   hero.className = "home-hero upgrade-hero";
   const heroCopy = document.createElement("div");
   heroCopy.className = "home-hero-copy";
-  const back = document.createElement("button");
-  back.type = "button";
-  back.className = "text-btn page-back";
-  back.textContent = "‹ Home";
-  back.addEventListener("click", () => navigateTo("home"));
   const title = document.createElement("h1");
-  title.textContent = "Unlock a richer reading experience";
+  title.textContent = "Book Lover is coming soon";
   const intro = document.createElement("p");
   intro.className = "page-description";
-  intro.textContent = "Go further with Book Lover: unlimited books and shelves, plus insurance-ready reports of your collection.";
-  back.classList.add("upgrade-back");
-  heroCopy.append(back, title, intro);
+  intro.textContent = "Paid upgrades aren't available yet. Keep enjoying Lite Reader for free. Complimentary Book Lover access granted by an admin remains available.";
+  heroCopy.append(title, intro);
   hero.append(heroCopy);
-
-  const toggle = document.createElement("div");
-  toggle.className = "upgrade-billing";
-  toggle.setAttribute("role", "group");
-  toggle.setAttribute("aria-label", "Billing period");
-  const buttons = {};
-  [["monthly", "Monthly"], ["annual", "Annual"]].forEach(([key, label]) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = label;
-    button.addEventListener("click", () => {
-      billing = key;
-      updateBilling();
-    });
-    buttons[key] = button;
-    toggle.append(button);
-  });
-  const saveBadge = document.createElement("span");
-  saveBadge.className = "upgrade-save-tag";
-  saveBadge.textContent = `Save ${annualSavings}%`;
-  buttons.annual.append(saveBadge);
 
   const plans = document.createElement("div");
   plans.className = "upgrade-plans";
@@ -7106,46 +7081,21 @@ function showUpgradePage() {
   premium.className = "upgrade-plan is-featured";
   const popular = document.createElement("span");
   popular.className = "upgrade-popular";
-  popular.textContent = "Most popular";
-  const cardSaveTag = document.createElement("span");
-  cardSaveTag.className = "upgrade-save-tag";
-  cardSaveTag.textContent = `Save ${annualSavings}%`;
+  popular.textContent = "Coming soon";
   const premiumName = document.createElement("h2");
   premiumName.textContent = "Book Lover";
-  const premiumPrice = document.createElement("p");
-  premiumPrice.className = "upgrade-price";
   const premiumCopy = document.createElement("p");
   premiumCopy.textContent = "For readers who want more. No limits on your collection, and reports you can use when it matters.";
   const cta = document.createElement("button");
   cta.type = "button";
   cta.className = "upgrade-cta";
+  cta.disabled = true;
+  cta.textContent = "Coming soon";
   if (isBookLover) {
-    cta.textContent = "Your current plan";
+    cta.textContent = state.profile?.complimentary_book_lover ? "Your complimentary plan" : "Your current plan";
     cta.classList.add("is-current");
-    cta.disabled = true;
   }
-  cta.addEventListener("click", () => {
-    if (!state.session) {
-      showToast("Sign in to upgrade.");
-      openAuthModal();
-      return;
-    }
-    openBilling(cta, { action: "checkout", billing });
-  });
-  premium.append(popular, cardSaveTag, premiumName, premiumPrice, premiumCopy, createUpgradeFeatureList(BOOK_LOVER_FEATURES), cta);
-
-  function updateBilling() {
-    Object.entries(buttons).forEach(([key, button]) => {
-      button.classList.toggle("active", key === billing);
-      button.setAttribute("aria-pressed", String(key === billing));
-    });
-    premiumPrice.textContent = billing === "annual"
-      ? `${formatCurrency(UPGRADE_PRICES.annual)} / year`
-      : `${formatCurrency(UPGRADE_PRICES.monthly)} / month`;
-    cardSaveTag.hidden = billing !== "annual";
-    if (!cta.disabled) cta.textContent = currentBillingStatus?.canManage ? "Resubscribe to Book Lover" : "Upgrade to Book Lover";
-  }
-  updateBilling();
+  premium.append(popular, premiumName, premiumCopy, createUpgradeFeatureList(BOOK_LOVER_FEATURES), cta);
 
   plans.append(lite, premium);
   const tagline = document.createElement("p");
@@ -7154,7 +7104,7 @@ function showUpgradePage() {
   const planOptions = document.createElement("section");
   planOptions.id = "bookLoverPlanOptions";
   planOptions.className = "upgrade-plan-options";
-  planOptions.append(toggle, plans, tagline);
+  planOptions.append(plans, tagline);
   const planVisibility = document.createElement("button");
   planVisibility.type = "button";
   planVisibility.className = "secondary-btn upgrade-plan-visibility";
@@ -7228,10 +7178,10 @@ function showUpgradePage() {
       refresh.hidden = billingPanel.hidden;
       const premiumAccess = getAccountTier().premium;
       liteStatus.textContent = premiumAccess ? "Free plan" : "Your current plan";
-      cta.disabled = premiumAccess || status.hasSubscription;
+      cta.disabled = true;
       cta.classList.toggle("is-current", premiumAccess);
-      cta.textContent = premiumAccess ? "Your current plan" : status.hasSubscription ? "Manage your existing subscription below"
-        : status.canManage ? "Resubscribe to Book Lover" : "Upgrade to Book Lover";
+      cta.textContent = profile.complimentary_book_lover ? "Your complimentary plan"
+        : premiumAccess ? "Your current plan" : "Coming soon";
       billingStatus.textContent = status.cancelAtPeriodEnd && subscriptionTiming(status)
         ? subscriptionTimingMessage(status)
         : status.status === "past_due"
@@ -8350,9 +8300,9 @@ window.addEventListener("scroll", trackRecommendationScroll, { capture: true, pa
 document.addEventListener("click", (event) => {
   const target = event.target;
   const activeMenu = target instanceof Element
-    ? target.closest(".card-add-menu, .card-menu, .book-shelf-menu")
+    ? target.closest(".card-add-menu, .card-menu, .book-shelf-menu, .account-menu")
     : null;
-  document.querySelectorAll(".card-add-menu[open], .card-menu[open], .book-shelf-menu[open]").forEach((menu) => {
+  document.querySelectorAll(".card-add-menu[open], .card-menu[open], .book-shelf-menu[open], .account-menu[open]").forEach((menu) => {
     if (menu !== activeMenu) menu.open = false;
   });
 });

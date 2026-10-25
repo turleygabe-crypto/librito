@@ -20,6 +20,67 @@ const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
 const functions = source.slice(source.indexOf("function createAccountLink("), source.indexOf("\nfunction showUpgradePage()"));
 const profileFunction = source.slice(source.indexOf("async function ensureProfile("), source.indexOf("\nasync function loadShelvesFromSupabase("));
 
+test("account dropdown closes on outside clicks without closing on clicks inside it", () => {
+  const handler = source.slice(source.indexOf('document.addEventListener("click", (event) => {'), source.indexOf('\nlibraryToggleBtn.addEventListener("click"'));
+  const menus = [".account-menu", ".card-menu", ".card-add-menu", ".book-shelf-menu"].map((selector) => ({
+    selector, open: true,
+  }));
+  let click;
+  class Target {
+    constructor(menu) { this.menu = menu; }
+    closest(selector) {
+      return this.menu && selector.split(", ").includes(this.menu.selector) ? this.menu : null;
+    }
+  }
+  runInNewContext(handler, {
+    Element: Target,
+    document: {
+      addEventListener: (event, callback) => { assert.equal(event, "click"); click = callback; },
+      querySelectorAll: (selector) => menus.filter((menu) => menu.open && selector.includes(`${menu.selector}[open]`)),
+    },
+  });
+  for (const active of [menus[0], menus[1], menus[2], menus[3], null]) {
+    menus.forEach((menu) => { menu.open = true; });
+    click({ target: new Target(active) });
+    menus.forEach((menu) => assert.equal(menu.open, menu === active));
+  }
+  menus[0].open = true;
+  click({ target: {} });
+  assert.equal(menus[0].open, false);
+});
+
+test("admin shortcuts are hidden unless the current signed-in user has verified admin access", async () => {
+  const adminFunction = source.slice(source.indexOf("async function updateAdminLink("), source.indexOf("\nfunction getDefaultBookLanguage("));
+  for (const outcome of ["admin", "reader", "signed-out", "error", "network-error", "changed-user", "signed-out-during-check"]) {
+    const links = [{ hidden: false }, { hidden: false }];
+    let calls = 0;
+    const errors = [];
+    const state = {
+      session: outcome === "signed-out" ? null : { user: { id: "reader" } },
+      supabase: { async rpc(name) {
+        assert.equal(name, "is_admin");
+        calls++;
+        assert.ok(links.every((link) => link.hidden));
+        if (outcome === "changed-user") state.session = { user: { id: "other" } };
+        if (outcome === "signed-out-during-check") state.session = null;
+        if (outcome === "network-error") throw new Error("Network unavailable");
+        return { data: !["reader", "error"].includes(outcome), error: outcome === "error" ? new Error("Access check failed") : null };
+      } },
+    };
+    const context = {
+      state, document: { querySelectorAll: (selector) => {
+        assert.equal(selector, "[data-admin-link]");
+        return links;
+      } }, console: { error: (...args) => errors.push(args) },
+    };
+    runInNewContext(`${adminFunction}\nthis.update = updateAdminLink;`, context);
+    await context.update();
+    assert.ok(links.every((link) => link.hidden === (outcome !== "admin")));
+    assert.equal(calls, outcome === "signed-out" ? 0 : 1);
+    assert.equal(errors.length, ["error", "network-error"].includes(outcome) ? 1 : 0);
+  }
+});
+
 test("account navigation and help links meet normal-text contrast requirements on the light theme", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const rule = (selector) => {

@@ -1,5 +1,5 @@
 import {
-  authenticate, billingDependencies, BillingError, cancelRenewal, checked, respondError, resumeRenewal, startCheckout, subscriptionSnapshot, withAccount,
+  authenticate, billingDependencies, BillingError, cancelRenewal, checked, respondError, resumeRenewal, subscriptionSnapshot, withAccount,
 } from "../lib/server/billing.js";
 
 export function createHandler(dependencies = billingDependencies) {
@@ -10,6 +10,9 @@ export function createHandler(dependencies = billingDependencies) {
       return res.status(405).json({ error: "Method not allowed" });
     }
     try {
+      if (req.method === "POST" && req.body?.action === "checkout") {
+        throw new BillingError(503, "Book Lover is coming soon. Paid upgrades are not available yet.");
+      }
       const deps = dependencies();
       const { db, stripe, config } = deps;
       if (req.method === "POST" && req.headers.origin !== config.origin) {
@@ -38,15 +41,9 @@ export function createHandler(dependencies = billingDependencies) {
           periodEnd: account?.period_end || null,
         });
       }
-      const { action, billing } = req.body || {};
-      if (!["checkout", "portal", "resume", "cancel"].includes(action)) throw new BillingError(400, "Invalid billing action.");
-      if (action === "checkout") {
-        const profile = checked(await db.from("profiles").select("complimentary_book_lover").eq("id", user.id).single());
-        if (profile.complimentary_book_lover) throw new BillingError(409, "You already have complimentary Book Lover access.");
-        if (!["monthly", "annual"].includes(billing)) throw new BillingError(400, "Choose monthly or annual billing.");
-      }
+      const { action } = req.body || {};
+      if (!["portal", "resume", "cancel"].includes(action)) throw new BillingError(400, "Invalid billing action.");
       const url = await withAccount(db, user.id, async (account, save) => {
-        if (action === "checkout") return startCheckout(deps, user, account, save, billing);
         if (action === "resume") {
           await resumeRenewal(deps, account, save);
           return null;

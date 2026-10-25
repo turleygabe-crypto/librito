@@ -6,6 +6,7 @@ Librito is a cozy, mobile-first library platform concept for scanning books, org
 - Responsive library dashboard with a cozy banner, warm paper tones, and bookish styling
 - Local demo library with mock data
 - Books are added to the library by default and can optionally be assigned to user-created shelves
+- Open a custom shelf to use **Rename shelf** or **Delete shelf**, both in local/demo mode and when signed in. Renaming keeps its books and saved items; deleting requires confirmation, keeps library books and their other shelf memberships, and removes items saved only to the deleted shelf. Built-in collections, including Wishlist, cannot be renamed or deleted.
 - Currently Reading and Completed Books are dedicated shelves; completed books can be restarted or managed for selling or donating
 - Welcome prompt for visitors to sign in or create an account, with the option to continue browsing
 - Adding a book starts with a choice to look it up or enter it manually. Lookup supports title and/or author searches, ISBN entry, and camera scanning; title lookup and Discover catalog results default to the browser language and use matching edition titles and covers. Book detail pages let users choose from available editions and covers in that language.
@@ -15,6 +16,8 @@ Librito is a cozy, mobile-first library platform concept for scanning books, org
 - Vercel-friendly static deployment structure
 
 ## Local preview
+For signed-in shelf management, apply [the shelf-management migration](supabase/migrations/20261025040000_shelf_management.sql) before deploying the updated app. It synchronizes legacy book shelf names atomically when a shelf is renamed or deleted; shelf memberships and saved items continue to use the existing foreign-key cascades.
+
 Run the site locally:
 
 ```bash
@@ -40,7 +43,7 @@ The Account menu opens a responsive [My account](https://librito.casa/#/account)
 
 The billing section reuses the existing upgrade page, subscription status, Checkout, Portal and cancel/renew dialogs rather than introducing a second billing implementation. Direct upgrade and Stripe return URLs continue to work. Signed-out visitors see a sign-in invitation rather than private settings. Support links remain public; the policy section explicitly says Terms and Privacy are not yet published and does not expose the drafts. No order history, shipping addresses or marketing preferences are included.
 
-The top account dropdown contains only My account, Book Lover plan, and Sign out (Sign in when signed out). Settings, support and account deletion remain inside My account; authorized administrators can reach their dashboard from the account overview. The plan page offers Show plans / Hide plans to collapse the price comparison and billing-period selector without hiding subscription-management controls. Plans are initially expanded.
+The top account dropdown contains My account, Book Lover plan, and Sign out (Sign in when signed out), plus an Admin dashboard shortcut only after admin access is verified. Settings, support and account deletion remain inside My account; authorized administrators can also reach their dashboard from the account overview. The plan page offers Show plans / Hide plans to collapse the price comparison and billing-period selector without hiding subscription-management controls. Plans are initially expanded.
 
 Account navigation uses dark text on the light panels, cream text for the selected section, and distinct hover/keyboard-focus states. Navigation and account-help link colors have regression checks for at least 4.5:1 normal-text contrast.
 
@@ -82,6 +85,12 @@ Accounts are **Lite Reader** (free) or **Book Lover** (paid), stored in `profile
 
 ## Stripe billing
 
+### Paid upgrades paused
+
+Book Lover is currently shown as **Coming soon**, with prices, billing-interval choices and purchase actions removed from the plan page (including My account's Billing section). `POST /api/billing` rejects every `checkout` action with HTTP 503 before loading Stripe configuration or contacting external services, including requests from cached clients and former subscribers. Admins can still grant or revoke complimentary Book Lover access; existing entitlements, limits and report exports are unchanged. Existing paid subscriptions can still be managed, canceled or renewed, and webhooks continue reconciling them. This does not cancel existing subscriptions or expire previously issued Stripe Checkout links.
+
+To launch paid upgrades later, deliberately restore the plan-page purchase controls and authenticated checkout routing, update their tests and public billing-support copy, and complete the production checklist below. The integration details below describe the retained, currently inactive new-purchase flow.
+
 ### Integration design
 
 Librito sells its own digital subscription, not books or marketplace payouts. Use Stripe Billing with hosted Checkout, one **Book Lover** Product, and two recurring USD Prices: **$2.99/month** and **$24.99/year**. Lite Reader stays free without a Stripe subscription. The Customer Portal manages payment methods, billing intervals, invoices and cancellation. No Stripe.js or publishable API key is needed for this hosted flow.
@@ -90,7 +99,7 @@ The upgrade page calls authenticated Vercel functions. The server validates the 
 
 Signed webhooks reconcile current Stripe subscription state rather than trusting redirects or old event payloads. Deliveries are recorded for deduplication, and concurrent updates are serialized. Active, trialing and past-due subscriptions retain access; canceled, unpaid, paused or expired incomplete subscriptions do not. Configure Stripe's retry policy to move exhausted subscriptions to **canceled or unpaid**, not leave them past due forever. Cancellation at period end preserves access until Stripe ends the subscription. Downgrades never delete books or shelves; existing database limits apply when adding books, shelves or reading entries.
 
-The plan page shows the days remaining (rounded up in 24-hour periods) and the exact end or renewal date. Canceled but still-active subscriptions offer **Renew subscription**, with a confirmation before restoring automatic renewal on the same subscription; this does not create a second subscription. The dialog explicitly states that the subscription is currently canceled and no payments are scheduled: **Renew subscription** restores automatic renewal, while **Continue cancellation** leaves the cancellation unchanged. Once access has ended, **Resubscribe to Book Lover** opens Checkout. Resuming requires **Subscriptions: Write** on the restricted Stripe key.
+The plan page shows the days remaining (rounded up in 24-hour periods) and the exact end or renewal date. Canceled but still-active subscriptions offer **Renew subscription**, with a confirmation before restoring automatic renewal on the same subscription; this does not create a second subscription. The dialog explicitly states that the subscription is currently canceled and no payments are scheduled: **Renew subscription** restores automatic renewal, while **Continue cancellation** leaves the cancellation unchanged. Once access has ended, resubscription is blocked while paid upgrades are paused. Resuming requires **Subscriptions: Write** on the restricted Stripe key.
 
 Renewal confirmation uses Librito's existing dialog rather than a native browser prompt. It disables duplicate submissions while saving, keeps failures inside the dialog with retry/cancel options, and only reports success after the server confirms the update. Resume requests clear the subscription's applicable cancellation field, not both cancellation parameters together. Billing logs include a bounded, credential-redacted diagnostic message and Stripe request ID where available; customer responses remain generic for unexpected failures.
 

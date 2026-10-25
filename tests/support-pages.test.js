@@ -21,8 +21,9 @@ test("public support pages have working local links, branded contact details, an
   assert.match(contact, /passwords, sign-in codes, full card numbers/);
   assert.match(contact, /Delete account/);
   const billing = await read("billing-support.html");
-  assert.match(billing, /\$2\.99 USD per month/);
-  assert.match(billing, /\$24\.99 USD per year/);
+  assert.match(billing, /paid upgrades are coming soon/);
+  assert.match(billing, /admins can still grant complimentary Book Lover access/);
+  assert.doesNotMatch(billing, /\$2\.99|\$24\.99|use <strong>Resubscribe/);
   assert.match(billing, /paid period/);
   assert.match(billing, /do not routinely refund/);
   assert.match(billing, /rights required by applicable law/);
@@ -33,10 +34,11 @@ test("support is reachable from the account menu, footer, sign-in and upgrade pa
   const index = await read("index.html");
   assert.match(index, /<footer class="site-footer"/);
   const menu = index.slice(index.indexOf('<div class="account-menu-panel">'), index.indexOf("</details>"));
-  assert.equal([...menu.matchAll(/<a /g)].length, 2);
+  assert.equal([...menu.matchAll(/<a /g)].length, 3);
   assert.match(menu, />My account<\/a>/);
   assert.match(menu, />Book Lover plan<\/a>/);
-  assert.doesNotMatch(menu, /Delete account|Account settings|Billing support|Admin dashboard/);
+  assert.match(menu, /href="\/admin.html" data-admin-link hidden>Admin dashboard<\/a>/);
+  assert.doesNotMatch(menu, /Delete account|Account settings|Billing support/);
   assert.match(index, /Need help with your account\?.*href="\/contact.html"/);
   assert.match(await read("app.js"), /supportLink.href = "\/billing-support.html"/);
   assert.match(await read(".vercelignore"), /^legal-drafts\/$/m);
