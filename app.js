@@ -7209,13 +7209,7 @@ function showUpgradePage() {
   }
   refresh.addEventListener("click", loadBillingStatus);
   billingPanel.append(billingHeading, billingStatus, resume, manage, cancel, refresh, billingHelp);
-  const support = document.createElement("p");
-  support.className = "upgrade-billing-status";
-  const supportLink = document.createElement("a");
-  supportLink.href = "/billing-support.html";
-  supportLink.textContent = "Need help? Contact billing support";
-  support.append(supportLink);
-  page.append(hero, planVisibility, planOptions, billingPanel, support);
+  page.append(hero, planVisibility, planOptions, billingPanel);
   const checkout = new URLSearchParams(window.location.hash.split("?")[1] || "").get("checkout");
   if (checkout === "success") {
     const notice = document.createElement("p");
