@@ -20,6 +20,42 @@ const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
 const functions = source.slice(source.indexOf("function createAccountLink("), source.indexOf("\nfunction showUpgradePage()"));
 const profileFunction = source.slice(source.indexOf("async function ensureProfile("), source.indexOf("\nasync function loadShelvesFromSupabase("));
 
+test("account navigation and help links meet normal-text contrast requirements on the light theme", async () => {
+  const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  const rule = (selector) => {
+    const start = css.indexOf(`${selector} {`);
+    assert.notEqual(start, -1);
+    return css.slice(start, css.indexOf("}", start));
+  };
+  const color = (declarations, property) => {
+    const match = declarations.match(new RegExp(`(?:[;{]|^)\\s*${property}:\\s*(#[a-f0-9]{6})`, "i"));
+    assert.ok(match, `Missing explicit ${property}`);
+    return match[1];
+  };
+  const luminance = (hex) => hex.slice(1).match(/../g).map((value) => {
+    const channel = parseInt(value, 16) / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  }).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+  const check = (foreground, background) => {
+    const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+    const ratio = (values[0] + 0.05) / (values[1] + 0.05);
+    assert.ok(ratio >= 4.5, `${foreground} on ${background}: ${ratio.toFixed(2)}:1`);
+  };
+  const theme = css.slice(css.lastIndexOf(":root {"), css.indexOf("}", css.lastIndexOf(":root {")));
+  const panel = color(theme, "--panel");
+  check(color(rule(".account-navigation a"), "color"), panel);
+  check(color(rule(".account-navigation .text-btn"), "color"), panel);
+  check(color(rule(".account-card a"), "color"), panel);
+  for (const selector of [
+    ".account-navigation a[aria-current=\"page\"]",
+    ".account-navigation a:hover, .account-navigation .text-btn:hover",
+  ]) {
+    const declarations = rule(selector);
+    check(color(declarations, "color"), color(declarations, "background"));
+  }
+  assert.match(rule(".account-navigation a:focus-visible, .account-navigation .text-btn:focus-visible"), /outline: 3px solid/);
+});
+
 function fixture(signedIn = true) {
   const page = new Element();
   const elements = [];

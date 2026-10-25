@@ -40,6 +40,8 @@ The Account menu opens a responsive [My account](https://librito.casa/#/account)
 
 The billing section reuses the existing upgrade page, subscription status, Checkout, Portal and cancel/renew dialogs rather than introducing a second billing implementation. Direct upgrade and Stripe return URLs continue to work. Signed-out visitors see a sign-in invitation rather than private settings. Support links remain public; the policy section explicitly says Terms and Privacy are not yet published and does not expose the drafts. No order history, shipping addresses or marketing preferences are included.
 
+Account navigation uses dark text on the light panels, cream text for the selected section, and distinct hover/keyboard-focus states. Navigation and account-help link colors have regression checks for at least 4.5:1 normal-text contrast.
+
 Public [Contact us](contact.html) and [Billing Support](billing-support.html) pages use **support@librito.casa** for customer help, billing and privacy requests. They are reachable without signing in; the app links to support in the account menu, footer, sign-in dialog and upgrade screen. The approved refund approach is **no routine partial-period or renewal refunds**, with billing errors, exceptional cases and mandatory consumer rights reviewed through support. Do not request passwords, sign-in codes or full payment-card information by email.
 
 ### Deploying self-service account deletion

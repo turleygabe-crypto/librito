@@ -54,14 +54,16 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
 .support-notice { padding: 1rem; border: 1px solid #c97b4d; border-radius: 0.75rem; background: var(--panel); }
 .account-layout { display: grid; grid-template-columns: minmax(180px, 220px) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
 .account-navigation { display: grid; gap: 0.35rem; padding: 0.75rem; border-radius: 0.8rem; background: var(--panel); }
-.account-navigation a { padding: 0.8rem; border-radius: 0.5rem; text-decoration: none; color: var(--paper); }
-.account-navigation a[aria-current="page"] { background: #684630; font-weight: bold; }
-.account-navigation .text-btn { padding: 0.8rem; text-align: left; }
+.account-navigation a { padding: 0.8rem; border-radius: 0.5rem; text-decoration: none; color: #33251d; font-weight: 600; line-height: 1.5; }
+.account-navigation a:hover, .account-navigation .text-btn:hover { background: #eee1d1; color: #33251d; }
+.account-navigation a[aria-current="page"] { background: #684630; color: #fffaf3; font-weight: bold; }
+.account-navigation a:focus-visible, .account-navigation .text-btn:focus-visible { outline: 3px solid #684630; outline-offset: 3px; }
+.account-navigation .text-btn { padding: 0.8rem; text-align: left; color: #33251d; line-height: 1.5; border-radius: 0.5rem; }
 .account-content { display: grid; gap: 1.25rem; min-width: 0; }
 .account-card { padding: 1.5rem; border: 1px solid #65493a; border-radius: 0.8rem; background: var(--panel); overflow-wrap: anywhere; }
 .account-card h2 { font-size: 1.3rem; }
 .account-card p { line-height: 1.6; }
-.account-card a { display: block; margin-top: 0.75rem; color: #f1be96; text-underline-offset: 0.2em; }
+.account-card a { display: block; margin-top: 0.75rem; color: #754127; text-underline-offset: 0.2em; }
 .account-card input { width: 100%; }
 @media (max-width: 700px) {
   .account-layout { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
