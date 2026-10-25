@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, access } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 import { test } from "node:test";
 
@@ -17,30 +17,28 @@ class Element {
   addEventListener(name, handler) { this.events[name] = handler; }
 }
 
-test("the combined sidebar artwork exists and is available offline", async () => {
+test("the CSS sidebar does not depend on PNG artwork or precache it", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
-  const artworkPath = css.match(/background: url\("([^"]*Librito%20Sidebar\.png)"\)/)[1];
-  await access(new URL(`..${decodeURIComponent(artworkPath)}`, import.meta.url));
-  const panel = await readFile(new URL(`..${decodeURIComponent(artworkPath)}`, import.meta.url));
-  assert.equal(panel.subarray(1, 4).toString(), "PNG");
-  assert.equal(panel[25], 6, "the prepared panel must support transparent corners");
+  assert.doesNotMatch(css, /Librito%20Sidebar\.png|sidebar-book-panel\.png|--sidebar-art-height/);
   const worker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
-  assert.ok(worker.includes(`"${artworkPath}"`), "the sidebar is precached for offline use");
+  assert.doesNotMatch(worker, /Librito%20Sidebar\.png/);
 });
 
-test("sidebar uses the built-in logo without a second branding image", async () => {
+test("sidebar has visible text branding without a separate image", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const sidebar = html.slice(html.indexOf('<aside id="sidebar"'), html.indexOf("</aside>"));
-  assert.match(sidebar, /<span class="visually-hidden">Librito<\/span>/);
+  assert.match(sidebar, /<h2>Librito<\/h2>/);
+  assert.match(sidebar, /<p>Digital Home Library<\/p>/);
   assert.doesNotMatch(sidebar, /<img|class="brand"|class="brand-mark"/);
   assert.match(sidebar, /id="closeLibraryBtn"[\s\S]*class="sidebar-content"[\s\S]*class="sidebar-nav"[\s\S]*id="shelfList"/);
 });
 
-test("sidebar navigation stays within the parchment below the logo and scrolls on short screens", async () => {
+test("sidebar content flows naturally and scrolls on short screens", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const content = css.match(/\.sidebar-content\s*\{([^}]+)\}/)[1];
-  assert.match(content, /position: absolute/);
-  assert.match(content, /inset: 25% 9% 4% 7%/);
+  assert.doesNotMatch(content, /position: absolute|inset:/);
+  assert.match(content, /min-height: 0/);
+  assert.match(content, /flex: 1/);
   assert.match(content, /overflow-y: auto/);
   assert.match(content, /overscroll-behavior: contain/);
   assert.match(css, /\.sidebar \.sidebar-library\s*\{[^}]*flex: 1 0 auto/);
@@ -50,7 +48,7 @@ test("sidebar navigation stays within the parchment below the logo and scrolls o
   assert.match(css, /\.sidebar\.is-open\s*\{[^}]*display: flex/);
 });
 
-test("sidebar provides room for the parchment artwork and readable navigation and shelf text", async () => {
+test("sidebar provides room for readable navigation and shelf text", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   assert.match(css, /grid-template-columns: clamp\(15rem, 18vw, 19rem\) minmax\(0, 1fr\)/);
   assert.match(css, /\.sidebar button\s*\{[^}]*font-family: inherit/);
@@ -62,20 +60,24 @@ test("sidebar provides room for the parchment artwork and readable navigation an
   assert.doesNotMatch(shelfNameRules.at(-1)[1], /font-size:/);
 });
 
-test("sidebar uses the prepared book image without simulated page overlays", async () => {
+test("sidebar uses CSS gradients for its book cover and layered page edges", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const sidebarRules = [...css.matchAll(/\.sidebar\s*\{([^}]+)\}/g)];
-  const bookCover = sidebarRules.find((rule) => rule[1].includes("/assets/Librito%20Sidebar.png"));
-  assert.ok(bookCover, "the sidebar uses the combined book and logo artwork");
-  assert.doesNotMatch(css, /sidebar-book-panel\.png/);
-  assert.match(bookCover[1], /center \/ 100% 100% no-repeat/);
+  const bookCover = sidebarRules.find((rule) => rule[1].includes("radial-gradient(ellipse at 15%"));
+  assert.ok(bookCover, "the sidebar uses the CSS-generated book cover");
+  assert.match(bookCover[1], /linear-gradient\(90deg, #302017/);
   assert.match(bookCover[1], /font-family: Georgia, "Times New Roman", serif/);
   assert.ok(sidebarRules.slice(sidebarRules.indexOf(bookCover) + 1).every((rule) => !/background:/.test(rule[1])),
     "responsive rules must preserve the book cover");
-  assert.doesNotMatch(css, /\.sidebar::(?:before|after)/);
-  assert.match(bookCover[1], /padding: 0/);
-  assert.match(bookCover[1], /color: #49301e/);
-  assert.match(css, /height: calc\(100dvh - 2rem\)/);
+  assert.match(css, /\.sidebar::before,[\s\S]*?pointer-events: none/);
+  assert.match(css, /\.sidebar::after\s*\{[^}]*repeating-linear-gradient/);
+  assert.match(bookCover[1], /padding: 1rem 2rem 1rem 0\.85rem/);
+  assert.match(bookCover[1], /color: #f8eee6/);
+  const responsivePanels = sidebarRules.slice(sidebarRules.indexOf(bookCover) + 1);
+  assert.equal(responsivePanels.length, 2);
+  for (const panel of responsivePanels) {
+    assert.match(panel[1], /height: calc\(100dvh - 2rem\)/);
+  }
   assert.match(css, /margin: 1rem 0;/);
 });
 

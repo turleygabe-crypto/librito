@@ -25,7 +25,7 @@ Then open http://127.0.0.1:3000/.
 
 ## Branding and home loading states
 
-The sidebar uses `assets/Librito Sidebar.png` as its single background, including the built-in Librito logo. A visually hidden label identifies Librito for screen readers without duplicating the logo. On desktop and in the mobile library drawer, navigation starts 25% down the artwork and is inset from the book edges. This content area scrolls independently so navigation and shelves remain accessible on short screens without covering the logo.
+The sidebar is generated with CSS: a dark brown book cover, layered page edges, and text branding. It does not depend on a PNG or a fixed artwork aspect ratio. On desktop and in the mobile library drawer, the content scrolls within the viewport-height panel so navigation and shelves remain accessible on short screens.
 
 Home rows use the bouncing-book loader while the account library or catalog requests are pending (animation respects reduced-motion preferences). Once a new account's empty library has loaded, Currently reading and Recently added show prompts to add books, and author recommendations need books in the library first. These empty states are not ongoing loading states; general recommendations remain available under Picked for your library.
 
