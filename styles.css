@@ -1149,15 +1149,6 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
   background: rgba(245, 221, 201, 0.1);
 }
 
-.card-add-menu > summary::-webkit-details-marker {
-  display: none;
-}
-
-.card-add-menu > summary {
-  cursor: pointer;
-  list-style: none;
-}
-
 .card-like {
   position: absolute;
   bottom: 0.8rem;
@@ -5416,6 +5407,25 @@ body {
 .compact-book-card .card-like {
   top: 0.6rem;
   bottom: auto;
+}
+
+.card-like-menu {
+  position: absolute;
+  top: 0.7rem;
+  left: 0.7rem;
+  z-index: 2;
+}
+
+.card-like-menu > summary.card-like {
+  position: relative;
+  inset: auto;
+  cursor: pointer;
+  list-style: none;
+  opacity: 1;
+}
+
+.card-like-menu > summary::-webkit-details-marker {
+  display: none;
 }
 
 @media (max-width: 700px) {

@@ -22,7 +22,7 @@ const profileFunction = source.slice(source.indexOf("async function ensureProfil
 
 test("account dropdown closes on outside clicks without closing on clicks inside it", () => {
   const handler = source.slice(source.indexOf('document.addEventListener("click", (event) => {'), source.indexOf('\nlibraryToggleBtn.addEventListener("click"'));
-  const menus = [".account-menu", ".card-menu", ".card-add-menu", ".book-shelf-menu"].map((selector) => ({
+  const menus = [".account-menu", ".card-menu", ".card-like-menu", ".book-shelf-menu"].map((selector) => ({
     selector, open: true,
   }));
   let click;
