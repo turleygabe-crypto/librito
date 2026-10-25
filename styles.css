@@ -2405,11 +2405,6 @@ body {
   font-weight: 500;
 }
 
-.account-menu summary::after {
-  color: #65594f;
-  content: "⌄";
-}
-
 .account-menu-panel {
   border-color: #e8ddd2;
   background: #fffaf3;
