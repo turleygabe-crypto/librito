@@ -32,6 +32,41 @@ Home rows use the bouncing-book loader while the account library or catalog requ
 ## Admin dashboard
 `/admin.html` is an unlinked, noindex report page (users, activity, books, shelves). Access is enforced in Supabase: run [the admin migration](supabase/migrations/20261021190000_admin_dashboard.sql) and [the v2 reports migration](supabase/migrations/20261021200000_admin_dashboard_v2.sql), then grant yourself access in SQL Editor with `insert into public.admins (user_id) select id from auth.users where email = 'you@example.com';`. Non-admins only see "Not found" and the `admin_stats` RPC rejects them. "Active" users are those with a recent `last_sign_in_at`.
 
+## Support, account deletion, and legal readiness
+
+Public [Contact us](contact.html) and [Billing Support](billing-support.html) pages use **support@librito.casa** for customer help, billing and privacy requests. They are reachable without signing in; the app links to support in the account menu, footer, sign-in dialog and upgrade screen. The approved refund approach is **no routine partial-period or renewal refunds**, with billing errors, exceptional cases and mandatory consumer rights reviewed through support. Do not request passwords, sign-in codes or full payment-card information by email.
+
+### Deploying self-service account deletion
+
+Apply [the account-deletion migration](supabase/migrations/20261025010000_account_deletion.sql) **after** both Stripe billing migrations and **before deploying this code**. It adds a persistent deletion barrier and an Auth-to-profile cascading foreign key. The key is initially `NOT VALID` to avoid deleting or failing the upgrade on legacy orphan profiles; it immediately enforces new writes and cascades deletion for existing linked accounts. A privileged operator can audit legacy orphans separately and then validate the constraint. Old JWTs cannot recreate a deleted profile because the Auth user must still exist.
+
+Signed-in users can choose **Account -> Delete account**. The Librito dialog explains permanent library removal, immediate subscription cancellation, forfeiture of remaining access, no automatic refund, and financial/back-up retention. The user must type **DELETE**. This does not replace ordinary period-end subscription cancellation, and the deletion dialog does not waive statutory refund rights.
+
+`POST /api/account` requires a Supabase-verified access token, the application origin, and exact confirmation. It ignores client-supplied account/customer IDs. Under the existing per-user/mode billing lease, it:
+
+1. Refuses sandbox deletion of accounts with live Stripe Customer records.
+2. Sets `billing_accounts.deletion_pending`, which survives errors and blocks new Checkout, Portal and subscription mutations. A database mode switch is also blocked until pending deletions finish.
+3. Expires all open Checkout Sessions for the account's dedicated Stripe Customer.
+4. Immediately cancels all nonterminal subscriptions on that Customer, including paused/incomplete subscriptions and old Price IDs, with `invoice_now=false` and `prorate=false`. It never calls a refund API.
+5. Deletes the dedicated Stripe Customer to prevent old portal sessions from opening new subscriptions. Stripe may retain invoices and legally required financial records. Already-processing payments are not guaranteed to be reversed.
+6. Rechecks lease ownership and permanently deletes the Supabase Auth user. The database cascades the profile, books, shelves, memberships, likes, shelf items, admin grant, and local billing mappings/event ledger.
+
+Stripe and Auth deletion are not one transaction. If Stripe fails, the account/library is not removed. If Stripe succeeds but Auth fails, the account remains marked for deletion and billing may already have stopped. The dialog preserves the error and allows retry; retries recognize an already-deleted Stripe Customer and continue. Do not blindly clear `deletion_pending` or promise that a partially completed deletion restores paid access. Diagnose and finish deletion, or contact the owner about a deliberate recovery plan.
+
+The client only clears the local session, Librito-prefixed browser storage/caches, and redirects to a lasting completion notice after a verified success response. If local cleanup fails, it explicitly asks the user to clear site data. Deletion cannot remotely erase another device's local caches, exports, emails, support correspondence, logs or provider backups.
+
+The server needs Customers read/write/delete, Checkout Sessions read/write, Subscriptions read/write/cancel, and the existing Supabase service-role access. Test permissions in the sandbox; never place server keys in browser configuration. When the production database is live, deletion handles its live Customer; historical sandbox Customers are not real charges and are not accessed with live credentials. Keep separate sandbox projects for ongoing tests.
+
+Never manually delete Auth users as a substitute for the billing-aware endpoint: database cascades cannot call Stripe to stop recurring charges. Do not introduce provider storage uploads without extending deletion to remove owned objects before Auth deletion.
+
+### Unpublished policies and launch blockers
+
+Original [Terms draft](legal-drafts/terms.md) and [Privacy draft](legal-drafts/privacy.md) are **not in force** and are excluded from Vercel uploads/static publishing. Do not enter their paths in Stripe's public legal fields. They contain no personal operator name or invented LLC identity. They are intended for owner and qualified legal review, not as a legal-compliance guarantee.
+
+The proposed age rule is **13+**, with parental/guardian agreement and supervision for under-18 users and parental authorization of paid subscriptions. **It is not yet an implemented age or parental-consent gate.** Finalize actual operator details, jurisdictions served, the signup/recurring-payment consent flows, required privacy disclosures and retention rules before publishing legal pages or opening live payments.
+
+The existing cookie banner's optional functional-storage preference is not consistently enforced by the app's storage/cache code. Resolve that mismatch before claiming consent-controlled optional storage. Identify the support-email provider and verify production analytics/logging settings. Affiliate links are planned, not enabled by this work: disclose commissions clearly near affected recommendations/links and review affiliate tracking/consent before introducing them.
+
 ## Account tiers
 Accounts are **Lite Reader** (free) or **Book Lover** (paid), stored in `profiles.tier`. Lite Reader is limited to 100 books, 5 custom shelves (Library, Liked Books and the built-in Wishlist shelf don't count) and 5 Currently Reading books; Book Lover is unlimited and can export library reports from the Stats page. Limits are enforced by database triggers as well as in the app. Users cannot change their own tier. Admins can grant or revoke complimentary Book Lover access from the Users page of `/admin.html`; removing a complimentary grant does not cancel a paid subscription. Run these migrations in order after the admin ones: `20261024190000_account_tiers`, `20261024200000_lite_reader_limits`, `20261024210000_lite_reader_reading_limit`, `20261024220000_admin_account_tiers` and `20261024240000_builtin_wishlist_shelf`. The last one gives every user a permanent Wishlist shelf that can't be renamed or deleted, and turns any existing user-made "Wishlist" shelf into it. Then apply [the Stripe billing migration](supabase/migrations/20261024250000_stripe_billing.sql). It preserves existing Book Lover accounts as complimentary grants and makes the effective tier the union of complimentary and Stripe access.
 
@@ -107,7 +142,7 @@ where requires_review
 order by created_at;
 ```
 
-Review the associated payment in Stripe, cancel the subscription or take other action as appropriate, and clear `requires_review` after handling it. Alert on webhook delivery failures; non-2xx responses must be retried. An expired server lease can be reclaimed after two minutes. Account deletion and billing cancellation are separate operations: cancel subscriptions before deleting Supabase accounts. Keep the event ledger for as long as delivery deduplication/audit requirements need it.
+Review the associated payment in Stripe, cancel the subscription or take other action as appropriate, and clear `requires_review` after handling it. Alert on webhook delivery failures; non-2xx responses must be retried. An expired server lease can be reclaimed after two minutes. Use the billing-aware account-deletion endpoint rather than manually deleting Auth users. The local event ledger cascades with account deletion; later signed events for the deleted customer's removed mapping are acknowledged without restoring access. Define any separate lawful financial/risk retention requirements before launch; do not retain library data unnecessarily.
 
 **Tax:** review sales-tax/VAT/GST obligations for digital subscriptions, including Stripe Tax and product tax codes. Automatic tax is deliberately not enabled: confirm applicable active tax registrations and inclusive/exclusive price behavior first.
 

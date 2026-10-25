@@ -89,6 +89,91 @@ test("in-app confirmation keeps errors visible, prevents duplicate submits and r
   assert.equal(await canceled, false);
 });
 
+test("account deletion uses typed in-app confirmation, prevents identity changes, and clears only Librito browser data after verified success", async () => {
+  const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
+  const dialogs = source.slice(source.indexOf("function ensureAppDialog()"), source.indexOf("\nasync function showAppPrompt("));
+  const deletion = source.slice(source.indexOf("async function deleteAccount("), source.indexOf("\nasync function openBilling("));
+  assert.doesNotMatch(deletion, /window\.(confirm|prompt)/);
+  for (const outcome of ["success", "server-failure", "changed-account", "canceled"]) {
+    const body = new Element();
+    const storage = { "librito-private": "reader data", "other-app": "keep", removeItem(key) { delete this[key]; } };
+    const sessionStorage = { "librito-reminder": "dismissed", removeItem(key) { delete this[key]; } };
+    const removedCaches = [];
+    let redirected;
+    let requests = 0;
+    let signedOut = false;
+    const context = {
+      document: { body, activeElement: new Element(), createElement: () => new Element() },
+      HTMLElement: Element, console: { error() {} }, localStorage: storage, sessionStorage,
+      state: { session: { user: { id: "reader" } }, profile: {}, supabase: {
+        auth: { signOut: async (options) => { assert.equal(options.scope, "local"); signedOut = true; return {}; } },
+      } },
+      window: { caches: {}, location: { replace: (url) => { redirected = url; } } },
+      caches: { keys: async () => ["librito-covers-v1", "other-app"], delete: async (name) => { removedCaches.push(name); } },
+      refreshAuthSession: async () => ({ user: { id: outcome === "changed-account" ? "other" : "reader" }, access_token: "verified-token" }),
+      fetch: async (url, options) => {
+        requests++;
+        assert.equal(url, "/api/account");
+        assert.equal(options.method, "POST");
+        assert.equal(options.headers.Authorization, "Bearer verified-token");
+        assert.deepEqual(JSON.parse(options.body), { confirmation: "DELETE" });
+        return {
+          ok: outcome !== "server-failure",
+          headers: { get: () => "application/json" },
+          json: async () => outcome === "server-failure" ? { error: "Billing may already have stopped. Retry deletion." } : { deleted: true },
+        };
+      },
+    };
+    runInNewContext(`
+      let appDialogOverlay = null, appDialogResolver = null, appDialogReturnFocus = null;
+      let appDialogBusy = false, appDialogConfirmAction = null;
+      ${dialogs}
+      ${deletion}
+      this.removeAccount = deleteAccount;
+      this.settle = settleAppDialog;
+    `, context);
+    const button = { disabled: false };
+    const pending = context.removeAccount(button);
+    const overlay = body.children[0];
+    const form = overlay.querySelector(".app-dialog-form");
+    const input = overlay.querySelector(".app-dialog-input");
+    const error = overlay.querySelector(".app-dialog-error");
+    assert.match(overlay.querySelector(".app-dialog-message").textContent, /subscription is canceled immediately/);
+    assert.match(overlay.querySelector(".app-dialog-message").textContent, /No automatic refund/);
+    assert.equal(input.attributes["aria-label"], "Type DELETE to confirm permanent account deletion");
+    if (outcome === "canceled") {
+      context.settle(null);
+    } else {
+      input.value = "delete";
+      await form.events.submit({ preventDefault() {} });
+      assert.equal(requests, 0);
+      assert.match(error.textContent, /Type DELETE exactly/);
+      input.value = "DELETE";
+      await form.events.submit({ preventDefault() {} });
+      if (outcome !== "success") {
+        assert.equal(error.hidden, false);
+        assert.match(error.textContent, outcome === "changed-account" ? /account changed/ : /Billing may already have stopped/);
+        context.settle(null);
+      }
+    }
+    await pending;
+    assert.equal(button.disabled, false);
+    if (outcome === "success") {
+      assert.equal(requests, 1);
+      assert.equal(signedOut, true);
+      assert.equal(storage["librito-private"], undefined);
+      assert.equal(storage["other-app"], "keep");
+      assert.equal(sessionStorage["librito-reminder"], undefined);
+      assert.deepEqual(removedCaches, ["librito-covers-v1"]);
+      assert.equal(redirected, "/contact.html?account=deleted");
+    } else {
+      assert.equal(signedOut, false);
+      assert.equal(storage["librito-private"], "reader data");
+      assert.equal(redirected, undefined);
+    }
+  }
+});
+
 test("resume control uses Librito confirmation and never calls a browser prompt", async () => {
   const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
   const functionSource = source.slice(source.indexOf("async function resumeBilling("), source.indexOf("\nlet reminderRequest"));

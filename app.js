@@ -925,6 +925,8 @@ function updateAuthButton() {
     : "Sign in to build your own shelves.";
   const upgradeLink = document.getElementById("upgradeLink");
   if (upgradeLink) upgradeLink.textContent = getAccountTier().premium ? "Book Lover plan" : "Upgrade to Book Lover";
+  const deleteAccountButton = document.getElementById("deleteAccountBtn");
+  if (deleteAccountButton) deleteAccountButton.hidden = !state.session;
   const accountName = state.session?.user?.email || "Account";
   document.querySelector(".account-menu-label").textContent = accountName;
   document.querySelector(".account-avatar").textContent = accountName.slice(0, 1).toUpperCase();
@@ -4966,7 +4968,7 @@ function ensureAppDialog() {
     [confirm, cancel, close].forEach((button) => { button.disabled = true; });
     errorMessage.hidden = true;
     try {
-      await appDialogConfirmAction();
+      await appDialogConfirmAction(result);
       appDialogBusy = false;
       settleAppDialog(result);
     } catch (error) {
@@ -5046,6 +5048,7 @@ function showAppDialog({
   inputNode.hidden = !input;
   inputNode.value = input?.value || "";
   inputNode.placeholder = input?.placeholder || "";
+  inputNode.setAttribute("aria-label", input?.label || input?.placeholder || "Your response");
   appDialogReturnFocus = document.activeElement;
   overlay.classList.remove("hidden");
   (input ? inputNode : confirm).focus();
@@ -6621,6 +6624,68 @@ async function performBillingRequest(body) {
   return data;
 }
 
+async function deleteAccount(button) {
+  if (!state.session) {
+    openAuthModal();
+    return;
+  }
+  const userId = state.session.user.id;
+  button.disabled = true;
+  try {
+    const result = await showAppDialog({
+      title: "Permanently delete your account?",
+      message: "This permanently removes your account, books, shelves, notes and reading history. Any subscription is canceled immediately, and remaining paid access is lost. No automatic refund is issued; this does not waive refunds required by law. Financial records and backups may be retained where needed. Save any information you want to keep first. Type DELETE to continue.",
+      confirmLabel: "Permanently delete account",
+      cancelLabel: "Keep my account",
+      danger: true,
+      input: { placeholder: "Type DELETE", label: "Type DELETE to confirm permanent account deletion" },
+      onConfirm: async (confirmation) => {
+        if (confirmation !== "DELETE") throw new Error("Type DELETE exactly to confirm, or choose Keep my account.");
+        const session = await refreshAuthSession();
+        if (!session) throw new Error("Your session expired. Sign in again before deleting your account.");
+        if (session.user.id !== userId) throw new Error("Your signed-in account changed. Close this dialog and try again.");
+        const response = await fetch("/api/account", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ confirmation }),
+          cache: "no-store",
+        });
+        if (!response.headers.get("content-type")?.includes("application/json")) {
+          throw new Error("Account deletion requires the Vercel server. Please use librito.casa.");
+        }
+        const data = await response.json();
+        if (!response.ok || data.deleted !== true) {
+          throw new Error(data.error || "We couldn't confirm deletion. Billing may already have stopped. Retry or contact support@librito.casa.");
+        }
+      },
+    });
+    if (result !== "DELETE") return;
+    state.session = null;
+    state.profile = null;
+    try {
+      const { error } = await state.supabase.auth.signOut({ scope: "local" });
+      if (error) throw error;
+      for (const storage of [localStorage, sessionStorage]) {
+        Object.keys(storage).filter((key) => key.startsWith("librito-")).forEach((key) => storage.removeItem(key));
+      }
+      if ("caches" in window) {
+        const names = await caches.keys();
+        await Promise.all(names.filter((name) => name.startsWith("librito-")).map((name) => caches.delete(name)));
+      }
+    } catch (error) {
+      console.error("Account deleted, but browser cleanup failed", error);
+      await showAppDialog({
+        title: "Account deleted",
+        message: "Your account was deleted, but this browser couldn't clear all local data. Clear this site's data in your browser settings, especially on a shared device. Stripe financial records and provider backups may remain where required.",
+        confirmLabel: "Continue", cancelLabel: null,
+      });
+    }
+    window.location.replace("/contact.html?account=deleted");
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function openBilling(button, body) {
   const label = button.textContent;
   button.disabled = true;
@@ -7018,7 +7083,13 @@ function showUpgradePage() {
   }
   refresh.addEventListener("click", loadBillingStatus);
   billingPanel.append(billingHeading, billingStatus, resume, manage, cancel, refresh, billingHelp);
-  page.append(hero, toggle, plans, tagline, billingPanel);
+  const support = document.createElement("p");
+  support.className = "upgrade-billing-status";
+  const supportLink = document.createElement("a");
+  supportLink.href = "/billing-support.html";
+  supportLink.textContent = "Need help? Contact billing support";
+  support.append(supportLink);
+  page.append(hero, toggle, plans, tagline, billingPanel, support);
   const checkout = new URLSearchParams(window.location.hash.split("?")[1] || "").get("checkout");
   if (checkout === "success") {
     const notice = document.createElement("p");
@@ -8254,6 +8325,8 @@ shelfDrawerOverlay.addEventListener("click", (event) => {
     closeShelfDrawer();
   }
 });
+
+document.getElementById("deleteAccountBtn").addEventListener("click", (event) => deleteAccount(event.currentTarget));
 
 authButton.addEventListener("click", async () => {
   let session;

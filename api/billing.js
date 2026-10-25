@@ -19,8 +19,11 @@ export function createHandler(dependencies = billingDependencies) {
       checked(await db.rpc("billing_assert_mode", { target_livemode: config.livemode }));
       if (req.method === "GET") {
         let account = checked(await db.from("billing_accounts")
-          .select("customer_id, has_subscription, subscription_status, cancel_at_period_end, period_end")
+          .select("customer_id, has_subscription, subscription_status, cancel_at_period_end, period_end, deletion_pending")
           .eq("user_id", user.id).eq("livemode", config.livemode).maybeSingle());
+        if (account?.deletion_pending) {
+          throw new BillingError(409, "Account deletion is in progress. Retry Delete account, or contact support@librito.casa.");
+        }
         if (account?.customer_id) {
           account = await withAccount(db, user.id, async (current, save) => {
             await save(await subscriptionSnapshot(stripe, current.customer_id, config));

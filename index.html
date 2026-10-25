@@ -67,6 +67,9 @@
               <p id="sidebarAuthCopy">Sign in to build your own shelves.</p>
               <a id="upgradeLink" class="account-menu-link" href="#/upgrade">Upgrade to Book Lover</a>
               <a id="adminLink" class="account-menu-link" href="/admin.html" hidden>Admin dashboard</a>
+              <a class="account-menu-link" href="/contact.html">Contact us</a>
+              <a class="account-menu-link" href="/billing-support.html">Billing support</a>
+              <button id="deleteAccountBtn" class="account-menu-link danger-action" type="button" hidden>Delete account</button>
               <button id="authButton" class="action-btn" type="button">Sign in</button>
             </div>
           </details>
@@ -79,7 +82,11 @@
             <span id="totalBooks">0</span><span id="totalSpent">$0</span><span id="shelvesCount">0</span>
           </div>
         </main>
-
+        <footer class="site-footer" aria-label="Support">
+          <a href="/contact.html">Contact us</a>
+          <a href="/billing-support.html">Billing support</a>
+          <a href="mailto:support@librito.casa">support@librito.casa</a>
+        </footer>
       </div>
     </div>
 
@@ -119,6 +126,7 @@
         </div>
         <div class="auth-panel">
           <p id="authCopy" class="auth-copy">Choose one way to sign in: continue with Google, or use your email and password.</p>
+          <p class="auth-copy">Need help with your account? <a href="/contact.html">Contact support</a>.</p>
           <div id="googleAuthOptions" class="google-auth-options">
             <button id="googleAuthBtn" class="google-auth-btn" type="button">Continue with Google</button>
             <p class="auth-divider">or use email instead</p>

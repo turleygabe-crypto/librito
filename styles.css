@@ -16,6 +16,43 @@ button { cursor: pointer; }
 .hidden { display: none !important; }
 h1, h2, h3, h4, p { margin-top: 0; }
 
+.site-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem 1.25rem;
+  padding: 2rem 1rem max(2rem, env(safe-area-inset-bottom));
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.site-footer a, .auth-copy a, .upgrade-billing-status a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+button.account-menu-link { width: 100%; border: 0; background: transparent; text-align: left; font: inherit; }
+.support-page { background: var(--black); color: var(--paper); }
+.support-page a { color: #f1be96; text-underline-offset: 0.2em; overflow-wrap: anywhere; }
+.support-header {
+  width: min(860px, 100%);
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.support-header nav { display: flex; flex-wrap: wrap; gap: 1rem; }
+.support-brand { font: bold 1.8rem Georgia, serif; text-decoration: none; }
+.support-content { width: min(780px, 100%); margin: 1.5rem auto; padding: 0 1.5rem; line-height: 1.7; }
+.support-content h1 { font: bold clamp(2.2rem, 8vw, 3rem) Georgia, serif; }
+.support-content h2 { font-size: 1.3rem; line-height: 1.4; }
+.support-content section { margin: 2rem 0; padding-top: 1.5rem; border-top: 1px solid #65493a; }
+.support-intro { font-size: 1.15rem; }
+.support-email { font-size: 1.15rem; font-weight: bold; }
+.support-notice { padding: 1rem; border: 1px solid #c97b4d; border-radius: 0.75rem; background: var(--panel); }
+
 .app-shell { min-height: 100vh; }
 .sidebar { display: none; }
 .main-stage { width: min(760px, 100%); min-height: 100vh; margin: 0 auto; padding: 0 1rem; }

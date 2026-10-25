@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { before, after, test } from "node:test";
 import { readFile } from "node:fs/promises";
 import { Readable } from "node:stream";
+import { randomUUID } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import Stripe from "stripe";
 import {
@@ -9,6 +10,7 @@ import {
 } from "../lib/server/billing.js";
 import { createHandler } from "../api/billing.js";
 import { createWebhookHandler } from "../api/stripe-webhook.js";
+import { createAccountHandler } from "../api/account.js";
 
 const sql = new PGlite();
 const userId = "11111111-1111-4111-8111-111111111111";
@@ -24,13 +26,15 @@ before(async () => {
       created_at timestamptz default now(), last_sign_in_at timestamptz
     );
     create table public.profiles (
-      id uuid primary key references auth.users(id), email text, full_name text,
+      id uuid primary key, email text, full_name text,
       tier text not null default 'lite_reader'
     );
-    create table public.books (user_id uuid);
-    create table public.shelves (user_id uuid);
-    create table public.liked_books (user_id uuid);
-    create table public.admins (user_id uuid);
+    create table public.books (id uuid primary key default gen_random_uuid(), user_id uuid references profiles(id) on delete cascade);
+    create table public.shelves (id uuid primary key default gen_random_uuid(), user_id uuid references profiles(id) on delete cascade);
+    create table public.liked_books (user_id uuid references profiles(id) on delete cascade, book_id uuid references books(id) on delete cascade);
+    create table public.book_shelves (user_id uuid references profiles(id) on delete cascade, book_id uuid references books(id) on delete cascade, shelf_id uuid references shelves(id) on delete cascade);
+    create table public.shelf_items (user_id uuid references profiles(id) on delete cascade, shelf_id uuid references shelves(id) on delete cascade);
+    create table public.admins (user_id uuid references auth.users(id) on delete cascade);
     create function public.is_admin() returns boolean language sql as
       $$ select coalesce(current_setting('test.admin', true), 'false') = 'true' $$;
     grant usage on schema public to authenticated, anon, service_role;
@@ -40,6 +44,7 @@ before(async () => {
   `);
   await sql.exec(await readFile(new URL("../supabase/migrations/20261024250000_stripe_billing.sql", import.meta.url), "utf8"));
   await sql.exec(await readFile(new URL("../supabase/migrations/20261024260000_stripe_billing_modes.sql", import.meta.url), "utf8"));
+  await sql.exec(await readFile(new URL("../supabase/migrations/20261025010000_account_deletion.sql", import.meta.url), "utf8"));
 });
 
 after(() => sql.close());
@@ -50,6 +55,7 @@ function database() {
       try {
         const params = name === "billing_assert_mode" ? [args.target_livemode]
           : [args.target_user, args.owner, args.target_livemode];
+        if (args.allow_deletion !== undefined) params.push(args.allow_deletion);
         const result = await sql.query(`select public.${name}(${params.map((_, i) => `$${i + 1}`).join(", ")}) as account`, params);
         return { data: result.rows[0].account };
       } catch (error) { return { error }; }
@@ -724,7 +730,7 @@ test("switching to live preserves sandbox history and grants, isolates checkout 
     await sql.exec("reset role");
   }
   await withAccount(fixture.db, id, async () => {
-    await assert.rejects(sql.exec("update billing_environment set livemode = true"), /requests are in progress/);
+    await assert.rejects(sql.exec("update billing_environment set livemode = true"), /requests or account deletions are in progress/);
   });
   await sql.exec("update billing_environment set livemode = true");
   try {
@@ -798,4 +804,232 @@ test("switching to live preserves sandbox history and grants, isolates checkout 
     await sql.exec("update billing_environment set livemode = false");
   }
   assert.equal(await fixture.tier(), "book_lover");
+});
+
+async function deletionFixture({ paid = false } = {}) {
+  const id = randomUUID();
+  const fixture = await lifecycleFixture(id, `cus_delete_${id}`);
+  const calls = [];
+  let customerDeleted = false;
+  let failCancellation = false;
+  let failAuth = false;
+  const subscriptions = paid ? [
+    { id: "sub_old_price", status: "active" },
+    { id: "sub_paused", status: "paused" },
+    { id: "sub_pending", status: "incomplete" },
+    { id: "sub_canceled", status: "canceled" },
+  ] : [];
+  const sessions = paid ? [{ id: "cs_open", status: "open" }] : [];
+  await sql.query("insert into admins(user_id) values ($1)", [id]);
+  await sql.query("insert into liked_books(user_id, book_id) select $1, id from books where user_id = $1", [id]);
+  await sql.query("insert into book_shelves(user_id, book_id, shelf_id) select $1, b.id, s.id from books b, shelves s where b.user_id = $1 and s.user_id = $1", [id]);
+  await sql.query("insert into shelf_items(user_id, shelf_id) select $1, id from shelves where user_id = $1", [id]);
+  const db = fixture.db;
+  db.auth = {
+    getUser: async (token) => {
+      const exists = (await sql.query("select id from auth.users where id = $1", [id])).rows.length > 0;
+      return { data: { user: token === "valid" && exists ? { id } : null } };
+    },
+    admin: {
+      deleteUser: async (target, soft) => {
+        calls.push(["deleteAuth", target]);
+        assert.equal(target, id);
+        assert.equal(soft, false);
+        if (failAuth) return { error: new Error("Auth unavailable") };
+        await sql.query("delete from auth.users where id = $1", [target]);
+        return { data: { user: { id } } };
+      },
+    },
+  };
+  const stripe = {
+    customers: {
+      retrieve: async (customer) => {
+        calls.push(["retrieveCustomer", customer]);
+        assert.equal(customer, `cus_delete_${id}`);
+        return { id: customer, deleted: customerDeleted };
+      },
+      del: async (customer) => {
+        calls.push(["deleteCustomer", customer]);
+        assert.equal(subscriptions.every((sub) => ["canceled", "incomplete_expired"].includes(sub.status)), true);
+        assert.equal(sessions.every((session) => session.status === "expired"), true);
+        customerDeleted = true;
+        return { id: customer, deleted: true };
+      },
+    },
+    checkout: { sessions: {
+      list: (params) => (async function* () {
+        assert.deepEqual(params, { customer: `cus_delete_${id}`, status: "open", limit: 100 });
+        yield* sessions.filter((session) => session.status === "open");
+      })(),
+      expire: async (sessionId) => {
+        calls.push(["expire", sessionId]);
+        sessions.find((session) => session.id === sessionId).status = "expired";
+      },
+    } },
+    subscriptions: {
+      list: (params) => (async function* () {
+        assert.equal(params.customer, `cus_delete_${id}`);
+        yield* subscriptions;
+      })(),
+      cancel: async (subscriptionId, options) => {
+        calls.push(["cancel", subscriptionId]);
+        assert.deepEqual(options, { invoice_now: false, prorate: false });
+        if (failCancellation) throw new Error("Stripe cancellation unavailable");
+        subscriptions.find((sub) => sub.id === subscriptionId).status = "canceled";
+      },
+    },
+  };
+  return {
+    id, calls, db, stripe, subscriptions,
+    failCancellation(value) { failCancellation = value; },
+    failAuth(value) { failAuth = value; },
+    async request(overrides = {}, activeConfig = config) {
+      const res = response();
+      await createAccountHandler(() => ({ db, stripe, config: activeConfig }))({
+        method: "POST",
+        headers: { origin: config.origin, authorization: "Bearer valid" },
+        body: { confirmation: "DELETE", userId, customer_id: "cus_attacker" },
+        ...overrides,
+      }, res);
+      return res;
+    },
+  };
+}
+
+test("account deletion requires same origin, verified identity, POST, and explicit confirmation without touching another account", async () => {
+  const fixture = await deletionFixture();
+  for (const [req, status] of [
+    [{ method: "DELETE" }, 405],
+    [{ headers: { origin: "https://evil.example", authorization: "Bearer valid" } }, 403],
+    [{ headers: { origin: config.origin } }, 401],
+    [{ headers: { origin: config.origin, authorization: "Bearer invalid" } }, 401],
+    [{ body: {} }, 400],
+    [{ body: { confirmation: "delete" } }, 400],
+  ]) {
+    const res = await fixture.request(req);
+    assert.equal(res.code, status);
+    assert.equal(res.headers["Cache-Control"], "no-store");
+  }
+  assert.deepEqual(fixture.calls, []);
+  await sql.query("update billing_accounts set customer_id = null where user_id = $1", [fixture.id]);
+  assert.equal((await fixture.request()).code, 200);
+  assert.deepEqual(fixture.calls, [["deleteAuth", fixture.id]]);
+  assert.equal((await sql.query("select count(*) as n from profiles where id = $1", [userId])).rows[0].n, 1);
+});
+
+test("account deletion expires Checkout, cancels all subscription states and old Prices without refunds, and cascades all owned data", async () => {
+  const fixture = await deletionFixture({ paid: true });
+  const res = await fixture.request();
+  assert.equal(res.code, 200);
+  assert.deepEqual(res.body, { deleted: true });
+  assert.deepEqual(fixture.calls.map(([name]) => name), [
+    "retrieveCustomer", "expire", "cancel", "cancel", "cancel", "deleteCustomer", "deleteAuth",
+  ]);
+  for (const [table, field] of [
+    ["auth.users", "id"], ["profiles", "id"], ["books", "user_id"], ["shelves", "user_id"],
+    ["liked_books", "user_id"], ["book_shelves", "user_id"], ["shelf_items", "user_id"],
+    ["admins", "user_id"], ["billing_accounts", "user_id"], ["billing_events", "user_id"],
+  ]) {
+    assert.equal(Number((await sql.query(`select count(*) as n from ${table} where ${field} = $1`, [fixture.id])).rows[0].n), 0, table);
+  }
+  await assert.rejects(sql.query("insert into profiles(id) values ($1)", [fixture.id]), /foreign key/);
+  assert.equal((await fixture.request()).code, 401);
+});
+
+test("Stripe failure retains the account and library, persists the deletion barrier across retries, and blocks checkout and mode switching", async () => {
+  const fixture = await deletionFixture({ paid: true });
+  fixture.failCancellation(true);
+  const res = await fixture.request();
+  assert.equal(res.code, 500);
+  assert.match(res.body.error, /Billing may already have stopped/);
+  assert.equal(fixture.calls.some(([name]) => name === "deleteAuth"), false);
+  assert.equal(Number((await sql.query("select count(*) as n from books where user_id = $1", [fixture.id])).rows[0].n), 1);
+  const account = (await sql.query("select deletion_pending, lock_owner from billing_accounts where user_id = $1", [fixture.id])).rows[0];
+  assert.equal(account.deletion_pending, true);
+  assert.equal(account.lock_owner, null);
+  await assert.rejects(withAccount(fixture.db, fixture.id, () => assert.fail("Must not run")), { status: 409 });
+  await assert.rejects(sql.exec("update billing_environment set livemode = true"), /deletions are in progress/);
+  const checkout = response();
+  await createHandler(() => ({ db: fixture.db, stripe: fixture.stripe, config }))({
+    method: "POST", headers: { origin: config.origin, authorization: "Bearer valid" },
+    body: { action: "checkout", billing: "monthly" },
+  }, checkout);
+  assert.equal(checkout.code, 409);
+  fixture.failCancellation(false);
+  assert.equal((await fixture.request()).code, 200);
+});
+
+test("Auth failure after Stripe cleanup is retryable without a new subscription or duplicate customer deletion", async () => {
+  const fixture = await deletionFixture({ paid: true });
+  fixture.failAuth(true);
+  assert.equal((await fixture.request()).code, 500);
+  assert.equal(Number((await sql.query("select count(*) as n from profiles where id = $1", [fixture.id])).rows[0].n), 1);
+  fixture.failAuth(false);
+  assert.equal((await fixture.request()).code, 200);
+  assert.equal(fixture.calls.filter(([name]) => name === "deleteCustomer").length, 1);
+  assert.equal(fixture.calls.filter(([name]) => name === "cancel").length, 3);
+});
+
+test("sandbox deletion cannot erase an account with real billing records", async () => {
+  const fixture = await deletionFixture();
+  await sql.exec("update billing_environment set livemode = true");
+  await withAccount(fixture.db, fixture.id, async (account, save) => {
+    await save({ customer_id: `cus_real_${fixture.id}` });
+  }, true);
+  await sql.exec("update billing_environment set livemode = false");
+  const res = await fixture.request();
+  assert.equal(res.code, 409);
+  assert.match(res.body.error, /live billing records/);
+  assert.deepEqual(fixture.calls, []);
+});
+
+test("Checkout expiry and Customer deletion failures retain the account and can be retried safely", async () => {
+  for (const stage of ["expire", "del"]) {
+    const fixture = await deletionFixture({ paid: true });
+    const target = stage === "expire" ? fixture.stripe.checkout.sessions : fixture.stripe.customers;
+    const original = target[stage];
+    target[stage] = async () => { throw new Error(`Stripe ${stage} unavailable`); };
+    assert.equal((await fixture.request()).code, 500);
+    assert.equal(fixture.calls.some(([name]) => name === "deleteAuth"), false);
+    assert.equal(Number((await sql.query("select count(*) as n from books where user_id = $1", [fixture.id])).rows[0].n), 1);
+    target[stage] = original;
+    assert.equal((await fixture.request()).code, 200);
+  }
+});
+
+test("an expired deletion lease and unconfirmed provider responses never report success or delete Auth", async () => {
+  const fixture = await deletionFixture({ paid: true });
+  const remove = fixture.stripe.customers.del;
+  fixture.stripe.customers.del = async (customer) => {
+    const result = await remove(customer);
+    await sql.query("update billing_accounts set locked_until = now() - interval '1 second' where user_id = $1", [fixture.id]);
+    return result;
+  };
+  assert.equal((await fixture.request()).code, 500);
+  assert.equal(fixture.calls.some(([name]) => name === "deleteAuth"), false);
+  assert.equal((await fixture.request()).code, 200);
+
+  const unconfirmed = await deletionFixture();
+  const removeAuth = unconfirmed.db.auth.admin.deleteUser;
+  unconfirmed.db.auth.admin.deleteUser = async () => ({ data: { user: null } });
+  assert.equal((await unconfirmed.request()).code, 500);
+  unconfirmed.db.auth.admin.deleteUser = removeAuth;
+  assert.equal((await unconfirmed.request()).code, 200);
+});
+
+test("live deletion stops real billing and removes both mode mappings without using sandbox credentials", async () => {
+  const fixture = await deletionFixture({ paid: true });
+  await sql.query("update billing_accounts set customer_id = null where user_id = $1", [fixture.id]);
+  await sql.exec("update billing_environment set livemode = true");
+  try {
+    await withAccount(fixture.db, fixture.id, async (account, save) => {
+      await save({ customer_id: `cus_delete_${fixture.id}`, has_access: true });
+    }, true);
+    const res = await fixture.request({}, { ...config, livemode: true });
+    assert.equal(res.code, 200);
+    assert.equal(fixture.calls.filter(([name]) => name === "cancel").length, 3);
+    assert.equal(Number((await sql.query("select count(*) as n from billing_accounts where user_id = $1", [fixture.id])).rows[0].n), 0);
+  } finally {
+    await sql.exec("update billing_environment set livemode = false");
+  }
 });
