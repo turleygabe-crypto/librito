@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="26" height="960" viewBox="0 0 26 960" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="paper" x1="0" x2="1">
+      <stop stop-color="#896747"/>
+      <stop offset=".18" stop-color="#d9bf94"/>
+      <stop offset=".48" stop-color="#efdbb8"/>
+      <stop offset=".78" stop-color="#cfb186"/>
+      <stop offset="1" stop-color="#886445"/>
+    </linearGradient>
+    <linearGradient id="fold" x1="0" x2="0" y1="0" y2="1">
+      <stop stop-color="#fff1d1" stop-opacity=".6"/>
+      <stop offset=".035" stop-color="#fff1d1" stop-opacity="0"/>
+      <stop offset=".96" stop-color="#654326" stop-opacity="0"/>
+      <stop offset="1" stop-color="#654326" stop-opacity=".5"/>
+    </linearGradient>
+  </defs>
+  <path d="M1 1 Q9 6 22 4 Q25 4 25 10 L25 944 Q25 950 20 950 Q9 951 1 959Z" fill="url(#paper)" stroke="#65472f" stroke-width="1"/>
+  <g fill="none" stroke="#8f704d" stroke-width=".65" opacity=".75">
+    <path d="M4 3 Q10 8 23 6 L23 946 Q12 947 4 956Z"/>
+    <path d="M7 4 Q13 10 21 8 L21 946 Q13 948 7 954Z"/>
+    <path d="M10 5 Q15 12 19 10 L19 946 Q14 949 10 952Z"/>
+    <path d="M13 6 Q16 12 16 14 L16 947 Q15 949 13 951Z"/>
+  </g>
+  <g fill="none" stroke="#fff0ce" stroke-width=".7" opacity=".75">
+    <path d="M5 5 L5 954"/>
+    <path d="M8 7 L8 952"/>
+    <path d="M11 9 L11 950"/>
+    <path d="M14 12 L14 948"/>
+    <path d="M20 12 L20 944"/>
+  </g>
+  <path d="M1 1 Q9 6 22 4 Q25 4 25 10 L25 944 Q25 950 20 950 Q9 951 1 959Z" fill="url(#fold)"/>
+</svg>

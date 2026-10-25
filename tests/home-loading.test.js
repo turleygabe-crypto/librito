@@ -67,9 +67,14 @@ test("sidebar has a decorative book cover and layered page edge without blocking
   assert.ok(sidebarRules.slice(sidebarRules.indexOf(bookCover) + 1).every((rule) => !/background:/.test(rule[1])),
     "responsive rules must preserve the book cover");
   assert.match(css, /\.sidebar::before,\s*\.sidebar::after\s*\{[^}]*pointer-events: none/);
-  assert.match(bookCover[1], /padding-right: 1\.5rem/);
-  assert.match(css, /\.sidebar::before\s*\{[^}]*border-radius: 0 5px 7px 0/);
-  assert.match(css, /\.sidebar::after\s*\{[^}]*width: 0\.7rem;[^}]*clip-path: polygon\([^;]+;[^}]*repeating-linear-gradient\(90deg/);
+  assert.match(bookCover[1], /padding-right: 2rem/);
+  assert.match(css, /\.sidebar::after\s*\{[^}]*width: 1\.4rem;[^}]*url\("\/assets\/book-page-edge\.svg"\)/);
+  assert.match(css, /height: calc\(100dvh - 2rem\)/);
+  assert.match(css, /margin: 1rem 0 1rem 0\.75rem/);
+  const pageEdge = await readFile(new URL("../assets/book-page-edge.svg", import.meta.url), "utf8");
+  assert.match(pageEdge, /preserveAspectRatio="none"/);
+  assert.match(pageEdge, /Q9 6 22 4/);
+  assert.match(pageEdge, /Q9 951 1 959/);
 });
 
 test("startup keeps the library pending until account initialization", () => {
