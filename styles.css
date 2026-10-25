@@ -2076,7 +2076,40 @@ body {
 .sidebar {
   gap: 0.85rem;
   color: #f8eee6;
-  background: #21130f;
+  background:
+    radial-gradient(ellipse at 15% 10%, rgba(139, 91, 51, 0.18), transparent 65%),
+    repeating-linear-gradient(2deg, rgba(255, 225, 180, 0.018) 0 1px, transparent 1px 4px),
+    linear-gradient(90deg, #302016, #21130f 70%, #3c281b);
+  box-shadow: inset 3px 0 8px rgba(0, 0, 0, 0.18), 3px 0 7px rgba(49, 28, 14, 0.25);
+}
+
+.sidebar::before,
+.sidebar::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+}
+
+.sidebar::before {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1.1rem;
+  border-radius: 0 4px 5px 0;
+  background: linear-gradient(90deg, #60442c, #b28b59 30%, #51321d 50%, #352015);
+  box-shadow: -3px 0 7px rgba(0, 0, 0, 0.3);
+}
+
+.sidebar::after {
+  top: 3px;
+  right: 2px;
+  bottom: 4px;
+  width: 0.65rem;
+  border-radius: 0 3px 4px 0;
+  background:
+    linear-gradient(180deg, rgba(255, 246, 220, 0.35), transparent 8%, transparent 92%, rgba(89, 53, 25, 0.25)),
+    repeating-linear-gradient(90deg, #ddc59c 0 1px, #a78a60 1px 2px, #efdbb5 2px 3px);
+  box-shadow: inset 1px 0 2px rgba(255, 245, 214, 0.65), 1px 0 2px rgba(0, 0, 0, 0.4);
 }
 
 .sidebar .brand {
@@ -2460,7 +2493,6 @@ body {
     padding: 1rem;
     border: 0;
     border-radius: 0;
-    background: #21130f;
   }
 
   .sidebar .brand {
@@ -2568,10 +2600,6 @@ body {
 @media (max-width: 899px) {
   .spotify-topbar > .library-toggle-btn {
     display: grid;
-  }
-
-  .sidebar {
-    background: #21130f;
   }
 
   .main-stage {

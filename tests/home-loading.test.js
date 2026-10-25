@@ -58,6 +58,18 @@ test("sidebar preserves its width and uses readable navigation and shelf text", 
   assert.doesNotMatch(shelfNameRules.at(-1)[1], /font-size:/);
 });
 
+test("sidebar has a decorative book cover and layered page edge without blocking controls", async () => {
+  const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  const sidebarRules = [...css.matchAll(/\.sidebar\s*\{([^}]+)\}/g)];
+  const bookCover = sidebarRules.find((rule) => rule[1].includes("radial-gradient"));
+  assert.ok(bookCover, "the sidebar has a textured cover background");
+  assert.match(bookCover[1], /box-shadow:/);
+  assert.ok(sidebarRules.slice(sidebarRules.indexOf(bookCover) + 1).every((rule) => !/background:/.test(rule[1])),
+    "responsive rules must preserve the book cover");
+  assert.match(css, /\.sidebar::before,\s*\.sidebar::after\s*\{[^}]*pointer-events: none/);
+  assert.match(css, /\.sidebar::after\s*\{[^}]*width: 0\.65rem;[^}]*repeating-linear-gradient\(90deg/);
+});
+
 test("startup keeps the library pending until account initialization", () => {
   const startup = source.slice(source.lastIndexOf("\ninitializeBookLanguageOptions();"));
   assert.doesNotMatch(startup, /state\.loading\s*=\s*false/);
