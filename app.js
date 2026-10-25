@@ -465,6 +465,9 @@ function restoreRouteFromLocation() {
     case "/upgrade":
       showUpgradePage();
       break;
+    case "/account":
+      showAccountPage(params.get("section") || "overview");
+      break;
     case "/purchase":
       showPurchasePage(params);
       break;
@@ -6874,6 +6877,161 @@ setInterval(() => {
   if (document.visibilityState === "visible") refreshSubscriptionReminder();
 }, 60 * 1000);
 
+function createAccountLink(label, href) {
+  const link = document.createElement("a");
+  link.textContent = label;
+  link.href = href;
+  return link;
+}
+
+function createAccountCard(title, copy) {
+  const card = document.createElement("section");
+  card.className = "account-card";
+  const heading = document.createElement("h2");
+  heading.textContent = title;
+  const description = document.createElement("p");
+  description.textContent = copy;
+  card.append(heading, description);
+  return card;
+}
+
+function showAccountPage(requestedSection = "overview") {
+  const section = ["overview", "settings", "billing", "support"].includes(requestedSection) ? requestedSection : "overview";
+  const page = showPage("account");
+  updateActiveNavigation("");
+  const heading = document.createElement("h1");
+  heading.textContent = "My Librito account";
+  if (!state.session) {
+    const card = createAccountCard("Your own cozy corner", "Sign in to manage your account, subscription and library.");
+    const signIn = document.createElement("button");
+    signIn.type = "button";
+    signIn.className = "action-btn";
+    signIn.textContent = "Sign in";
+    signIn.addEventListener("click", openAuthModal);
+    card.append(signIn, createAccountLink("Contact support", "/contact.html"));
+    page.append(heading, card);
+    return;
+  }
+  const userId = state.session.user.id;
+  const layout = document.createElement("div");
+  layout.className = "account-layout";
+  const navigation = document.createElement("nav");
+  navigation.className = "account-navigation";
+  navigation.setAttribute("aria-label", "Account sections");
+  for (const [key, label] of [
+    ["overview", "Overview"], ["settings", "Account settings"],
+    ["billing", "Billing & subscription"], ["support", "Support & policies"],
+  ]) {
+    const link = createAccountLink(label, createRouteHash("account", { section: key }));
+    if (section === key) link.setAttribute("aria-current", "page");
+    navigation.append(link);
+  }
+  const signOut = document.createElement("button");
+  signOut.type = "button";
+  signOut.className = "text-btn";
+  signOut.textContent = "Sign out";
+  signOut.addEventListener("click", () => authButton.click());
+  navigation.append(signOut);
+  const content = document.createElement("div");
+  content.className = "account-content";
+  if (section === "billing") {
+    // Keep the existing payment controls, confirmation dialogs and status refresh intact.
+    showUpgradePage();
+    content.append(...Array.from(page.childNodes));
+    state.view = "account";
+  } else if (section === "settings") {
+    const profile = createAccountCard("Account settings", "Make this little corner of Librito your own.");
+    const form = document.createElement("form");
+    form.className = "book-form";
+    const label = document.createElement("label");
+    label.textContent = "Display name";
+    const name = document.createElement("input");
+    name.name = "displayName";
+    name.autocomplete = "nickname";
+    name.required = true;
+    name.maxLength = 100;
+    name.value = state.profile?.full_name || state.session.user.user_metadata?.full_name || "";
+    label.append(name);
+    const email = document.createElement("p");
+    email.textContent = `Sign-in email: ${state.session.user.email || "Not provided"}`;
+    const emailHelp = document.createElement("p");
+    emailHelp.textContent = "Your sign-in email identifies your account. Contact support if you need help changing it.";
+    const status = document.createElement("p");
+    status.setAttribute("role", "status");
+    const save = document.createElement("button");
+    save.type = "submit";
+    save.className = "action-btn";
+    save.textContent = "Save changes";
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (save.disabled) return;
+      save.disabled = true;
+      status.textContent = "Saving...";
+      try {
+        const value = name.value.trim();
+        if (!value || value.length > 100) throw new Error("Enter a display name between 1 and 100 characters.");
+        const session = await refreshAuthSession();
+        if (session?.user.id !== userId) throw new Error("Your signed-in account changed. Reload account settings before saving.");
+        const { data, error } = await state.supabase.from("profiles").update({ full_name: value })
+          .eq("id", userId).select("*").single();
+        if (error) throw error;
+        if (state.session?.user.id !== userId) return;
+        state.profile = data;
+        name.value = data.full_name;
+        updateAuthButton();
+        status.textContent = "Your account settings have been saved.";
+      } catch (error) {
+        console.error("Could not save account settings", error);
+        status.textContent = error.message || "Your changes couldn't be saved. Please try again.";
+      } finally {
+        save.disabled = false;
+      }
+    });
+    form.append(label, email, emailHelp, createAccountLink("Get account help", "/contact.html"), save, status);
+    profile.append(form);
+    const security = createAccountCard("Sign-in & security", "Never share your password or sign-in codes with anyone, including support.");
+    const providers = state.session.user.app_metadata?.providers || [];
+    const providerCopy = document.createElement("p");
+    providerCopy.textContent = providers.includes("google")
+      ? "Google sign-in is connected. Manage your Google password and security in your Google account."
+      : "You use email sign-in. For password recovery, sign out and choose Forgot password? on the sign-in screen. Contact support if you cannot recover access.";
+    security.append(providerCopy, createAccountLink("Security and sign-in help", "/contact.html"));
+    const danger = createAccountCard("Delete account", "This permanently removes your account and library, immediately cancels your subscription, and ends remaining paid access. No automatic refund is issued. Normal subscription cancellation is available in Billing instead.");
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "secondary-btn danger-action";
+    remove.textContent = "Delete account";
+    remove.addEventListener("click", () => deleteAccount(remove));
+    danger.append(remove);
+    content.append(profile, security, danger);
+  } else if (section === "support") {
+    const support = createAccountCard("A helping hand", "Customer support, billing help, privacy requests and accessibility feedback all reach us at support@librito.casa.");
+    support.append(
+      createAccountLink("Contact us", "/contact.html"),
+      createAccountLink("Billing support & refund information", "/billing-support.html"),
+      createAccountLink("Privacy requests", "/contact.html#privacy"),
+      createAccountLink("Email support@librito.casa", "mailto:support@librito.casa"),
+    );
+    const policies = createAccountCard("Terms & Privacy", "Our Terms of Service and Privacy Policy are being finalized and are not yet published. Policy links will appear here when the reviewed documents are available.");
+    content.append(support, policies);
+  } else {
+    const welcome = createAccountCard("Welcome to your account", state.profile?.full_name
+      ? `Hello, ${state.profile.full_name}. Manage the essentials, then get back to your next good book.`
+      : "Manage the essentials, then get back to your next good book.");
+    welcome.append(createAccountLink("Edit account settings", createRouteHash("account", { section: "settings" })));
+    const plan = createAccountCard("Your plan", `Current access: ${getAccountTier().name}.`);
+    plan.append(createAccountLink("View plan & manage billing", createRouteHash("account", { section: "billing" })));
+    const library = createAccountCard("Your library", "Your books, shelves and reading progress live in your library. No orders or shipping addresses to manage here.");
+    library.append(createAccountLink("Back to your library", "#/library"));
+    const help = createAccountCard("Support & policies", "Need a hand or have a privacy question? We're here to help.");
+    help.append(createAccountLink("Support & policy information", createRouteHash("account", { section: "support" })));
+    content.append(welcome, plan, library, help);
+  }
+  layout.append(navigation, content);
+  page.replaceChildren(heading, layout);
+  document.querySelector(".account-menu").open = false;
+}
+
 function showUpgradePage() {
   updateActiveNavigation("");
   const page = showPage("upgrade");
@@ -7222,6 +7380,7 @@ function render() {
   else if (state.view === "book") renderBookRoute();
   else if (state.view === "purchase") showPurchasePage();
   else if (state.view === "upgrade") showUpgradePage();
+  else if (state.view === "account") showAccountPage(new URLSearchParams(window.location.hash.split("?")[1] || "").get("section") || "overview");
 }
 
 function openDialog() {
@@ -7877,6 +8036,17 @@ async function refreshAuthSession() {
 async function ensureProfile(displayName = "") {
   if (!state.supabase || !state.session) return;
   const user = state.session.user;
+  const existing = await state.supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
+  if (existing.error) {
+    console.error("Could not load account profile", existing.error);
+    showToast("Your account profile couldn't be loaded. Please try again.");
+    return;
+  }
+  if (existing.data) {
+    state.profile = existing.data;
+    updateAuthButton();
+    return;
+  }
   const { data, error } = await state.supabase
     .from("profiles")
     .upsert(

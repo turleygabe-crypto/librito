@@ -34,6 +34,12 @@ Home rows use the bouncing-book loader while the account library or catalog requ
 
 ## Support, account deletion, and legal readiness
 
+### My account
+
+The Account menu opens a responsive [My account](https://librito.casa/#/account) area with Overview, Account settings, Billing & subscription, and Support & policies. Account settings saves the display name to the authenticated user's profile, shows the sign-in email, and provides sign-in help and the existing permanent-deletion flow. Signing in again preserves saved profile names instead of overwriting them with original signup metadata. Email changes are handled through support; this update does not add unverified email changes or a new password-recovery implementation.
+
+The billing section reuses the existing upgrade page, subscription status, Checkout, Portal and cancel/renew dialogs rather than introducing a second billing implementation. Direct upgrade and Stripe return URLs continue to work. Signed-out visitors see a sign-in invitation rather than private settings. Support links remain public; the policy section explicitly says Terms and Privacy are not yet published and does not expose the drafts. No order history, shipping addresses or marketing preferences are included.
+
 Public [Contact us](contact.html) and [Billing Support](billing-support.html) pages use **support@librito.casa** for customer help, billing and privacy requests. They are reachable without signing in; the app links to support in the account menu, footer, sign-in dialog and upgrade screen. The approved refund approach is **no routine partial-period or renewal refunds**, with billing errors, exceptional cases and mandatory consumer rights reviewed through support. Do not request passwords, sign-in codes or full payment-card information by email.
 
 ### Deploying self-service account deletion
