@@ -2075,40 +2075,13 @@ body {
 
 .sidebar {
   gap: 0.85rem;
-  color: #f8eee6;
-  padding: 1rem 2rem 1rem 0.85rem;
-  font-family: Georgia, "Times New Roman", serif;
-  border-radius: 1px 5px 5px 1px;
-  background:
-    radial-gradient(ellipse at 15% 8%, rgba(133, 90, 57, 0.14), transparent 65%),
-    radial-gradient(ellipse at 70% 85%, rgba(114, 74, 43, 0.1), transparent 60%),
-    linear-gradient(90deg, #302017, #291b14 75%, #342319);
+  color: #fff8ef;
+  padding: 1rem;
+  font-family: inherit;
+  border-radius: 0.45rem;
+  background: #32190e;
   filter: none;
-  box-shadow: inset 1px 0 2px rgba(231, 187, 127, 0.12), 3px 4px 5px rgba(44, 28, 17, 0.35);
-}
-
-.sidebar::before,
-.sidebar::after {
-  position: absolute;
-  content: "";
-  pointer-events: none;
-  top: 1px;
-  bottom: 2px;
-}
-
-.sidebar::before {
-  right: 0;
-  width: 1.65rem;
-  border-radius: 0 5px 5px 0;
-  background: linear-gradient(90deg, #513a28, #8c6845 12%, #3e291c 24%, #382418 88%, #6e4b2f);
-  box-shadow: -5px 0 10px rgba(13, 7, 3, 0.25);
-}
-
-.sidebar::after {
-  right: 3px;
-  width: 1.15rem;
-  border-radius: 0 50% 50% 0 / 0 3% 3% 0;
-  background: repeating-linear-gradient(90deg, #b49a73 0 1px, #e1cba3 1px 3px, #917552 3px 4px);
+  box-shadow: none;
 }
 
 .sidebar-content {
@@ -2131,7 +2104,8 @@ body {
 
 .sidebar .sidebar-brand h2 {
   margin: 0;
-  color: #f8eee6;
+  color: #fff8ef;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 2rem;
   font-weight: 400;
 }
@@ -2157,7 +2131,7 @@ body {
 .sidebar .mobile-sidebar-close {
   position: absolute;
   top: 1rem;
-  right: 2rem;
+  right: 1rem;
 }
 
 .sidebar .nav-pill,
@@ -2178,11 +2152,11 @@ body {
 }
 
 .sidebar .nav-pill {
-  border-radius: 2px;
+  border-radius: 0.45rem;
 }
 
 .sidebar .nav-pill.active {
-  box-shadow: inset 2px 0 #91643d;
+  box-shadow: inset 3px 0 #b64d2c;
 }
 
 .sidebar .nav-pill:hover,
@@ -2197,15 +2171,6 @@ body {
 .sidebar .sidebar-nav,
 .sidebar .sidebar-library-nav {
   border-bottom-color: rgba(245, 221, 201, 0.12);
-}
-
-.sidebar-ornament {
-  width: 1.6rem;
-  height: 2.3rem;
-  flex: 0 0 auto;
-  align-self: center;
-  margin: 0.75rem 0 0.5rem;
-  color: #ae7c4c;
 }
 
 .sidebar .nav-pill,
@@ -2553,7 +2518,7 @@ body {
     height: calc(100dvh - 2rem);
     margin: 1rem 0;
     gap: 0.85rem;
-    padding: 1rem 2rem 1rem 0.85rem;
+    padding: 1rem;
     border: 0;
   }
 

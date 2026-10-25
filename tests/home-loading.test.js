@@ -60,20 +60,26 @@ test("sidebar provides room for readable navigation and shelf text", async () =>
   assert.doesNotMatch(shelfNameRules.at(-1)[1], /font-size:/);
 });
 
-test("sidebar uses CSS gradients for its book cover and layered page edges", async () => {
+test("sidebar is a basic panel matching the hero without book effects", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const sidebarRules = [...css.matchAll(/\.sidebar\s*\{([^}]+)\}/g)];
-  const bookCover = sidebarRules.find((rule) => rule[1].includes("radial-gradient(ellipse at 15%"));
-  assert.ok(bookCover, "the sidebar uses the CSS-generated book cover");
-  assert.match(bookCover[1], /linear-gradient\(90deg, #302017/);
-  assert.match(bookCover[1], /font-family: Georgia, "Times New Roman", serif/);
-  assert.ok(sidebarRules.slice(sidebarRules.indexOf(bookCover) + 1).every((rule) => !/background:/.test(rule[1])),
-    "responsive rules must preserve the book cover");
-  assert.match(css, /\.sidebar::before,[\s\S]*?pointer-events: none/);
-  assert.match(css, /\.sidebar::after\s*\{[^}]*repeating-linear-gradient/);
-  assert.match(bookCover[1], /padding: 1rem 2rem 1rem 0\.85rem/);
-  assert.match(bookCover[1], /color: #f8eee6/);
-  const responsivePanels = sidebarRules.slice(sidebarRules.indexOf(bookCover) + 1);
+  const panel = sidebarRules.find((rule) => rule[1].includes("background: #32190e"));
+  assert.ok(panel, "the sidebar uses the hero background color");
+  const hero = css.match(/\.home-hero\s*\{([^}]+)\}/)[1];
+  assert.match(hero, /background-color: #32190e/);
+  assert.match(hero, /border-radius: 0\.45rem/);
+  assert.match(panel[1], /border-radius: 0\.45rem/);
+  assert.match(panel[1], /font-family: inherit/);
+  assert.match(panel[1], /box-shadow: none/);
+  assert.ok(sidebarRules.slice(sidebarRules.indexOf(panel) + 1).every((rule) => !/background:/.test(rule[1])),
+    "responsive rules must preserve the basic panel background");
+  assert.doesNotMatch(css, /\.sidebar::(?:before|after)|sidebar-ornament/);
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  assert.doesNotMatch(html, /sidebar-ornament/);
+  assert.match(panel[1], /padding: 1rem/);
+  assert.match(panel[1], /color: #fff8ef/);
+  assert.match(css, /\.sidebar \.nav-pill\.active\s*\{[^}]*#b64d2c/);
+  const responsivePanels = sidebarRules.slice(sidebarRules.indexOf(panel) + 1);
   assert.equal(responsivePanels.length, 2);
   for (const panel of responsivePanels) {
     assert.match(panel[1], /height: calc\(100dvh - 2rem\)/);
