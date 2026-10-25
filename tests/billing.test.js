@@ -12,7 +12,7 @@ import { createWebhookHandler } from "../api/stripe-webhook.js";
 
 const sql = new PGlite();
 const userId = "11111111-1111-4111-8111-111111111111";
-const config = { origin: "https://librito.casa", prices: { monthly: "price_month", annual: "price_year" } };
+const config = { livemode: false, origin: "https://librito.casa", prices: { monthly: "price_month", annual: "price_year" } };
 const user = { id: userId, email: "reader@example.test" };
 
 before(async () => {
@@ -39,6 +39,7 @@ before(async () => {
     insert into public.profiles(id, tier) values ('${userId}', 'book_lover');
   `);
   await sql.exec(await readFile(new URL("../supabase/migrations/20261024250000_stripe_billing.sql", import.meta.url), "utf8"));
+  await sql.exec(await readFile(new URL("../supabase/migrations/20261024260000_stripe_billing_modes.sql", import.meta.url), "utf8"));
 });
 
 after(() => sql.close());
@@ -47,7 +48,9 @@ function database() {
   return {
     rpc: async (name, args) => {
       try {
-        const result = await sql.query(`select public.${name}($1, $2) as account`, [args.target_user, args.owner]);
+        const params = name === "billing_assert_mode" ? [args.target_livemode]
+          : [args.target_user, args.owner, args.target_livemode];
+        const result = await sql.query(`select public.${name}(${params.map((_, i) => `$${i + 1}`).join(", ")}) as account`, params);
         return { data: result.rows[0].account };
       } catch (error) { return { error }; }
     },
@@ -95,7 +98,7 @@ function stripeMock(subscriptions = []) {
     subscriptions: { list: () => (async function* () { yield* subscriptions; })() },
     customers: { create: async () => ({ id: "cus_reader" }) },
     prices: { retrieve: async (id) => ({
-      id, active: true, currency: "usd", unit_amount: id === "price_month" ? 299 : 2499,
+      id, livemode: false, active: true, currency: "usd", unit_amount: id === "price_month" ? 299 : 2499,
       recurring: { interval: id === "price_month" ? "month" : "year", interval_count: 1 },
     }) },
     checkout: { sessions: {
@@ -118,12 +121,28 @@ function response() {
 }
 
 test("billing config validates origin and requires both configured prices", () => {
-  assert.throws(() => billingConfig({}), BillingError);
-  assert.throws(() => billingConfig({ APP_URL: "not a URL" }), { status: 503 });
-  assert.throws(() => billingConfig({ APP_URL: "http://librito.casa" }), BillingError);
-  assert.equal(billingConfig({
+  const env = {
     APP_URL: "http://localhost:3000", STRIPE_PRICE_MONTHLY: "m", STRIPE_PRICE_ANNUAL: "y",
-  }).origin, "http://localhost:3000");
+    STRIPE_MODE: "test", STRIPE_SECRET_KEY: "rk_test_placeholder",
+  };
+  assert.throws(() => billingConfig({}), BillingError);
+  assert.throws(() => billingConfig({ ...env, APP_URL: "not a URL" }), { status: 503 });
+  assert.throws(() => billingConfig({ ...env, APP_URL: "http://librito.casa" }), BillingError);
+  assert.throws(() => billingConfig({ ...env, STRIPE_PRICE_ANNUAL: "" }), BillingError);
+  assert.equal(billingConfig(env).origin, "http://localhost:3000");
+});
+
+test("billing requires an explicit mode matching a server-side test or live key", () => {
+  const env = { APP_URL: "https://librito.casa", STRIPE_PRICE_MONTHLY: "m", STRIPE_PRICE_ANNUAL: "y" };
+  for (const mode of ["test", "live"]) {
+    for (const prefix of ["rk", "sk"]) {
+      assert.equal(billingConfig({ ...env, STRIPE_MODE: mode, STRIPE_SECRET_KEY: `${prefix}_${mode}_placeholder` }).livemode, mode === "live");
+    }
+  }
+  for (const [mode, key] of [[undefined, "rk_test_placeholder"], ["live", "rk_test_placeholder"],
+    ["test", "rk_live_placeholder"], ["test", "pk_test_placeholder"], ["invalid", "sk_test_placeholder"]]) {
+    assert.throws(() => billingConfig({ ...env, STRIPE_MODE: mode, STRIPE_SECRET_KEY: key }), { status: 503 });
+  }
 });
 
 test("authentication validates the token with Supabase rather than trusting client identity", async () => {
@@ -357,7 +376,7 @@ test("checkout uses server Prices and verified user, validates amount, reuses op
 test("webhooks reconcile live state, deduplicate deliveries, preserve complimentary grants and record risks", async () => {
   const db = database();
   await sql.query("update billing_accounts set customer_id = 'cus_reader' where user_id = $1", [userId]);
-  const event = { id: "evt_paid", type: "invoice.paid", data: { object: { customer: "cus_reader" } } };
+  const event = { id: "evt_paid", livemode: false, type: "invoice.paid", data: { object: { customer: "cus_reader" } } };
   await processWebhook({ db, stripe: stripeMock([subscription("active")]), config }, event);
   assert.equal((await sql.query("select tier from profiles")).rows[0].tier, "book_lover");
   await processWebhook({ db, stripe: stripeMock(), config }, event);
@@ -426,14 +445,14 @@ test("risk events resolve their charge's Customer; unrelated customerless paymen
     assert.equal(await eventCustomer(stripe, { type, data: { object: { charge: "ch_risk" } } }), "cus_reader");
   }
   await processWebhook({ db: database(), stripe, config }, {
-    id: "evt_unrelated", type: "charge.refunded", data: { object: { customer: null } },
+    id: "evt_unrelated", livemode: false, type: "charge.refunded", data: { object: { customer: null } },
   });
 });
 
 test("webhook handler accepts signed raw payloads and rejects tampering", async () => {
   const stripe = new Stripe("sk_test_placeholder");
   const secret = "whsec_placeholder";
-  const payload = JSON.stringify({ id: "evt_ignored", type: "unhandled.event", data: { object: {} } });
+  const payload = JSON.stringify({ id: "evt_ignored", livemode: false, type: "unhandled.event", data: { object: {} } });
   const handler = createWebhookHandler(() => ({ stripe, config, db: database() }), () => secret);
   const signed = stripe.webhooks.generateTestHeaderString({ payload, secret });
   for (const [body, status] of [[payload, 200], [`${payload} `, 400]]) {
@@ -449,8 +468,8 @@ test("webhook handler accepts signed raw payloads and rejects tampering", async 
 test("webhook processing failures return non-2xx so Stripe retries, and unconfigured signing is explicit", async () => {
   const stripe = new Stripe("sk_test_placeholder");
   const secret = "whsec_placeholder";
-  const payload = JSON.stringify({ id: "evt_failure", type: "invoice.paid", data: { object: { customer: "cus_reader" } } });
-  const db = { from() { throw new Error("database unavailable"); } };
+  const payload = JSON.stringify({ id: "evt_failure", livemode: false, type: "invoice.paid", data: { object: { customer: "cus_reader" } } });
+  const db = { rpc() { throw new Error("database unavailable"); } };
   const handler = createWebhookHandler(() => ({ stripe, config, db }), () => secret);
   const req = Readable.from([Buffer.from(payload)]);
   req.method = "POST";
@@ -596,7 +615,7 @@ async function lifecycleFixture(id, customer, price = "price_month") {
     async deliver(type, state, eventId = `evt_${customer}_${++sequence}`) {
       stripe.subscriptions = stripeMock([subscription(state, price)]).subscriptions;
       const payload = JSON.stringify({
-        id: eventId, type, data: { object: { customer } },
+        id: eventId, livemode: false, type, data: { object: { customer } },
       });
       const req = Readable.from([Buffer.from(payload)]);
       req.method = "POST";
@@ -668,4 +687,115 @@ test("signed period-end cancellation keeps access until ended and never changes 
   await fixture.deliver("customer.subscription.deleted", "canceled", eventId);
   assert.equal(Number((await sql.query("select count(*) as count from billing_events where event_id = $1", [eventId])).rows[0].count), 1);
   assert.equal((await sql.query("select tier from profiles where id = $1", [userId])).rows[0].tier, otherTier);
+});
+
+test("signed webhooks reject cross-mode and missing-mode events before touching billing data", async () => {
+  const stripe = new Stripe("sk_test_placeholder");
+  const secret = "whsec_mode_placeholder";
+  const handler = createWebhookHandler(() => ({
+    stripe, config,
+    db: { rpc() { assert.fail("Mismatched events must not touch the database"); } },
+  }), () => secret);
+  for (const livemode of [true, undefined]) {
+    const payload = JSON.stringify({ id: "evt_wrong_mode", livemode, type: "invoice.paid", data: { object: { customer: "cus_reader" } } });
+    const req = Readable.from([Buffer.from(payload)]);
+    req.method = "POST";
+    req.headers = { "stripe-signature": stripe.webhooks.generateTestHeaderString({ payload, secret }) };
+    const res = response();
+    await handler(req, res);
+    assert.equal(res.code, 400);
+    assert.match(res.body.error, /mode/);
+  }
+});
+
+test("switching to live preserves sandbox history and grants, isolates checkout and events, and rejects stale deployments", async () => {
+  const id = "66666666-6666-4666-8666-666666666666";
+  const fixture = await lifecycleFixture(id, "cus_mode_sandbox");
+  await fixture.deliver("invoice.paid", "active", "evt_shared_mode");
+  assert.equal(await fixture.tier(), "book_lover");
+  const count = Number((await sql.query("select count(*) as count from billing_accounts")).rows[0].count);
+
+  await sql.exec("set role authenticated");
+  try {
+    await assert.rejects(sql.exec("select * from billing_environment"), /permission denied/);
+    await assert.rejects(sql.exec("update billing_environment set livemode = true"), /permission denied/);
+    await assert.rejects(sql.exec("select billing_assert_mode(true)"), /permission denied/);
+  } finally {
+    await sql.exec("reset role");
+  }
+  await withAccount(fixture.db, id, async () => {
+    await assert.rejects(sql.exec("update billing_environment set livemode = true"), /requests are in progress/);
+  });
+  await sql.exec("update billing_environment set livemode = true");
+  try {
+    assert.equal(await fixture.tier(), "lite_reader");
+    assert.equal((await sql.query("select tier from profiles where id = $1", [userId])).rows[0].tier, "book_lover");
+    assert.equal(Number((await sql.query("select count(*) as count from billing_accounts")).rows[0].count), count);
+    assert.equal((await sql.query("select has_access from billing_accounts where user_id = $1 and not livemode", [id])).rows[0].has_access, true);
+    await assert.rejects(withAccount(fixture.db, id, async () => assert.fail("Sandbox work must be blocked")), /does not match/);
+    await assert.rejects(sql.query("update billing_accounts set has_access = false where user_id = $1 and not livemode", [id]), /does not match/);
+    await assert.rejects(processWebhook({ db: fixture.db, stripe: fixture.stripe, config }, {
+      id: "evt_stale_sandbox", livemode: false, type: "invoice.paid", data: { object: { customer: "cus_mode_sandbox" } },
+    }), /does not match/);
+    const staleStatus = response();
+    await createHandler(() => ({ db: fixture.db, stripe: fixture.stripe, config }))({
+      method: "GET", headers: { authorization: "Bearer valid" },
+    }, staleStatus);
+    assert.equal(staleStatus.code, 500);
+
+    const liveConfig = { ...config, livemode: true };
+    const stripe = stripeMock();
+    let creates = 0;
+    stripe.customers.create = async (params, options) => {
+      creates++;
+      assert.equal(params.metadata.librito_user_id, id);
+      assert.equal(options.idempotencyKey, `librito-customer-live-${id}`);
+      return { id: "cus_mode_live" };
+    };
+    stripe.checkout.sessions.create = async (params, options) => {
+      assert.equal(params.customer, "cus_mode_live");
+      assert.equal(options.idempotencyKey, `librito-checkout-live-${id}-first-monthly`);
+      return { id: "cs_mode_live", url: "https://checkout.stripe.com/live" };
+    };
+    const deps = { db: fixture.db, stripe, config: liveConfig };
+    const handler = createHandler(() => deps);
+    const status = response();
+    await handler({ method: "GET", headers: { authorization: "Bearer valid" } }, status);
+    assert.equal(status.code, 200);
+    assert.equal(status.body.canManage, false);
+    const req = { method: "POST", headers: { origin: config.origin, authorization: "Bearer valid" },
+      body: { action: "checkout", billing: "monthly" } };
+    const wrongPrice = response();
+    await handler(req, wrongPrice);
+    assert.equal(wrongPrice.code, 503);
+    const retrieve = stripe.prices.retrieve;
+    stripe.prices.retrieve = async (price) => ({ ...await retrieve(price), livemode: true });
+    const checkout = response();
+    await handler(req, checkout);
+    assert.equal(checkout.code, 200);
+    assert.equal(creates, 1);
+    assert.equal(await fixture.tier(), "lite_reader");
+    assert.equal(Number((await sql.query("select count(*) as count from billing_accounts where user_id = $1", [id])).rows[0].count), 2);
+
+    stripe.subscriptions = stripeMock([subscription("active")]).subscriptions;
+    await processWebhook(deps, {
+      id: "evt_unowned_live", livemode: true, type: "invoice.paid", data: { object: { customer: "cus_mode_sandbox" } },
+    });
+    assert.equal(await fixture.tier(), "lite_reader");
+    const event = { id: "evt_shared_mode", livemode: true, type: "invoice.paid", data: { object: { customer: "cus_mode_live" } } };
+    await processWebhook(deps, event);
+    assert.equal(await fixture.tier(), "book_lover");
+    assert.equal(Number((await sql.query("select count(*) as count from billing_events where event_id = 'evt_shared_mode'")).rows[0].count), 2);
+    stripe.subscriptions = stripeMock().subscriptions;
+    await processWebhook(deps, event);
+    assert.equal(await fixture.tier(), "book_lover");
+    await processWebhook(deps, { ...event, id: "evt_mode_live_ended", type: "customer.subscription.deleted" });
+    assert.equal(await fixture.tier(), "lite_reader");
+    for (const table of ["books", "shelves"]) {
+      assert.equal(Number((await sql.query(`select count(*) as count from ${table} where user_id = $1`, [id])).rows[0].count), 1);
+    }
+  } finally {
+    await sql.exec("update billing_environment set livemode = false");
+  }
+  assert.equal(await fixture.tier(), "book_lover");
 });

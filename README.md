@@ -41,7 +41,7 @@ Accounts are **Lite Reader** (free) or **Book Lover** (paid), stored in `profile
 
 Librito sells its own digital subscription, not books or marketplace payouts. Use Stripe Billing with hosted Checkout, one **Book Lover** Product, and two recurring USD Prices: **$2.99/month** and **$24.99/year**. Lite Reader stays free without a Stripe subscription. The Customer Portal manages payment methods, billing intervals, invoices and cancellation. No Stripe.js or publishable API key is needed for this hosted flow.
 
-The upgrade page calls authenticated Vercel functions. The server validates the Supabase access token, chooses an allowlisted Price, and verifies that the amount, currency and interval match the UI. Server-only billing tables map each Supabase user to one Stripe Customer. Per-account leases and Stripe idempotency keys prevent concurrent duplicate checkouts; an open Checkout Session is reused or expired when switching intervals.
+The upgrade page calls authenticated Vercel functions. The server validates the Supabase access token, chooses an allowlisted Price, and verifies that the mode, amount, currency and interval match the UI. Server-only billing tables map each Supabase user to one Stripe Customer per mode. Per-account leases and mode-specific Stripe idempotency keys prevent concurrent duplicate checkouts; an open Checkout Session is reused or expired when switching intervals.
 
 Signed webhooks reconcile current Stripe subscription state rather than trusting redirects or old event payloads. Deliveries are recorded for deduplication, and concurrent updates are serialized. Active, trialing and past-due subscriptions retain access; canceled, unpaid, paused or expired incomplete subscriptions do not. Configure Stripe's retry policy to move exhausted subscriptions to **canceled or unpaid**, not leave them past due forever. Cancellation at period end preserves access until Stripe ends the subscription. Downgrades never delete books or shelves; existing database limits apply when adding books, shelves or reading entries.
 
@@ -62,12 +62,13 @@ In-app banners remind signed-in readers when canceled access ends or automatic r
 ### Sandbox setup
 
 1. In Stripe Dashboard, create a separate **sandbox** for development. Keep production and CI credentials/data separate. No live Stripe resources have been created by this setup.
-2. Apply all existing Supabase migrations, followed by [the billing migration](supabase/migrations/20261024250000_stripe_billing.sql), preferably in a development Supabase project first.
+2. Apply all existing Supabase migrations, followed by [the billing migration](supabase/migrations/20261024250000_stripe_billing.sql) and [the billing-mode migration](supabase/migrations/20261024260000_stripe_billing_modes.sql), preferably in a development Supabase project first. The database initially accepts sandbox billing only.
 3. In the sandbox, create the Book Lover Product and the two Prices above (quantity one, interval count one). Copy their `price_...` IDs. Treat these Price IDs as stable; adding replacement Prices requires planning how existing subscriptions will remain entitled.
 4. Set server environment variables using [.env.example](.env.example) as a list of names:
    - `APP_URL`: the exact application origin, such as `https://librito.casa` or `http://localhost:3000`. HTTPS is required except on localhost.
    - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`: match the project used by the browser's `config.js`. The service-role key must never enter browser configuration.
    - `STRIPE_SECRET_KEY`: prefer a sandbox **restricted API key** with only the permissions needed to read/write Customers, Checkout Sessions and Subscriptions, read Prices and Charges, and create Customer Portal sessions. Subscriptions write access is required to resume renewal. Adjust permissions if Stripe reports an authorization error.
+   - `STRIPE_MODE`: `test` for a sandbox, `live` for real payments. Required; must match the API key prefix and the database billing environment.
    - `STRIPE_PRICE_MONTHLY` and `STRIPE_PRICE_ANNUAL`: the sandbox Price IDs.
    - `STRIPE_WEBHOOK_SECRET`: the endpoint's signing secret, not an API key. For local forwarding, use the signing secret printed by `stripe listen`.
    Store secrets in Vercel's **sensitive environment variables**. For local development only, use an ignored `.env.local`; never paste keys into chat, commit them, or log them. The deployment only publishes explicitly selected browser assets.
@@ -91,7 +92,7 @@ In-app banners remind signed-in readers when canceled access ends or automatic r
 
 Run `npm test` for API/authentication, signed-webhook, checkout, concurrency and PostgreSQL migration/permission tests. No real API keys are needed for these tests.
 
-The automated lifecycle scenarios exercise authenticated monthly/annual Checkout requests, signed webhook delivery through the real signature verifier, failed initial payments, asynchronous failure/success, renewal retries, retry exhaustion, payment recovery, period-end cancellation, duplicate delivery, library preservation and user isolation. Stripe API responses are simulated; these tests do not charge cards or validate the Dashboard's live configuration, real payment authentication, tax settings, or sandbox/live data separation.
+The automated lifecycle scenarios exercise authenticated monthly/annual Checkout requests, signed webhook delivery through the real signature verifier, failed initial payments, asynchronous failure/success, renewal retries, retry exhaustion, payment recovery, period-end cancellation, duplicate delivery, library preservation and user isolation. Mode-isolation regressions cover key/mode mismatch, wrong-mode Prices and signed events, separate customers/Checkout idempotency keys/event ledgers, database environment switching, blocked stale sandbox deployments, preserved sandbox history, and independent complimentary grants. Stripe API responses are simulated; these tests do not charge cards or validate the Dashboard's live configuration, real payment authentication, or tax settings.
 
 If billing logs report PostgreSQL `42703` (missing column), check that the Stripe billing migration was applied to the Supabase project configured on the server. Earlier account-tier migrations do not create the billing tables or complimentary-access field. The upgrade page hides billing-management details for readers without a billing account; failed status requests show a friendly, centered retry message rather than raw server errors.
 
@@ -100,7 +101,7 @@ Before launch, exercise the deployed sandbox with Stripe's documented test payme
 Refunds do not automatically cancel subscriptions, and disputes/fraud signals need an explicit business decision. The integration persists these events in `billing_events` with `requires_review = true`, reconciles subscription state, and emits a warning without payment details or credentials. Monitor Vercel logs and Stripe Dashboard notifications. Review the queue in Supabase SQL Editor:
 
 ```sql
-select event_id, event_type, user_id, created_at
+select event_id, event_type, user_id, livemode, created_at
 from public.billing_events
 where requires_review
 order by created_at;
@@ -110,7 +111,31 @@ Review the associated payment in Stripe, cancel the subscription or take other a
 
 **Tax:** review sales-tax/VAT/GST obligations for digital subscriptions, including Stripe Tax and product tax codes. Automatic tax is deliberately not enabled: confirm applicable active tax registrations and inclusive/exclusive price behavior first.
 
-For production, repeat Product/Price/Portal/webhook setup in live mode with separate restricted credentials, set the production `APP_URL`, and run the go-live checklist. Sandbox IDs and signing secrets cannot be reused in live mode.
+### Moving an existing sandbox deployment to live
+
+The billing-mode migration labels all existing billing records as sandbox (`livemode = false`), preserves them, and adds a database-wide active billing environment. Only that environment contributes paid access to `profiles.tier`; complimentary grants always remain independent. Changing environments never deletes books, shelves, profiles, or Stripe records. This migration assumes this installation has only used sandbox Stripe credentials so far; do not use it unchanged to label an already-live installation.
+
+Use a separate Supabase project for ongoing sandbox development/CI after launch. A database has **one active billing environment**: a preview with sandbox credentials pointed at a live database deliberately fails rather than granting sandbox access to production users.
+
+1. **Prepare without changing Stripe credentials.** Apply [the billing-mode migration](supabase/migrations/20261024260000_stripe_billing_modes.sql) in Supabase SQL Editor. Set `STRIPE_MODE=test` in Vercel and deploy this version with the existing sandbox variables. Verify sandbox billing still works. Keep [vercel.json](vercel.json): it routes extensionless billing requests to the server functions and limits published static files.
+2. **Create live resources.** In the activated Stripe account's **live mode**, create one Book Lover Product with USD $2.99/month and $24.99/year recurring Prices, interval count one. Configure the live Customer Portal with payment-method updates, invoices and period-end cancellation. If allowing interval switching, allow only these two Prices and review proration/timing. Set payment retries to end subscriptions as canceled or unpaid after exhaustion.
+3. **Create the required live webhook.** Use `https://librito.casa/api/stripe-webhook`, snapshot events for your account, an API version compatible with the installed SDK, and all **11 events** listed above. Save its live signing secret securely. Deliveries will not succeed until the live deployment is ready; retry failed deliveries afterward.
+4. **Prepare live credentials.** Create a live restricted API key with the permissions listed above. Store it and the webhook secret as Vercel sensitive environment variables, not in chat, browser configuration or source control. Prepare the live Price IDs. Do not mix live and sandbox values.
+5. **Cut over during a short billing maintenance window.** Pause new billing activity and disable the old sandbox webhook destination pointing at production. In Supabase SQL Editor run:
+
+   ```sql
+   update public.billing_environment set livemode = true where id = true;
+   select livemode from public.billing_environment where id = true;
+   ```
+
+   If a billing lease is active, the switch fails and rolls back; wait for requests to finish (abandoned leases expire after two minutes), then retry. Sandbox-only paid access ends at this switch; admin complimentary access remains. Old sandbox deployments can no longer mutate billing or return authoritative billing status.
+
+   Together, set Vercel Production's `STRIPE_MODE=live`, `STRIPE_SECRET_KEY`, `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_ANNUAL`, and `STRIPE_WEBHOOK_SECRET` to their live values, keep `APP_URL=https://librito.casa`, then redeploy. Supabase variables do not change when keeping the existing database. Between the database switch and deployment, billing intentionally reports an error rather than mixing environments.
+6. **Verify before announcing launch.** Check deployment success, sign in, and confirm sandbox purchases no longer appear as real subscriptions. Live Checkout must show the correct live Product, price, currency, return URL and no test-mode indicator. With explicit owner approval, make a genuine live purchase using a real payment method, confirm the paid invoice, successful live webhook deliveries, Book Lover access, Portal access, cancellation and renewal. Test cards do not work in live mode. A complimentary account cannot start Checkout; use a separate non-complimentary owner account. Live testing creates real charges and any refunds are a separate deliberate action.
+
+Review tax obligations/registrations, price tax behavior, customer support contact, cancellation/refund policies, account activation and payout details before opening payments publicly. Automatic tax remains off until active registrations are confirmed.
+
+For rollback before accepting real purchases, revert the database environment to `false` and redeploy with the entire sandbox configuration including `STRIPE_MODE=test`; preserve all billing rows. **After accepting live purchases, do not switch production back to sandbox**: use a separate development project and fix forward so real subscribers retain access. Switching database modes does not cancel either live or sandbox subscriptions in Stripe.
 
 ### Stripe agent tooling
 

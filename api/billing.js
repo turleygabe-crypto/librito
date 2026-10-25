@@ -16,15 +16,16 @@ export function createHandler(dependencies = billingDependencies) {
         throw new BillingError(403, "Billing must be opened from Librito.");
       }
       const user = await authenticate(req, db);
+      checked(await db.rpc("billing_assert_mode", { target_livemode: config.livemode }));
       if (req.method === "GET") {
         let account = checked(await db.from("billing_accounts")
           .select("customer_id, has_subscription, subscription_status, cancel_at_period_end, period_end")
-          .eq("user_id", user.id).maybeSingle());
+          .eq("user_id", user.id).eq("livemode", config.livemode).maybeSingle());
         if (account?.customer_id) {
           account = await withAccount(db, user.id, async (current, save) => {
             await save(await subscriptionSnapshot(stripe, current.customer_id, config));
             return current;
-          });
+          }, config.livemode);
         }
         return res.status(200).json({
           canManage: Boolean(account?.customer_id),
@@ -56,7 +57,7 @@ export function createHandler(dependencies = billingDependencies) {
           customer: account.customer_id, return_url: `${config.origin}/#/upgrade`,
         });
         return session.url;
-      });
+      }, config.livemode);
       return res.status(200).json(action === "resume" ? { resumed: true }
         : action === "cancel" ? { canceled: true } : { url });
     } catch (error) {
