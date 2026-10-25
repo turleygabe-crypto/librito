@@ -2076,12 +2076,42 @@ body {
 .sidebar {
   gap: 0.85rem;
   color: #49301e;
-  padding: 1.5rem 2.75rem 1.5rem 1rem;
+  padding: 0;
   font-family: Georgia, "Times New Roman", serif;
   border-radius: 1px 5px 5px 1px;
-  background: url("/assets/sidebar-book-panel.png") right center / calc(100% + 1rem) 100% no-repeat;
+  background: url("/assets/Librito%20Sidebar.png") center / 100% 100% no-repeat;
   filter: drop-shadow(3px 4px 4px rgba(44, 28, 17, 0.3));
   box-shadow: none;
+}
+
+.sidebar-content {
+  position: absolute;
+  inset: 25% 9% 4% 7%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: #91643d transparent;
+  scrollbar-width: thin;
+}
+
+.sidebar .sidebar-library {
+  flex: 1 0 auto;
+}
+
+.sidebar .sidebar-nav {
+  flex: 0 0 auto;
+}
+
+.sidebar .sidebar-content .shelf-list {
+  overflow: visible;
+}
+
+.sidebar .mobile-sidebar-close {
+  position: absolute;
+  top: 2%;
+  right: 8%;
 }
 
 .sidebar .nav-pill,
@@ -2130,41 +2160,6 @@ body {
   align-self: center;
   margin: 0.75rem 0 0.5rem;
   color: #ae7c4c;
-}
-
-.sidebar .brand {
-  position: relative;
-  flex-direction: column;
-  text-align: center;
-}
-
-.sidebar .brand-mark {
-  display: block;
-  width: 100%;
-  height: auto;
-  flex: 0 0 auto;
-  border-radius: 0;
-  background: transparent;
-  object-fit: contain;
-}
-
-.sidebar .brand .mobile-sidebar-close {
-  position: absolute;
-  top: 0;
-  right: 0;
-}
-
-.sidebar .brand .eyebrow {
-  color: #c6a58e;
-  font-size: 0.68rem;
-  letter-spacing: 0.02em;
-  text-transform: none;
-}
-
-.sidebar .brand h2 {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 1.45rem;
-  font-weight: 400;
 }
 
 .sidebar .nav-pill,
@@ -2511,23 +2506,8 @@ body {
     height: calc(100dvh - 2rem);
     margin: 1rem 0;
     gap: 0.85rem;
-    padding: 1.5rem 2.75rem 1.5rem 1rem;
+    padding: 0;
     border: 0;
-  }
-
-  .sidebar .brand {
-    gap: 0.55rem;
-    padding: 0 0 0.65rem;
-    border: 0;
-  }
-
-  .sidebar .brand .eyebrow {
-    margin-bottom: 0;
-    font-size: 0.58rem;
-  }
-
-  .sidebar .brand h2 {
-    font-size: 1.4rem;
   }
 
   .sidebar-nav {

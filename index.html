@@ -18,33 +18,33 @@
   <body>
     <div class="app-shell">
       <aside id="sidebar" class="sidebar" aria-label="Library and navigation">
-        <div class="brand">
-          <img class="brand-mark" src="/assets/Librito%20Digital%20Home%20Library%20Emblem.png" alt="Librito" />
-          <button id="closeLibraryBtn" class="mobile-sidebar-close" type="button" aria-label="Close library">×</button>
-        </div>
-        <nav class="sidebar-nav" aria-label="Primary navigation">
-          <button class="nav-pill active" type="button">Home</button>
-          <button class="nav-pill" type="button">Discover</button>
-          <button class="nav-pill" type="button">Stats</button>
-        </nav>
-        <section class="sidebar-library" aria-labelledby="libraryHeading">
-          <div class="library-heading">
-            <h2 id="libraryHeading"><button id="libraryNavBtn" class="nav-pill library-heading-btn" type="button">Your Library</button></h2>
-          </div>
-          <nav class="sidebar-library-nav" aria-label="Your library">
-            <button class="nav-pill" type="button">Your shelves</button>
-            <button id="sidebarAddBookBtn" class="nav-pill" type="button">Add book</button>
+        <span class="visually-hidden">Librito</span>
+        <button id="closeLibraryBtn" class="mobile-sidebar-close" type="button" aria-label="Close library">×</button>
+        <div class="sidebar-content">
+          <nav class="sidebar-nav" aria-label="Primary navigation">
+            <button class="nav-pill active" type="button">Home</button>
+            <button class="nav-pill" type="button">Discover</button>
+            <button class="nav-pill" type="button">Stats</button>
           </nav>
-          <div class="library-heading sidebar-shelf-heading">
-            <h2 id="shelvesHeading">Shelves</h2>
-            <button id="sidebarCreateShelfBtn" class="sidebar-create-shelf" type="button" aria-label="Create a shelf">＋</button>
-          </div>
-          <div id="shelfList" class="shelf-list" aria-label="Your shelves"></div>
-        </section>
-        <svg class="sidebar-ornament" viewBox="0 0 28 40" aria-hidden="true" focusable="false">
-          <path d="M15 37C11 28 17 18 12 5" fill="none" stroke="currentColor" stroke-width="1.5" />
-          <path d="M13 16C5 15 2 10 3 5C9 6 13 9 13 16ZM14 23C14 15 19 10 25 10C25 17 21 22 14 23ZM13 30C5 29 2 25 2 20C8 20 12 24 13 30ZM14 34C14 27 19 24 25 24C24 30 20 33 14 34Z" fill="currentColor" />
-        </svg>
+          <section class="sidebar-library" aria-labelledby="libraryHeading">
+            <div class="library-heading">
+              <h2 id="libraryHeading"><button id="libraryNavBtn" class="nav-pill library-heading-btn" type="button">Your Library</button></h2>
+            </div>
+            <nav class="sidebar-library-nav" aria-label="Your library">
+              <button class="nav-pill" type="button">Your shelves</button>
+              <button id="sidebarAddBookBtn" class="nav-pill" type="button">Add book</button>
+            </nav>
+            <div class="library-heading sidebar-shelf-heading">
+              <h2 id="shelvesHeading">Shelves</h2>
+              <button id="sidebarCreateShelfBtn" class="sidebar-create-shelf" type="button" aria-label="Create a shelf">＋</button>
+            </div>
+            <div id="shelfList" class="shelf-list" aria-label="Your shelves"></div>
+          </section>
+          <svg class="sidebar-ornament" viewBox="0 0 28 40" aria-hidden="true" focusable="false">
+            <path d="M15 37C11 28 17 18 12 5" fill="none" stroke="currentColor" stroke-width="1.5" />
+            <path d="M13 16C5 15 2 10 3 5C9 6 13 9 13 16ZM14 23C14 15 19 10 25 10C25 17 21 22 14 23ZM13 30C5 29 2 25 2 20C8 20 12 24 13 30ZM14 34C14 27 19 24 25 24C24 30 20 33 14 34Z" fill="currentColor" />
+          </svg>
+        </div>
       </aside>
       <button id="sidebarBackdrop" class="sidebar-backdrop" type="button" aria-label="Close library" hidden></button>
 
