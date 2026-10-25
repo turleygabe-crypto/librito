@@ -32,7 +32,11 @@ test("public support pages have working local links, branded contact details, an
 test("support is reachable from the account menu, footer, sign-in and upgrade page; legal drafts are not published", async () => {
   const index = await read("index.html");
   assert.match(index, /<footer class="site-footer"/);
-  assert.match(index, /id="deleteAccountBtn"[^>]*hidden/);
+  const menu = index.slice(index.indexOf('<div class="account-menu-panel">'), index.indexOf("</details>"));
+  assert.equal([...menu.matchAll(/<a /g)].length, 2);
+  assert.match(menu, />My account<\/a>/);
+  assert.match(menu, />Book Lover plan<\/a>/);
+  assert.doesNotMatch(menu, /Delete account|Account settings|Billing support|Admin dashboard/);
   assert.match(index, /Need help with your account\?.*href="\/contact.html"/);
   assert.match(await read("app.js"), /supportLink.href = "\/billing-support.html"/);
   assert.match(await read(".vercelignore"), /^legal-drafts\/$/m);

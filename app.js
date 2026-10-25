@@ -927,9 +927,7 @@ function updateAuthButton() {
     ? `You're signed in with a ${getAccountTier().name} account. Your shelves are saved to your account.`
     : "Sign in to build your own shelves.";
   const upgradeLink = document.getElementById("upgradeLink");
-  if (upgradeLink) upgradeLink.textContent = getAccountTier().premium ? "Book Lover plan" : "Upgrade to Book Lover";
-  const deleteAccountButton = document.getElementById("deleteAccountBtn");
-  if (deleteAccountButton) deleteAccountButton.hidden = !state.session;
+  if (upgradeLink) upgradeLink.textContent = "Book Lover plan";
   const accountName = state.session?.user?.email || "Account";
   document.querySelector(".account-menu-label").textContent = accountName;
   document.querySelector(".account-avatar").textContent = accountName.slice(0, 1).toUpperCase();
@@ -7019,6 +7017,10 @@ function showAccountPage(requestedSection = "overview") {
       ? `Hello, ${state.profile.full_name}. Manage the essentials, then get back to your next good book.`
       : "Manage the essentials, then get back to your next good book.");
     welcome.append(createAccountLink("Edit account settings", createRouteHash("account", { section: "settings" })));
+    const admin = createAccountLink("Admin dashboard", "/admin.html");
+    admin.id = "adminLink";
+    admin.hidden = true;
+    welcome.append(admin);
     const plan = createAccountCard("Your plan", `Current access: ${getAccountTier().name}.`);
     plan.append(createAccountLink("View plan & manage billing", createRouteHash("account", { section: "billing" })));
     const library = createAccountCard("Your library", "Your books, shelves and reading progress live in your library. No orders or shipping addresses to manage here.");
@@ -7029,6 +7031,7 @@ function showAccountPage(requestedSection = "overview") {
   }
   layout.append(navigation, content);
   page.replaceChildren(heading, layout);
+  updateAdminLink();
   document.querySelector(".account-menu").open = false;
 }
 
@@ -7148,6 +7151,21 @@ function showUpgradePage() {
   const tagline = document.createElement("p");
   tagline.className = "upgrade-tagline";
   tagline.textContent = "More books. More shelves. A library that's truly yours.";
+  const planOptions = document.createElement("section");
+  planOptions.id = "bookLoverPlanOptions";
+  planOptions.className = "upgrade-plan-options";
+  planOptions.append(toggle, plans, tagline);
+  const planVisibility = document.createElement("button");
+  planVisibility.type = "button";
+  planVisibility.className = "secondary-btn upgrade-plan-visibility";
+  planVisibility.textContent = "Hide plans";
+  planVisibility.setAttribute("aria-controls", planOptions.id);
+  planVisibility.setAttribute("aria-expanded", "true");
+  planVisibility.addEventListener("click", () => {
+    planOptions.hidden = !planOptions.hidden;
+    planVisibility.textContent = planOptions.hidden ? "Show plans" : "Hide plans";
+    planVisibility.setAttribute("aria-expanded", String(!planOptions.hidden));
+  });
   const billingStatus = document.createElement("p");
   billingStatus.className = "upgrade-billing-status";
   billingStatus.setAttribute("role", "status");
@@ -7247,7 +7265,7 @@ function showUpgradePage() {
   supportLink.href = "/billing-support.html";
   supportLink.textContent = "Need help? Contact billing support";
   support.append(supportLink);
-  page.append(hero, toggle, plans, tagline, billingPanel, support);
+  page.append(hero, planVisibility, planOptions, billingPanel, support);
   const checkout = new URLSearchParams(window.location.hash.split("?")[1] || "").get("checkout");
   if (checkout === "success") {
     const notice = document.createElement("p");
@@ -8495,8 +8513,6 @@ shelfDrawerOverlay.addEventListener("click", (event) => {
     closeShelfDrawer();
   }
 });
-
-document.getElementById("deleteAccountBtn").addEventListener("click", (event) => deleteAccount(event.currentTarget));
 
 authButton.addEventListener("click", async () => {
   let session;

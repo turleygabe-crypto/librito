@@ -11,10 +11,11 @@ class Element {
   textContent = "";
   isConnected = true;
   events = {};
+  attributes = {};
   classList = { add() {}, toggle() {} };
   append(...elements) { this.children.push(...elements); }
   prepend(...elements) { this.children.unshift(...elements); }
-  setAttribute() {}
+  setAttribute(name, value) { this.attributes[name] = value; }
   addEventListener(name, handler) { this.events[name] = handler; }
   contains(element) { return this.children.some((child) => child === element || child.contains?.(element)); }
 }
@@ -63,6 +64,18 @@ test("upgrade page displays canceled countdown and resume action, then resubscri
     const message = elements.find((element) => element.className === "upgrade-billing-status");
     const cta = elements.find((element) => element.className === "upgrade-cta");
     assert.equal(panel.hidden, false);
+    const visibility = elements.find((element) => element.className === "secondary-btn upgrade-plan-visibility");
+    const options = elements.find((element) => element.id === "bookLoverPlanOptions");
+    assert.equal(visibility.attributes["aria-controls"], options.id);
+    visibility.events.click();
+    assert.equal(options.hidden, true);
+    assert.equal(visibility.textContent, "Show plans");
+    assert.equal(visibility.attributes["aria-expanded"], "false");
+    assert.equal(panel.hidden, false);
+    visibility.events.click();
+    assert.equal(options.hidden, false);
+    assert.equal(visibility.textContent, "Hide plans");
+    assert.equal(visibility.attributes["aria-expanded"], "true");
     assert.equal(resume.hidden, mode !== "canceled");
     const cancel = elements.find((element) => element.textContent === "Cancel subscription");
     assert.equal(cancel.hidden, mode !== "active");

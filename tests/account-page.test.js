@@ -89,7 +89,7 @@ function fixture(signedIn = true) {
     },
     showPage(view) { context.state.view = view; page.replaceChildren(); return page; },
     showUpgradePage() { context.state.view = "upgrade"; page.replaceChildren({ billingControls: true }); },
-    updateActiveNavigation() {}, updateAuthButton() {},
+    updateActiveNavigation() {}, updateAuthButton() {}, updateAdminLink() {},
     getAccountTier: () => ({ name: "Lite Reader" }),
     createRouteHash: (view, params) => `#/${view}?section=${params.section}`,
     refreshAuthSession: async () => ({ user: { id: authUser } }),
