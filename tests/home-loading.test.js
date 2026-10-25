@@ -64,8 +64,7 @@ test("sidebar uses the prepared book image without simulated page overlays", asy
   const sidebarRules = [...css.matchAll(/\.sidebar\s*\{([^}]+)\}/g)];
   const bookCover = sidebarRules.find((rule) => rule[1].includes("/assets/sidebar-book-panel.png"));
   assert.ok(bookCover, "the sidebar uses the leather book image");
-  assert.match(bookCover[1], /right center \/ max\(100%, calc\(\(100dvh - 2rem\) \* 807 \/ 1587\)\) auto no-repeat/);
-  assert.doesNotMatch(bookCover[1], /filter:/);
+  assert.match(bookCover[1], /right center \/ calc\(100% \+ 1rem\) 100% no-repeat/);
   assert.match(bookCover[1], /font-family: Georgia, "Times New Roman", serif/);
   assert.ok(sidebarRules.slice(sidebarRules.indexOf(bookCover) + 1).every((rule) => !/background:/.test(rule[1])),
     "responsive rules must preserve the book cover");

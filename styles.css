@@ -2079,7 +2079,8 @@ body {
   padding: 1.5rem 2.75rem 1.5rem 1rem;
   font-family: Georgia, "Times New Roman", serif;
   border-radius: 1px 5px 5px 1px;
-  background: url("/assets/sidebar-book-panel.png") right center / max(100%, calc((100dvh - 2rem) * 807 / 1587)) auto no-repeat;
+  background: url("/assets/sidebar-book-panel.png") right center / calc(100% + 1rem) 100% no-repeat;
+  filter: drop-shadow(3px 4px 4px rgba(44, 28, 17, 0.3));
   box-shadow: none;
 }
 
