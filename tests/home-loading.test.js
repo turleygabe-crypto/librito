@@ -47,9 +47,9 @@ test("sidebar branding fills the available width without stretching the logo or 
   assert.match(css, /\.sidebar \.brand \.mobile-sidebar-close\s*\{[^}]*position: absolute/);
 });
 
-test("sidebar preserves its width and uses readable navigation and shelf text", async () => {
+test("sidebar provides room for the parchment artwork and readable navigation and shelf text", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
-  assert.match(css, /grid-template-columns: clamp\(13rem, 15vw, 17\.5rem\) minmax\(0, 1fr\)/);
+  assert.match(css, /grid-template-columns: clamp\(19rem, 26vw, 28rem\) minmax\(0, 1fr\)/);
   assert.match(css, /\.sidebar \.nav-pill,\s*\.sidebar \.shelf-item-copy strong,\s*\.sidebar \.sidebar-empty\s*\{\s*font-size: 1rem/);
   assert.match(css, /\.sidebar-library-nav \.nav-pill\s*\{[^}]*font-size: 1rem/);
   assert.match(css, /\.sidebar-shelf-heading h2\s*\{[^}]*font-size: 0\.9rem !important/);
@@ -58,23 +58,22 @@ test("sidebar preserves its width and uses readable navigation and shelf text", 
   assert.doesNotMatch(shelfNameRules.at(-1)[1], /font-size:/);
 });
 
-test("sidebar has a decorative book cover and layered page edge without blocking controls", async () => {
+test("sidebar uses the prepared book image without simulated page overlays", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const sidebarRules = [...css.matchAll(/\.sidebar\s*\{([^}]+)\}/g)];
-  const bookCover = sidebarRules.find((rule) => rule[1].includes("radial-gradient"));
-  assert.ok(bookCover, "the sidebar has a textured cover background");
-  assert.match(bookCover[1], /box-shadow:/);
+  const bookCover = sidebarRules.find((rule) => rule[1].includes("/assets/sidebar-book-panel.png"));
+  assert.ok(bookCover, "the sidebar uses the leather book image");
+  assert.match(bookCover[1], /center \/ 100% 100% no-repeat/);
   assert.ok(sidebarRules.slice(sidebarRules.indexOf(bookCover) + 1).every((rule) => !/background:/.test(rule[1])),
     "responsive rules must preserve the book cover");
-  assert.match(css, /\.sidebar::before,\s*\.sidebar::after\s*\{[^}]*pointer-events: none/);
-  assert.match(bookCover[1], /padding-right: 2rem/);
-  assert.match(css, /\.sidebar::after\s*\{[^}]*width: 1\.4rem;[^}]*url\("\/assets\/book-page-edge\.svg"\)/);
+  assert.doesNotMatch(css, /\.sidebar::(?:before|after)/);
+  assert.match(bookCover[1], /padding: 1\.5rem 3\.5rem 1\.5rem 1\.5rem/);
+  assert.match(bookCover[1], /color: #49301e/);
   assert.match(css, /height: calc\(100dvh - 2rem\)/);
   assert.match(css, /margin: 1rem 0 1rem 0\.75rem/);
-  const pageEdge = await readFile(new URL("../assets/book-page-edge.svg", import.meta.url), "utf8");
-  assert.match(pageEdge, /preserveAspectRatio="none"/);
-  assert.match(pageEdge, /Q9 6 22 4/);
-  assert.match(pageEdge, /Q9 951 1 959/);
+  const panel = await readFile(new URL("../assets/sidebar-book-panel.png", import.meta.url));
+  assert.equal(panel.subarray(1, 4).toString(), "PNG");
+  assert.equal(panel[25], 6, "the prepared panel must support transparent corners");
 });
 
 test("startup keeps the library pending until account initialization", () => {

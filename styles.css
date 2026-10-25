@@ -2075,39 +2075,37 @@ body {
 
 .sidebar {
   gap: 0.85rem;
-  color: #f8eee6;
-  padding-right: 2rem;
+  color: #49301e;
+  padding: 1.5rem 3.5rem 1.5rem 1.5rem;
   border-radius: 1px 5px 5px 1px;
-  background:
-    radial-gradient(ellipse at 15% 8%, rgba(133, 90, 57, 0.14), transparent 65%),
-    radial-gradient(ellipse at 70% 85%, rgba(114, 74, 43, 0.1), transparent 60%),
-    linear-gradient(90deg, #302017, #291b14 75%, #342319);
-  box-shadow: inset 1px 0 2px rgba(231, 187, 127, 0.12), 3px 4px 5px rgba(44, 28, 17, 0.35);
+  background: url("/assets/sidebar-book-panel.png") center / 100% 100% no-repeat;
+  filter: drop-shadow(3px 4px 4px rgba(44, 28, 17, 0.3));
+  box-shadow: none;
 }
 
-.sidebar::before,
-.sidebar::after {
-  position: absolute;
-  content: "";
-  pointer-events: none;
+.sidebar .nav-pill,
+.sidebar .shelf-item,
+.sidebar .shelf-item-count,
+.sidebar .shelf-item::after,
+.sidebar .sidebar-empty,
+.sidebar .shelf-item-copy > span,
+.sidebar .nav-pill::before,
+.sidebar .sidebar-create-shelf {
+  color: #49301e;
 }
 
-.sidebar::before {
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 1.65rem;
-  border-radius: 0 5px 5px 0;
-  background: linear-gradient(90deg, #513a28, #8c6845 12%, #3e291c 24%, #382418 88%, #6e4b2f);
-  box-shadow: -5px 0 10px rgba(13, 7, 3, 0.25);
+.sidebar .nav-pill:hover,
+.sidebar .nav-pill.active,
+.sidebar .shelf-item:hover,
+.sidebar .shelf-item:focus-visible,
+.sidebar .sidebar-create-shelf:hover {
+  background: rgba(119, 70, 32, 0.14);
+  color: #352113;
 }
 
-.sidebar::after {
-  top: 1px;
-  right: 3px;
-  bottom: 2px;
-  width: 1.4rem;
-  background: url("/assets/book-page-edge.svg") center / 100% 100% no-repeat;
+.sidebar .sidebar-nav,
+.sidebar .sidebar-library-nav {
+  border-bottom-color: rgba(100, 64, 34, 0.3);
 }
 
 .sidebar-ornament {
@@ -2217,7 +2215,7 @@ body {
 }
 
 .sidebar-shelf-heading h2 {
-  color: #c6a58e !important;
+  color: #674529 !important;
   font-size: 0.9rem !important;
   font-weight: 500;
   letter-spacing: 0.12em;
@@ -2489,7 +2487,7 @@ body {
 
 @media (min-width: 900px) {
   .app-shell {
-    grid-template-columns: clamp(13rem, 15vw, 17.5rem) minmax(0, 1fr);
+    grid-template-columns: clamp(19rem, 26vw, 28rem) minmax(0, 1fr);
     gap: 0;
   }
 
@@ -2498,7 +2496,7 @@ body {
     height: calc(100dvh - 2rem);
     margin: 1rem 0 1rem 0.75rem;
     gap: 0.85rem;
-    padding: 1rem 2rem 1rem 0.85rem;
+    padding: 1.5rem clamp(3.5rem, 4.7vw, 5rem) 1.5rem 1.5rem;
     border: 0;
   }
 
@@ -2541,7 +2539,7 @@ body {
   }
 
   #libraryHeading {
-    color: #c6a58e;
+    color: #674529;
     font-size: 0.9rem !important;
     font-weight: 500;
     letter-spacing: 0.12em;
