@@ -28,7 +28,7 @@ Then open http://127.0.0.1:3000/.
 
 ## Branding and home loading states
 
-The sidebar is styled as a vintage leather bookmark, with a textured dark-brown finish, brass edging, serif branding, a tassel, and warm highlighted navigation. Branding and shelf covers remain live text and book data rather than static sidebar artwork. On desktop and in the mobile library drawer, the content scrolls within the viewport-height panel so navigation and shelves remain accessible on short screens.
+The sidebar uses [Elegant Brown Leather Bookmark with Tassel](assets/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel.png) as its background, including the brass eyelet and tassel. The artwork scales to the viewport-height panel, compensating for its transparent side margins, with space reserved above and below the scrollable controls for the decorative details. Branding and shelf covers remain live text and book data. The artwork is precached for offline use; both desktop navigation and the mobile library drawer keep their scrollable content.
 
 Home rows use the bouncing-book loader while the account library or catalog requests are pending (animation respects reduced-motion preferences). Once a new account's empty library has loaded, Currently reading and Recently added show prompts to add books, and author recommendations need books in the library first. These empty states are not ongoing loading states; general recommendations remain available under Picked for your library.
 

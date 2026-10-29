@@ -17,11 +17,14 @@ class Element {
   addEventListener(name, handler) { this.events[name] = handler; }
 }
 
-test("the CSS sidebar does not depend on PNG artwork or precache it", async () => {
+test("the sidebar uses the transparent bookmark artwork and precaches it", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
-  assert.doesNotMatch(css, /Librito%20Sidebar\.png|sidebar-book-panel\.png|--sidebar-art-height/);
+  assert.match(css, /url\("\/assets\/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel\.png"\)/);
   const worker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
-  assert.doesNotMatch(worker, /Librito%20Sidebar\.png/);
+  assert.match(worker, /"\/assets\/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel\.png"/);
+  const image = await readFile(new URL("../assets/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel.png", import.meta.url));
+  assert.equal(image.readUInt32BE(16), 819);
+  assert.equal(image.readUInt32BE(20), 1920);
 });
 
 test("sidebar has visible text branding without a separate image", async () => {
@@ -67,15 +70,16 @@ test("sidebar shelf covers use portrait book proportions", async () => {
   assert.match(css, /\.book-cover-art img\s*\{[^}]*object-fit: cover/);
 });
 
-test("sidebar has a leather bookmark finish with tassel details", async () => {
+test("sidebar artwork replaces CSS ornaments and reserves room for the eyelet and tassel", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const sidebarRules = [...css.matchAll(/\.sidebar\s*\{([^}]+)\}/g)];
-  const bookmark = sidebarRules.find((rule) => rule[1].includes("clip-path: polygon"));
-  assert.match(bookmark[1], /repeating-linear-gradient/);
-  assert.match(bookmark[1], /clip-path: polygon/);
-  assert.match(bookmark[1], /#a77a4a/);
-  assert.match(css, /\.sidebar::before\s*\{[^}]*#d2ae6c/);
-  assert.match(css, /\.sidebar::after\s*\{[^}]*#c67b4c/);
+  const bookmark = sidebarRules.find((rule) => rule[1].includes("Elegant%20Brown"));
+  assert.match(bookmark[1], /transparent url/);
+  assert.match(bookmark[1], /250% 100% no-repeat/);
+  assert.match(bookmark[1], /padding: calc\(\(100dvh - 2rem\) \* 0\.085\) 1\.5rem calc\(\(100dvh - 2rem\) \* 0\.25\)/);
+  assert.match(bookmark[1], /clip-path: none/);
+  assert.doesNotMatch(css, /\.sidebar::(?:before|after)/);
+  assert.match(sidebarRules.at(-1)[1], /position: fixed/);
   assert.match(css, /\.sidebar \.sidebar-brand h2\s*\{[^}]*Georgia/);
   assert.match(css, /\.sidebar \.nav-pill\.active\s*\{[^}]*#df8052/);
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");

@@ -2781,57 +2781,23 @@ body {
 .sidebar {
   position: relative;
   isolation: isolate;
-  border: 1px solid #a77a4a;
-  border-radius: 0.9rem 0.9rem 0 0;
-  background-color: #2b170f;
-  background-image:
-    radial-gradient(ellipse at 50% 0%, rgba(198, 151, 87, 0.16), transparent 58%),
-    repeating-linear-gradient(108deg, rgba(255, 235, 211, 0.018) 0 1px, transparent 1px 5px),
-    repeating-linear-gradient(0deg, rgba(14, 7, 5, 0.12) 0 2px, transparent 2px 4px),
-    linear-gradient(145deg, #4a2b1d 0%, #2b170f 42%, #1d100b 100%);
-  clip-path: polygon(0 0, 100% 0, 100% 96%, 50% 100%, 0 96%);
-  box-shadow: 0 1rem 2rem rgba(12, 5, 3, 0.32), inset 0 0 0 2px rgba(238, 194, 115, 0.24);
-}
-
-.sidebar::before,
-.sidebar::after {
-  position: absolute;
-  left: 50%;
-  z-index: 0;
-  pointer-events: none;
-  content: "";
-  transform: translateX(-50%);
-}
-
-.sidebar::before {
-  top: -0.45rem;
-  width: 1.35rem;
-  height: 2.7rem;
-  border-radius: 0.6rem;
-  background:
-    radial-gradient(circle at 50% 76%, transparent 0 0.27rem, #d2ae6c 0.3rem 0.4rem, #684523 0.43rem 0.49rem, transparent 0.52rem),
-    repeating-linear-gradient(55deg, #6e3925 0 2px, #b87748 2px 4px);
-}
-
-.sidebar::after {
-  bottom: 0.5rem;
-  width: 1.8rem;
-  height: 2.9rem;
-  border-radius: 0 0 50% 50%;
-  background:
-    linear-gradient(#c9a262, #6e471f) center top / 0.58rem 0.45rem no-repeat,
-    repeating-linear-gradient(90deg, #733723 0 2px, #c67b4c 2px 3px, #914b30 3px 4px);
-  clip-path: polygon(20% 0, 80% 0, 100% 100%, 0 100%);
+  overflow: hidden;
+  padding: calc((100dvh - 2rem) * 0.085) 1.5rem calc((100dvh - 2rem) * 0.25);
+  border: 0;
+  border-radius: 0;
+  background: transparent url("/assets/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel.png") center / 250% 100% no-repeat;
+  clip-path: none;
+  box-shadow: none;
 }
 
 .sidebar-content {
   position: relative;
   z-index: 1;
-  padding-bottom: 3.25rem;
+  padding-bottom: 0.75rem;
 }
 
 .sidebar .sidebar-brand {
-  padding: 2.2rem 0.65rem 1.25rem;
+  padding: 0.75rem 0.65rem 1.25rem;
   border-bottom-color: rgba(224, 172, 103, 0.42);
   text-align: center;
 }
@@ -2918,7 +2884,12 @@ body {
 
 @media (max-width: 899px) {
   .sidebar {
-    border-radius: 0.9rem 0.9rem 0 0;
+    position: fixed;
+  }
+
+  .sidebar .mobile-sidebar-close {
+    top: calc((100dvh - 2rem) * 0.085);
+    right: 1.5rem;
   }
 }
 
