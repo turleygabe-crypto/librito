@@ -98,7 +98,7 @@ test("sidebar artwork replaces CSS ornaments and reserves room for the eyelet an
   assert.doesNotMatch(html, /sidebar-ornament/);
   assert.match(css, /\.sidebar-content\s*\{[^}]*overflow-y: auto/);
   assert.match(css, /\.sidebar\.is-open\s*\{[^}]*display: flex/);
-  assert.match(css, /margin: 1rem 0;/);
+  assert.match(css, /top: -2rem;[\s\S]*margin: -2rem 0 1rem;/);
 });
 
 test("startup keeps the library pending until account initialization", () => {
