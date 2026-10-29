@@ -31,6 +31,7 @@ function createCard(book, { ownedBooks = [], shelfNames = [], currentShelf = "",
   const shelfAdds = [];
   const favorites = [];
   const shelfRemovals = [];
+  const cardStatusMenus = [];
   const context = {
     document: { createElement: () => new Element() },
     state,
@@ -40,6 +41,18 @@ function createCard(book, { ownedBooks = [], shelfNames = [], currentShelf = "",
     getAnyShelfNames: () => shelfNames,
     getCustomShelves: () => state.shelves.filter((shelf) => !shelf.is_wishlist),
     createBookCover: () => new Element(),
+    createReadingStatusMenu: () => {
+      const menu = new Element();
+      menu.className = "reading-status-control";
+      cardStatusMenus.push(menu.className);
+      return menu;
+    },
+    createOwnershipStatusMenu: () => {
+      const menu = new Element();
+      menu.className = "ownership-status-control";
+      cardStatusMenus.push(menu.className);
+      return menu;
+    },
     wireCardPopover() {},
     navigateTo() {},
     promptAddToShelf() {},
@@ -50,19 +63,22 @@ function createCard(book, { ownedBooks = [], shelfNames = [], currentShelf = "",
     removeBookFromLibrary() {},
   };
   const createBookCard = runInNewContext(`${cardFunction}\n${menuFunction}\ncreateBookCard`, context);
-  return { card: createBookCard(book), shelfAdds, favorites, shelfRemovals };
+  return { card: createBookCard(book), shelfAdds, favorites, shelfRemovals, cardStatusMenus };
 }
 
 test("book cards toggle Favorite directly and offer custom-shelf actions without an Add to Library action", () => {
   const book = { key: "book-1", title: "A Book", author: "An Author" };
-  const { card, favorites } = createCard(book);
+  const { card, favorites, cardStatusMenus } = createCard(book);
   const favorite = card.children.find((child) => child.className.startsWith("card-like"));
+  const controls = card.children.find((child) => child.className === "card-status-controls");
   const menu = card.children.find((child) => child.className === "card-menu");
   const actions = menu.children[1].children;
 
   assert.equal(favorite.textContent, "♡");
   assert.match(favorite.attributes["aria-label"], /Favorite/);
   assert.equal(favorite.attributes["aria-pressed"], "false");
+  assert.deepEqual(cardStatusMenus, ["reading-status-control", "ownership-status-control"]);
+  assert.equal(controls.children.length, 2);
   favorite.events.click();
   assert.deepEqual(favorites, [book]);
   assert.equal(actions[0].textContent, "Add to a shelf");

@@ -4,8 +4,10 @@ import { translate as t } from "./translations.js";
 
 const storageKey = "librito-library-v1";
 const shelvesStorageKey = "librito-shelves-v1";
+const statusShelvesStorageKey = "librito-status-shelves-v1";
 const legacyShelfItemsStorageKey = "librito-shelf-items-v1";
 const bookMetaKey = "librito-book-meta-v1";
+const statusShelfFilters = ["next_read", "reading", "read", "dnf", "owned"];
 let bookMetaStore = null;
 const bookMetaPending = new Map();
 const openLibraryLanguages = [
@@ -226,6 +228,7 @@ function checkBookLimit() {
 const state = {
   books: [],
   shelves: [],
+  statusShelfKeys: [],
   session: null,
   profile: null,
   supabase: null,
@@ -1317,6 +1320,7 @@ function renderShelves() {
   const libraryBooks = getLibraryBooks();
   const libraryCount = document.getElementById("libraryCount");
   if (libraryCount) libraryCount.textContent = String(libraryBooks.length);
+  const filters = getLibraryFilterOptions(libraryBooks);
   const shelvesToRender = getCustomShelves().map((shelf) => ({
     ...shelf,
     color: shelf.color || "#8b5e3c",
@@ -1324,22 +1328,18 @@ function renderShelves() {
   }));
 
   shelfList.replaceChildren();
+  state.statusShelfKeys
+    .map((key) => filters.find((filter) => filter.key === key))
+    .filter(Boolean)
+    .forEach((filter) => shelfList.append(createStatusShelfNavigationItem(filter)));
   shelvesToRender.forEach((shelf) => {
     shelfList.append(createShelfNavigationItem(shelf.name, String(shelf.books.length), shelf.color, shelf.books));
   });
-  if (!shelvesToRender.length) {
+  if (!shelvesToRender.length && !state.statusShelfKeys.length) {
     const empty = document.createElement("p");
     empty.className = "sidebar-empty";
     empty.textContent = "Create a shelf to organize your books.";
     shelfList.append(empty);
-  }
-
-  const filterList = document.getElementById("libraryFilterList");
-  if (filterList) {
-    filterList.replaceChildren();
-    getLibraryFilterOptions(libraryBooks).filter(({ key }) => key !== "").forEach((filter) => {
-      filterList.append(createLibraryFilterButton(filter));
-    });
   }
 }
 
@@ -1363,27 +1363,15 @@ function getLibraryFilterOptions(books = getLibraryBooks()) {
   ];
 }
 
-function createLibraryFilterButton(filter, { category = false } = {}) {
+function createLibraryFilterButton(filter) {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = category ? "browse-chip" : "nav-pill library-filter-button";
+  button.className = "browse-chip";
   button.dataset.libraryFilter = filter.key;
-  button.dataset.navLabel = filter.label;
   button.setAttribute("aria-label", `${filter.label}, ${filter.count} books`);
   button.classList.toggle("active", state.view === "library" && state.library.filter === filter.key);
-  if (!category) {
-    const label = document.createElement("span");
-    label.textContent = filter.label;
-    const count = document.createElement("span");
-    count.className = "library-filter-count";
-    count.textContent = filter.count;
-    count.setAttribute("aria-hidden", "true");
-    button.append(label, count);
-  } else {
-    button.textContent = `${filter.label} · ${filter.count}`;
-  }
+  button.textContent = `${filter.label} · ${filter.count}`;
   button.addEventListener("click", () => {
-    if (!category && window.matchMedia("(max-width: 899px)").matches) setLibraryDrawerOpen(false);
     navigateTo("library", { filter: filter.key });
   });
   return button;
@@ -1439,6 +1427,100 @@ function createShelfNavigationItem(name, count, color, books = []) {
   copy.append(title, subtitle);
   item.append(thumbnail, copy, itemCount);
   return item;
+}
+
+function createStatusShelfNavigationItem(filter) {
+  const row = document.createElement("div");
+  row.className = "status-shelf-navigation";
+  const item = document.createElement("button");
+  item.className = "shelf-item status-shelf-item";
+  item.type = "button";
+  item.dataset.statusShelf = filter.key;
+  const isActive = state.view === "library" && state.library.filter === filter.key;
+  item.classList.toggle("active", isActive);
+  item.setAttribute("aria-label", `${filter.label}, ${filter.count} books`);
+  if (isActive) item.setAttribute("aria-current", "page");
+  item.addEventListener("click", () => {
+    if (window.matchMedia("(max-width: 899px)").matches) setLibraryDrawerOpen(false);
+    navigateTo("library", { filter: filter.key });
+  });
+  const thumbnail = document.createElement("span");
+  thumbnail.className = "shelf-thumbnail status-shelf-thumbnail";
+  thumbnail.textContent = "↗";
+  thumbnail.setAttribute("aria-hidden", "true");
+  const copy = document.createElement("span");
+  copy.className = "shelf-item-copy";
+  const title = document.createElement("strong");
+  title.textContent = filter.label;
+  const subtitle = document.createElement("span");
+  subtitle.textContent = t("status.shelf_view", { count: filter.count });
+  copy.append(title, subtitle);
+  const count = document.createElement("span");
+  count.className = "shelf-item-count";
+  count.textContent = String(filter.count);
+  count.setAttribute("aria-hidden", "true");
+  item.append(thumbnail, copy, count);
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "status-shelf-remove";
+  remove.textContent = "×";
+  remove.setAttribute("aria-label", t("status.shelf_remove", { status: filter.label }));
+  remove.addEventListener("click", () => toggleStatusShelf(filter.key, false));
+  row.append(item, remove);
+  return row;
+}
+
+function loadLocalStatusShelfKeys() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(statusShelvesStorageKey) || "[]");
+    return Array.isArray(stored) ? [...new Set(stored.filter((key) => statusShelfFilters.includes(key)))] : [];
+  } catch (error) {
+    console.error("Could not load saved status shelves", error);
+    return [];
+  }
+}
+
+function saveLocalStatusShelfKeys() {
+  localStorage.setItem(statusShelvesStorageKey, JSON.stringify(state.statusShelfKeys));
+}
+
+async function loadStatusShelvesFromSupabase() {
+  if (!state.supabase || !state.session) return;
+  const { data, error } = await state.supabase
+    .from("status_shelf_preferences")
+    .select("filter_key")
+    .eq("user_id", state.session.user.id);
+  if (error) throw error;
+  state.statusShelfKeys = [...new Set((data || [])
+    .map(({ filter_key }) => filter_key)
+    .filter((key) => statusShelfFilters.includes(key)))];
+}
+
+async function toggleStatusShelf(filterKey, shouldAdd = !state.statusShelfKeys.includes(filterKey)) {
+  if (!statusShelfFilters.includes(filterKey)) return;
+  if (state.supabase && state.session) {
+    const query = state.supabase.from("status_shelf_preferences");
+    const result = shouldAdd
+      ? await query.upsert(
+        { user_id: state.session.user.id, filter_key: filterKey },
+        { onConflict: "user_id,filter_key", ignoreDuplicates: true }
+      )
+      : await query.delete().eq("user_id", state.session.user.id).eq("filter_key", filterKey);
+    if (result.error) {
+      console.error(result.error);
+      showToast("Could not update your My Shelves shortcuts.");
+      return;
+    }
+  } else {
+    state.statusShelfKeys = shouldAdd
+      ? [...new Set([...state.statusShelfKeys, filterKey])]
+      : state.statusShelfKeys.filter((key) => key !== filterKey);
+    saveLocalStatusShelfKeys();
+  }
+  state.statusShelfKeys = shouldAdd
+    ? [...new Set([...state.statusShelfKeys, filterKey])]
+    : state.statusShelfKeys.filter((key) => key !== filterKey);
+  render();
 }
 
 function renderShelfOptions() {
@@ -2153,6 +2235,13 @@ function createBookCard(book, { compact = false, subtitle = "" } = {}) {
     tag.textContent = shelfNames.length ? `📚 ${shelfNames.join(", ")}` : "No shelf yet";
     open.append(tag);
   }
+  const statusControls = document.createElement("div");
+  statusControls.className = "card-status-controls";
+  statusControls.append(
+    createReadingStatusMenu(book, ownedBook, { compact: true }),
+    createOwnershipStatusMenu(book, ownedBook, { compact: true }),
+  );
+  card.append(statusControls);
   const isFavorite = Boolean(ownedBook?.is_favorite);
   const like = document.createElement("button");
   like.type = "button";
@@ -2808,8 +2897,8 @@ function updateActiveNavigation(label) {
     if (active) item.setAttribute("aria-current", "page");
     else item.removeAttribute("aria-current");
   });
-  document.querySelectorAll(".library-filter-button").forEach((item) => {
-    const active = libraryActive && item.dataset.libraryFilter === state.library.filter;
+  document.querySelectorAll("[data-status-shelf]").forEach((item) => {
+    const active = libraryActive && item.dataset.statusShelf === state.library.filter;
     item.classList.toggle("active", active);
     if (active) item.setAttribute("aria-current", "page");
     else item.removeAttribute("aria-current");
@@ -3797,7 +3886,7 @@ function showLibraryPage(filter = state.library.filter || "") {
   categories.setAttribute("role", "group");
   categories.setAttribute("aria-label", "Filter your library");
   getLibraryFilterOptions().forEach((item) => {
-    categories.append(createLibraryFilterButton(item, { category: true }));
+    categories.append(createLibraryFilterButton(item));
   });
   const search = document.createElement("input");
   search.type = "search";
@@ -3805,6 +3894,20 @@ function showLibraryPage(filter = state.library.filter || "") {
   search.placeholder = "Search title, author, or genre…";
   search.setAttribute("aria-label", "Search your library");
   search.value = state.library.query;
+  const leading = document.createElement("div");
+  leading.className = "library-browse-leading";
+  leading.append(categories, search);
+  if (statusShelfFilters.includes(state.library.filter)) {
+    leading.classList.add("has-status-shelf-toggle");
+    const shortcutAction = document.createElement("button");
+    const isShortcut = state.statusShelfKeys.includes(state.library.filter);
+    shortcutAction.type = "button";
+    shortcutAction.className = "library-view-shelf-toggle";
+    shortcutAction.textContent = isShortcut ? t("status.shortcut_remove") : t("status.shortcut_add");
+    shortcutAction.setAttribute("aria-pressed", String(isShortcut));
+    shortcutAction.addEventListener("click", () => toggleStatusShelf(state.library.filter));
+    leading.append(shortcutAction);
+  }
   const results = document.createElement("div");
   results.className = "library-results";
 
@@ -3818,7 +3921,7 @@ function showLibraryPage(filter = state.library.filter || "") {
       .filter((book) => !query || [book.title, book.author, book.genre].some((v) => String(v || "").toLowerCase().includes(query)));
     results.replaceChildren();
     if (!books.length) {
-      results.append(categories, search);
+      results.append(leading);
       const empty = document.createElement("p");
       empty.className = "row-empty-state";
       empty.textContent = query
@@ -3829,9 +3932,6 @@ function showLibraryPage(filter = state.library.filter || "") {
       results.append(empty);
       return;
     }
-    const leading = document.createElement("div");
-    leading.className = "library-browse-leading";
-    leading.append(categories, search);
     results.append(createShelfBrowser(books, `library:${state.library.filter || "all"}`, leading));
   };
   page.append(header, results);
@@ -4020,16 +4120,27 @@ function renderBookPage(book) {
   });
   content.append(metadata);
 
-  const actions = document.createElement("div");
-  actions.className = "page-actions";
   const ownedBook = findOwnedBook(book);
   const isLibraryBook = Boolean(ownedBook);
   const isDisposed = ["sold", "donated"].includes(ownedBook?.ownership_status);
   layout.classList.toggle("is-disposed", isDisposed);
   const isCurrentlyReading = ownedBook?.reading_status === "reading";
   const moreMenu = createBookMoreMenu(book, ownedBook);
-  actions.append(createReadingStatusMenu(book, ownedBook));
-  actions.append(createOwnershipStatusMenu(book, ownedBook));
+  const statusControls = document.createElement("div");
+  statusControls.className = "book-state-controls";
+  const readingControl = document.createElement("div");
+  readingControl.className = "book-state-control";
+  const readingLabel = document.createElement("span");
+  readingLabel.textContent = t("status.control_label");
+  readingControl.append(readingLabel, createReadingStatusMenu(book, ownedBook));
+  const ownershipControl = document.createElement("div");
+  ownershipControl.className = "book-state-control";
+  const ownershipLabel = document.createElement("span");
+  ownershipLabel.textContent = t("ownership.control_label");
+  ownershipControl.append(ownershipLabel, createOwnershipStatusMenu(book, ownedBook));
+  statusControls.append(readingControl, ownershipControl);
+  const actions = document.createElement("div");
+  actions.className = "page-actions book-profile-actions";
   const like = document.createElement("button");
   like.type = "button";
   like.className = "secondary-btn";
@@ -4039,7 +4150,7 @@ function renderBookPage(book) {
   like.addEventListener("click", () => toggleBookFavorite(book));
   actions.append(like);
   actions.append(createBookShelfMenu(book), moreMenu);
-  content.append(createShelfStatus(book, ownedBook), actions);
+  content.append(createShelfStatus(book, ownedBook), statusControls, actions);
   if (isLibraryBook) {
     const readingActions = document.createElement("div");
     readingActions.className = "reading-actions";
@@ -4478,13 +4589,13 @@ function createShelfStatus(book, ownedBook) {
   return box;
 }
 
-function createReadingStatusMenu(book, ownedBook) {
+function createReadingStatusMenu(book, ownedBook, { compact = false } = {}) {
   const menu = document.createElement("details");
-  menu.className = "book-status-menu";
+  menu.className = `book-status-menu${compact ? " card-quick-status-menu" : ""}`;
   const summary = document.createElement("summary");
   summary.className = "currently-reading-button";
   const currentStatus = ownedBook?.reading_status || "";
-  summary.textContent = `${getReadingStatusLabel(currentStatus) || t("library.add_to_library")} ▾`;
+  summary.textContent = `${getReadingStatusLabel(currentStatus) || (compact ? "Reading status" : t("library.add_to_library"))} ▾`;
   summary.setAttribute("aria-label", t("status.aria_label", {
     status: getReadingStatusLabel(currentStatus) || t("status.not_set"),
   }));
@@ -4517,9 +4628,9 @@ function createReadingStatusMenu(book, ownedBook) {
   return menu;
 }
 
-function createOwnershipStatusMenu(book, ownedBook) {
+function createOwnershipStatusMenu(book, ownedBook, { compact = false } = {}) {
   const menu = document.createElement("details");
-  menu.className = "book-status-menu ownership-status-menu";
+  menu.className = `book-status-menu ownership-status-menu${compact ? " card-quick-status-menu" : ""}`;
   const summary = document.createElement("summary");
   summary.className = "secondary-btn";
   const currentStatus = ownedBook?.ownership_status || "";
@@ -4549,6 +4660,7 @@ function createOwnershipStatusMenu(book, ownedBook) {
     });
     panel.append(remove);
   }
+  if (currentStatus === "owned") panel.append(createOwnedFormatPicker(book, ownedBook));
   menu.append(summary, panel);
   wireCardPopover(menu, summary, panel);
   return menu;
@@ -4575,16 +4687,6 @@ function createBookMoreMenu(book, ownedBook) {
   summary.setAttribute("aria-label", "More book actions");
   const panel = document.createElement("div");
   panel.className = "book-more-menu-panel";
-  const ownershipToggle = document.createElement("button");
-  ownershipToggle.type = "button";
-  ownershipToggle.textContent = ownedBook?.ownership_status === "owned" ? "✓ I own this" : "I own this";
-  ownershipToggle.setAttribute("aria-pressed", String(ownedBook?.ownership_status === "owned"));
-  ownershipToggle.addEventListener("click", () => {
-    menu.open = false;
-    setOwnershipStatus(book, ownedBook?.ownership_status === "owned" ? null : "owned");
-  });
-  panel.append(ownershipToggle);
-  if (ownedBook?.ownership_status === "owned") panel.append(createOwnedFormatPicker(book, ownedBook));
   const share = document.createElement("button");
   share.type = "button";
   share.textContent = "Share";
@@ -8026,6 +8128,7 @@ async function initializeSupabaseOnce() {
         state.loadError = "";
         state.books = [];
         state.shelves = [];
+        state.statusShelfKeys = [];
         render();
         loadFromSupabase().catch(handleLibraryLoadFailure);
       } else {
@@ -8034,6 +8137,7 @@ async function initializeSupabaseOnce() {
         state.loadError = "";
         state.books = loadBooks();
         state.shelves = loadLocalShelves();
+        state.statusShelfKeys = loadLocalStatusShelfKeys();
         render();
       }
     });
@@ -8042,6 +8146,7 @@ async function initializeSupabaseOnce() {
       state.loading = false;
       state.books = loadBooks();
       state.shelves = loadLocalShelves();
+      state.statusShelfKeys = loadLocalStatusShelfKeys();
       render();
       if (!authPrompted) {
         openAuthModal();
@@ -8051,6 +8156,7 @@ async function initializeSupabaseOnce() {
 
     state.books = [];
     state.shelves = [];
+    state.statusShelfKeys = [];
     state.loading = true;
     state.loadError = "";
     render();
@@ -8061,6 +8167,7 @@ async function initializeSupabaseOnce() {
     state.loadError = "";
     state.books = loadBooks();
     state.shelves = loadLocalShelves();
+    state.statusShelfKeys = loadLocalStatusShelfKeys();
     render();
     if (!authPrompted) {
       openAuthModal();
@@ -8205,6 +8312,13 @@ async function loadFromSupabase() {
   if (!state.supabase || !state.session) return false;
   await ensureProfile();
   await loadShelvesFromSupabase();
+  try {
+    await loadStatusShelvesFromSupabase();
+  } catch (error) {
+    console.error(error);
+    state.statusShelfKeys = [];
+    showToast("Could not load your My Shelves shortcuts.");
+  }
   const { data, error } = await state.supabase.from("books").select("*").order("created_at", { ascending: false });
   if (error) {
     console.error(error);

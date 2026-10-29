@@ -12,6 +12,7 @@ class Element {
   events = {};
   dataset = {};
   classList = {
+    add() {},
     toggle() {},
   };
   append(...children) { this.children.push(...children); }
@@ -84,7 +85,8 @@ test("library route filters books by status and exposes categories for sorting a
     getReadingStatusLabel: (status) => translate(`status.${status}`),
     getOwnershipStatusLabel: (status) => translate(`ownership.${status}`),
     t: translate,
-    state: { view: "library", library: { query: "", filter: "" } },
+    state: { view: "library", library: { query: "", filter: "" }, statusShelfKeys: [] },
+    statusShelfFilters: ["next_read", "reading", "read", "dnf", "owned"],
     document: { createElement: () => new Element() },
     window: { matchMedia: () => ({ matches: false }) },
     getLibraryBooks: () => books,
@@ -99,6 +101,7 @@ test("library route filters books by status and exposes categories for sorting a
       return browser;
     },
     navigateTo: (...args) => routes.push(args),
+    toggleStatusShelf() {},
     stateFilter: "",
     shelfBrowse: { page: 1 },
     applyBrowseControls: (libraryBooks) => libraryBooks,
