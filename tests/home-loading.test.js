@@ -92,7 +92,7 @@ test("mobile bookmark extends beyond both screen edges with the tassel below the
   assert.match(sidebar, /height: var\(--sidebar-height\)/);
   assert.match(sidebar, /padding-top: max\(calc\(5\.5rem \+ env\(safe-area-inset-top\)\), calc\(var\(--sidebar-height\) \* 0\.085\)\)/);
   assert.match(sidebar, /padding-bottom: calc\(var\(--sidebar-height\) \* 0\.26\)/);
-  assert.match(css, /\.sidebar \.mobile-sidebar-close\s*\{[^}]*top: max\(2\.125rem, calc\(env\(safe-area-inset-top\) \+ 1\.5rem\)\)[^}]*right: 1\.5rem/);
+  assert.match(css, /\.sidebar \.mobile-sidebar-close\s*\{[^}]*top: max\(2\.625rem, calc\(env\(safe-area-inset-top\) \+ 2rem\)\)[^}]*right: 1\.25rem/);
 });
 
 test("mobile close button is an understated, keyboard-accessible golden medallion", async () => {

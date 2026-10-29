@@ -2936,8 +2936,8 @@ body {
   }
 
   .sidebar .mobile-sidebar-close {
-    top: max(2.125rem, calc(env(safe-area-inset-top) + 1.5rem));
-    right: 1.5rem;
+    top: max(2.625rem, calc(env(safe-area-inset-top) + 2rem));
+    right: 1.25rem;
   }
 }
 
