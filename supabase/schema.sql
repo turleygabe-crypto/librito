@@ -35,6 +35,11 @@ create table if not exists public.books (
 alter table public.books add column if not exists genre text;
 alter table public.books add column if not exists reading_status text;
 alter table public.books add column if not exists disposition text;
+-- Status dimensions (stable keys only; labels live in client translations).
+-- See migrations/20261029150000_status_dimensions.sql.
+alter table public.books add column if not exists ownership_status text;
+alter table public.books add column if not exists is_favorite boolean not null default false;
+alter table public.books add column if not exists owned_format text;
 alter table public.books add column if not exists current_page integer not null default 0;
 alter table public.books add column if not exists edition_progress jsonb not null default '{}'::jsonb;
 alter table public.books add column if not exists bookmarked_at timestamptz;
@@ -218,3 +223,6 @@ alter table public.profiles enable row level security;
 -- Atomic shelf rename/delete book updates: see migrations/20261025040000_shelf_management.sql.
 -- Lite Reader book/shelf limits: see migrations/20261024200000_lite_reader_limits.sql.
 -- Lite Reader Currently Reading limit: see migrations/20261024210000_lite_reader_reading_limit.sql.
+-- Reading/ownership status dimensions, favorites, and retirement of the built-in
+-- Wishlist shelf and shelf_items: see migrations/20261029150000_status_dimensions.sql
+-- (rollback in rollbacks/20261029150000_status_dimensions_down.sql).

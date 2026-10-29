@@ -6,18 +6,16 @@ import { PGlite } from "@electric-sql/pglite";
 
 const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
 const operations = source.slice(source.indexOf("async function renameShelf("), source.indexOf("\nfunction formatCurrency("));
-const shelfNames = source.slice(source.indexOf("function getBookShelfNames("), source.indexOf("\nfunction setLibraryDrawerOpen("));
 
 function harness({ signedIn = false, failure = false } = {}) {
   const shelf = { id: "custom", name: "Cozy Reads" };
   const state = {
     shelves: [shelf, { id: "other", name: "Favorites" }, { id: "wishlist", name: "Wishlist", is_wishlist: true }],
     books: [
-      { id: "legacy", shelf: shelf.name },
-      { id: "multi", shelf: shelf.name, shelves: [shelf.name, "Favorites"] },
-      { id: "other", shelf: "Favorites", shelves: ["Favorites"] },
+      { id: "legacy", shelves: [shelf.name] },
+      { id: "multi", shelves: [shelf.name, "Favorites"] },
+      { id: "other", shelves: ["Favorites"] },
     ],
-    shelfItems: [{ shelf_id: "custom" }, { shelf_id: "other" }],
     view: "shelf", currentShelf: shelf.name,
     session: signedIn ? { user: { id: "reader" } } : null,
   };
@@ -38,37 +36,34 @@ function harness({ signedIn = false, failure = false } = {}) {
   const context = {
     state, localStorage: { setItem: (key, value) => storage.set(key, JSON.parse(value)) },
     storageKey: "books", shelvesStorageKey: "shelves",
-    saveShelfItemsLocally: () => { if (!state.session) storage.set("items", state.shelfItems); },
+    getBookShelfNames: (book) => Array.isArray(book.shelves) ? book.shelves : [],
+    getCustomShelves: () => state.shelves.filter((item) => !item.is_wishlist),
+    isReservedShelfName: (name) => ["library", "liked", "liked books", "wishlist", "currently reading", "completed books", "favorites", "owned", "sold", "donated"].includes(name.toLowerCase()),
     navigateTo: (view, values = {}) => { state.view = view; state.currentShelf = values.name; },
     render() {}, showToast: (message) => notices.push(message), console: { error() {} },
   };
-  runInNewContext(`${shelfNames}\n${operations}\nthis.rename = renameShelf; this.remove = deleteShelf;`, context);
+  runInNewContext(`${operations}\nthis.rename = renameShelf; this.remove = deleteShelf;`, context);
   return { context, state, shelf, storage, calls, notices };
 }
 
-test("local rename persists legacy and multi-shelf assignments without losing saved items", async () => {
+test("local rename persists custom-shelf memberships without changing Library book records", async () => {
   const { context, state, shelf, storage } = harness();
   await context.rename(shelf, "  Weekend Reads  ");
   assert.equal(shelf.name, "Weekend Reads");
   assert.equal(state.currentShelf, "Weekend Reads");
-  assert.equal(state.books[0].shelf, "Weekend Reads");
   assert.deepEqual([...state.books[0].shelves], ["Weekend Reads"]);
   assert.deepEqual([...state.books[1].shelves], ["Weekend Reads", "Favorites"]);
   assert.equal(storage.get("shelves")[0].name, "Weekend Reads");
-  assert.equal(storage.get("books")[0].shelf, "Weekend Reads");
-  assert.equal(state.shelfItems.length, 2);
+  assert.equal(Object.hasOwn(state.books[0], "shelf"), false);
 });
 
 test("local delete keeps books and other memberships and persists removal", async () => {
   const { context, state, shelf, storage } = harness();
   await context.remove(shelf);
   assert.equal(state.books.length, 3);
-  assert.equal(state.books[0].shelf, "");
   assert.equal(state.books[0].shelves.length, 0);
-  assert.equal(state.books[1].shelf, "Favorites");
   assert.deepEqual([...state.books[1].shelves], ["Favorites"]);
   assert.equal(storage.get("shelves").some((item) => item.id === shelf.id), false);
-  assert.deepEqual(storage.get("items"), [{ shelf_id: "other" }]);
   assert.equal(state.view, "home");
 });
 
@@ -79,7 +74,7 @@ test("invalid names and built-in Wishlist mutations leave data unchanged", async
     assert.equal(shelf.name, "Cozy Reads");
   }
   await assert.rejects(context.rename(state.shelves[2], "Custom"), /unique shelf name/);
-  await assert.rejects(context.remove(state.shelves[2]), /cannot be deleted/);
+  await assert.rejects(context.remove(state.shelves[2]), /Only custom shelves/);
 });
 
 test("signed-in mutations target the owned shelf, require a returned row, and do not write demo storage", async () => {
@@ -126,6 +121,8 @@ test("custom shelf controls work in local and signed-in modes using retryable di
       const context = {
         state, document: { createElement: () => new Element() }, updateActiveNavigation() {},
         showPage: () => page, getLibraryBooks: () => [], getAllBooksOnShelf: () => [],
+        getCustomShelves: () => state.shelves.filter((item) => !item.is_wishlist
+          && !["liked", "liked books", "wishlist", "currently reading", "completed books"].includes(item.name.toLowerCase())),
         formatCurrency: () => "$0", createPageHeader: () => new Element(),
         createBookTable: () => new Element(), createCurrentlyReadingList: () => new Element(),
         createCompletedBooksList: () => new Element(), openDialog() {},

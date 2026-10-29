@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 import { test } from "node:test";
+import { translate } from "../translations.js";
 
 class Element {
   children = [];
@@ -256,6 +257,8 @@ test("Book Lover welcome waits for confirmed access, lists benefits, and appears
   const dialogs = [];
   let navigated;
   const context = {
+    t: translate,
+    getReadingStatusLabel: (status) => translate(`status.${status}`),
     sessionStorage: {
       getItem: (key) => storage.get(key),
       removeItem: (key) => storage.delete(key),

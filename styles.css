@@ -583,11 +583,6 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
   font-weight: 700;
 }
 
-.liked-thumbnail {
-  background: linear-gradient(135deg, #5b2636, #d18c5b);
-  font-family: sans-serif;
-}
-
 .shelf-thumb-art {
   width: 100%;
   height: 100%;
@@ -2287,6 +2282,44 @@ body {
   font-size: 1.1rem;
 }
 
+.library-filter-list {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.sidebar-library-nav .library-filter-button {
+  justify-content: flex-start;
+  padding: 0.45rem 0.5rem;
+}
+
+.sidebar-library-nav .library-filter-button::before {
+  content: "";
+}
+
+.library-filter-count {
+  margin-left: auto;
+  color: #c6a58e;
+  font-size: 0.9rem;
+}
+
+.library-heading-btn .library-filter-count {
+  margin-left: auto;
+}
+
+.library-category-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.library-browse-leading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
 .sidebar-shelf-heading {
   margin-top: 0.85rem;
 }
@@ -2994,6 +3027,7 @@ body {
   background: #f0e3d5;
   color: #735a48;
   font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 .book-detail-content {
@@ -3356,6 +3390,113 @@ body {
   }
 }
 
+.book-detail-layout.is-disposed > .book-detail-cover {
+  opacity: 0.68;
+}
+
+.book-detail-content .page-actions > .book-status-menu {
+  position: relative;
+}
+
+.book-status-menu > summary {
+  display: inline-flex;
+  min-height: 2.3rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.52rem 0.8rem;
+  border: 1px solid #dfd2c5;
+  border-radius: 999px;
+  background: #fffaf3;
+  color: #51463d;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  list-style: none;
+  white-space: nowrap;
+}
+
+.book-status-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.book-status-menu > summary.currently-reading-button {
+  border-color: #b64d2c;
+  background: #b64d2c;
+  color: #fffaf5;
+}
+
+.book-status-menu[open] > summary {
+  box-shadow: 0 0 0 3px rgba(182, 77, 44, 0.13);
+}
+
+.book-status-menu-panel {
+  position: fixed;
+  z-index: 20;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  display: grid;
+  min-width: 12rem;
+  gap: 0.2rem;
+  padding: 0.45rem;
+  border: 1px solid #e6d7c8;
+  border-radius: 0.75rem;
+  background: #fffaf3;
+  box-shadow: 0 12px 28px rgba(45, 29, 19, 0.18);
+}
+
+.book-status-menu-panel > button {
+  padding: 0.55rem 0.7rem;
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: #51463d;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  text-align: left;
+}
+
+.book-status-menu-panel > button:hover,
+.book-status-menu-panel > button[aria-pressed="true"] {
+  background: #f3e8dc;
+  color: #8b3f27;
+}
+
+.book-status-menu-panel > .status-remove-option {
+  margin-top: 0.15rem;
+  border-top: 1px solid #e8ddd2;
+  border-radius: 0;
+  color: #7d4a3b;
+}
+
+.owned-format-select {
+  min-height: 2.3rem;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid #dfd2c5;
+  border-radius: 0.55rem;
+  background: #fffdf9;
+  color: #51463d;
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.book-more-menu-panel .owned-format-select {
+  width: 100%;
+}
+
+.book-shelf-status {
+  display: block;
+}
+
+.book-shelf-status-summary {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.book-shelf-status .book-shelf-chip {
+  margin: 0.45rem 0.35rem 0 0;
+}
+
 .page-view {
   gap: 1rem;
 }
@@ -3474,13 +3615,6 @@ body {
   display: none;
 }
 
-.book-profile-genres {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-top: 0.65rem;
-}
-
 .book-profile-genre {
   margin: 0;
   padding: 0.3rem 0.65rem;
@@ -3489,6 +3623,7 @@ body {
   background: #f7eee4;
   color: #73513c;
   font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 .book-detail-content {
@@ -5409,25 +5544,6 @@ body {
   bottom: auto;
 }
 
-.card-like-menu {
-  position: absolute;
-  top: 0.7rem;
-  left: 0.7rem;
-  z-index: 2;
-}
-
-.card-like-menu > summary.card-like {
-  position: relative;
-  inset: auto;
-  cursor: pointer;
-  list-style: none;
-  opacity: 1;
-}
-
-.card-like-menu > summary::-webkit-details-marker {
-  display: none;
-}
-
 @media (max-width: 700px) {
   .global-search {
     flex-basis: 0;
@@ -5646,6 +5762,7 @@ body {
   cursor: pointer;
   font-size: 0.8rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .book-shelf-chip:hover {

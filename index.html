@@ -31,14 +31,14 @@
           </nav>
           <section class="sidebar-library" aria-labelledby="libraryHeading">
             <div class="library-heading">
-              <h2 id="libraryHeading"><button id="libraryNavBtn" class="nav-pill library-heading-btn" type="button">Your Library</button></h2>
+              <h2 id="libraryHeading"><button id="libraryNavBtn" class="nav-pill library-heading-btn" type="button"><span>Library</span><span id="libraryCount" class="library-filter-count" aria-hidden="true">0</span></button></h2>
             </div>
             <nav class="sidebar-library-nav" aria-label="Your library">
-              <button class="nav-pill" type="button">Your shelves</button>
+              <div id="libraryFilterList" class="library-filter-list" aria-label="Library filters"></div>
               <button id="sidebarAddBookBtn" class="nav-pill" type="button">Add book</button>
             </nav>
             <div class="library-heading sidebar-shelf-heading">
-              <h2 id="shelvesHeading">Shelves</h2>
+              <h2 id="shelvesHeading">My Shelves</h2>
               <button id="sidebarCreateShelfBtn" class="sidebar-create-shelf" type="button" aria-label="Create a shelf">＋</button>
             </div>
             <div id="shelfList" class="shelf-list" aria-label="Your shelves"></div>

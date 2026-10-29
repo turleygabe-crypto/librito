@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 import { test } from "node:test";
+import { translate } from "../translations.js";
 
 class Element {
   children = [];
@@ -14,7 +15,7 @@ class Element {
 }
 
 const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
-const cardFunction = source.slice(source.indexOf("function createBookCard("), source.indexOf("\nfunction normalizeShelfRecord("));
+const cardFunction = source.slice(source.indexOf("function createBookCard("), source.indexOf("\nfunction normalizeBookRecord("));
 const menuFunction = source.slice(source.indexOf("function createBookCardMenu("), source.indexOf("\nfunction removeOrphanPopovers("));
 
 function createCard(book, { ownedBooks = [], shelfNames = [], currentShelf = "", view = "browse" } = {}) {
@@ -28,63 +29,62 @@ function createCard(book, { ownedBooks = [], shelfNames = [], currentShelf = "",
     currentShelf,
   };
   const shelfAdds = [];
-  const likedBooks = [];
+  const favorites = [];
   const shelfRemovals = [];
   const context = {
     document: { createElement: () => new Element() },
     state,
+    t: translate,
     getLibraryBooks: () => ownedBooks,
     getBookKey: (entry) => entry.key,
     getAnyShelfNames: () => shelfNames,
+    getCustomShelves: () => state.shelves.filter((shelf) => !shelf.is_wishlist),
     createBookCover: () => new Element(),
     wireCardPopover() {},
-    markBookAsOwned() {},
     navigateTo() {},
     promptAddToShelf() {},
-    toggleBookLike: (entry) => likedBooks.push(entry),
+    toggleBookFavorite: (entry) => favorites.push(entry),
     addAnyBookToShelf: (entry, shelf) => shelfAdds.push([entry, shelf]),
     removeAnyBookFromShelf: (entry, shelfName) => shelfRemovals.push([entry, shelfName]),
     openBookProfile() {},
     removeBookFromLibrary() {},
-    renderBooks() {},
   };
   const createBookCard = runInNewContext(`${cardFunction}\n${menuFunction}\ncreateBookCard`, context);
-  return { card: createBookCard(book), shelfAdds, likedBooks, shelfRemovals };
+  return { card: createBookCard(book), shelfAdds, favorites, shelfRemovals };
 }
 
-test("book-card left menu offers Like and Wishlist; right menu holds the remaining actions", () => {
+test("book cards toggle Favorite directly and offer custom-shelf actions without an Add to Library action", () => {
   const book = { key: "book-1", title: "A Book", author: "An Author" };
-  const { card, shelfAdds, likedBooks } = createCard(book);
-  const likeMenu = card.children.find((child) => child.className === "card-like-menu");
-  const rightMenu = card.children.find((child) => child.className === "card-menu");
-  const leftOptions = likeMenu.children[1].children;
-  const rightOptions = rightMenu.children[1].children;
+  const { card, favorites } = createCard(book);
+  const favorite = card.children.find((child) => child.className.startsWith("card-like"));
+  const menu = card.children.find((child) => child.className === "card-menu");
+  const actions = menu.children[1].children;
 
-  assert.deepEqual(leftOptions.map((option) => option.textContent), ["Like", "Add to Wishlist"]);
-  assert.deepEqual(rightOptions.map((option) => option.textContent), [
-    "Add to Library", "Add to a shelf", "Purchase",
-  ]);
-  leftOptions[0].events.click();
-  leftOptions[1].events.click();
-  assert.deepEqual(likedBooks, [book]);
-  assert.deepEqual(shelfAdds, [[book, { id: "wishlist", name: "Wishlist", is_wishlist: true }]]);
+  assert.equal(favorite.textContent, "♡");
+  assert.match(favorite.attributes["aria-label"], /Favorite/);
+  assert.equal(favorite.attributes["aria-pressed"], "false");
+  favorite.events.click();
+  assert.deepEqual(favorites, [book]);
+  assert.equal(actions[0].textContent, "Add to a shelf");
+  assert.equal(actions.some((action) => /Add to Library|Wishlist/.test(action.textContent)), false);
+  assert.equal(actions.some((action) => action.textContent === "Purchase"), true);
 });
 
-test("owned book cards keep Like on the left and omit acquisition actions on the right", () => {
-  const book = { key: "book-2", title: "Owned Book", author: "An Author", liked: true };
+test("saved book cards show favorite state and keep Remove from library in the menu", () => {
+  const book = { key: "book-2", title: "Saved Book", author: "An Author", is_favorite: true };
   const { card } = createCard(book, { ownedBooks: [book] });
-  const likeMenu = card.children.find((child) => child.className === "card-like-menu");
-  const rightMenu = card.children.find((child) => child.className === "card-menu");
+  const favorite = card.children.find((child) => child.className.startsWith("card-like"));
+  const actions = card.children.find((child) => child.className === "card-menu").children[1].children;
 
-  assert.equal(likeMenu.children[0].textContent, "♥");
-  assert.equal(likeMenu.children[1].children[0].textContent, "Unlike");
+  assert.equal(favorite.textContent, "♥");
+  assert.equal(favorite.attributes["aria-pressed"], "true");
   assert.deepEqual(
-    rightMenu.children[1].children.map((option) => option.textContent),
-    ["Add to a shelf", "Open book"],
+    actions.map((action) => action.textContent),
+    ["Add to a shelf", "Open book", "Remove from library"],
   );
 });
 
-test("Remove from shelf appears only for books on the current shelf", () => {
+test("Remove from shelf appears only for books on the current custom shelf", () => {
   const book = { key: "book-3", title: "Shelved Book", author: "An Author" };
   const onShelf = createCard(book, {
     shelfNames: ["Favorites"],

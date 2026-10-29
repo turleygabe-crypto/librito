@@ -1,9 +1,10 @@
 import { createSupabaseClient } from "./lib/supabase-client.js";
 import { subscriptionTiming, subscriptionTimingMessage } from "./lib/billing-status.js";
+import { translate as t } from "./translations.js";
 
 const storageKey = "librito-library-v1";
 const shelvesStorageKey = "librito-shelves-v1";
-const shelfItemsStorageKey = "librito-shelf-items-v1";
+const legacyShelfItemsStorageKey = "librito-shelf-items-v1";
 const bookMetaKey = "librito-book-meta-v1";
 let bookMetaStore = null;
 const bookMetaPending = new Map();
@@ -76,7 +77,7 @@ const defaultBooks = [
     author: "Matt Haig",
     genre: "Fiction",
     isbn: "9780525559474",
-    shelf: "New Arrivals",
+    shelves: ["New Arrivals"],
     cost: 18.99,
     added: "2026-07-11",
     notes: "A warm, reflective pick for rainy evenings.",
@@ -87,7 +88,7 @@ const defaultBooks = [
     author: "Susanna Clarke",
     genre: "Fiction",
     isbn: "9781635575637",
-    shelf: "New Arrivals",
+    shelves: ["New Arrivals"],
     cost: 14.5,
     added: "2026-07-08",
     notes: "Dreamlike architecture and lingering wonder.",
@@ -98,7 +99,7 @@ const defaultBooks = [
     author: "Robin Wall Kimmerer",
     genre: "Nonfiction",
     isbn: "9781579654672",
-    shelf: "New Arrivals",
+    shelves: ["New Arrivals"],
     cost: 22.0,
     added: "2026-06-27",
     notes: "A grounding gift for slow afternoons.",
@@ -109,7 +110,7 @@ const defaultBooks = [
     author: "Tan Twan Eng",
     genre: "Fiction",
     isbn: "9780593540465",
-    shelf: "Cozy Recs",
+    shelves: ["Cozy Recs"],
     cost: 24.0,
     added: "2026-06-24",
     notes: "Atmospheric and lush for slower evenings.",
@@ -120,7 +121,7 @@ const defaultBooks = [
     author: "Fredrik Backman",
     genre: "Fiction",
     isbn: "9781501160837",
-    shelf: "Cozy Recs",
+    shelves: ["Cozy Recs"],
     cost: 16.5,
     added: "2026-06-21",
     notes: "Witty, warm, and quietly comforting.",
@@ -131,7 +132,7 @@ const defaultBooks = [
     author: "Michelle Obama",
     genre: "Nonfiction",
     isbn: "9780593237465",
-    shelf: "Cozy Recs",
+    shelves: ["Cozy Recs"],
     cost: 20.0,
     added: "2026-06-14",
     notes: "Thoughtful notes for reflective mornings.",
@@ -142,7 +143,7 @@ const defaultBooks = [
     author: "Tara Westover",
     genre: "Nonfiction",
     isbn: "9780399590504",
-    shelf: "Staff Picks",
+    shelves: ["Staff Picks"],
     cost: 19.75,
     added: "2026-06-11",
     notes: "A memoir that lingers long after the final page.",
@@ -153,7 +154,7 @@ const defaultBooks = [
     author: "Gabrielle Zevin",
     genre: "Fiction",
     isbn: "9780593321201",
-    shelf: "Staff Picks",
+    shelves: ["Staff Picks"],
     cost: 18.25,
     added: "2026-06-05",
     notes: "A crowd favorite for story lovers.",
@@ -164,7 +165,7 @@ const defaultBooks = [
     author: "Brit Bennett",
     genre: "Fiction",
     isbn: "9780525536291",
-    shelf: "Staff Picks",
+    shelves: ["Staff Picks"],
     cost: 17.5,
     added: "2026-05-28",
     notes: "A beautifully layered novel for book club.",
@@ -185,21 +186,12 @@ function getAccountTier() {
   return ACCOUNT_TIERS[state.profile?.tier] || ACCOUNT_TIERS.lite_reader;
 }
 
-// The Wishlist shelf doesn't count toward the shelf limit.
 function countLimitedShelves() {
-  return state.shelves.filter((shelf) => !shelf.is_wishlist).length;
+  return getCustomShelves().length;
 }
 
-// Wishlist is built in: every user always has it, and it can't be renamed, deleted or recreated.
 function isReservedShelfName(name) {
-  return name.trim().toLowerCase() === "wishlist";
-}
-
-function withWishlistShelf(shelves) {
-  const list = Array.isArray(shelves) ? shelves : [];
-  const wishlist = list.find((shelf) => shelf.is_wishlist)
-    || { id: "local:wishlist", name: "Wishlist", color: "#b64d2c", is_wishlist: true };
-  return [wishlist, ...list.filter((shelf) => shelf !== wishlist && !isReservedShelfName(shelf.name))];
+  return RESERVED_CUSTOM_SHELF_NAMES.has(String(name || "").trim().toLowerCase());
 }
 
 function checkShelfLimit(name) {
@@ -212,9 +204,13 @@ function checkShelfLimit(name) {
 
 function checkReadingLimit(book) {
   const tier = getAccountTier();
-  const reading = state.books.filter((item) => item.reading_status === "reading" && !item.disposition && item !== book).length;
+  const reading = state.books.filter((item) => item.reading_status === "reading" && item !== book).length;
   if (reading < tier.maxReading) return true;
-  showToast(`${tier.name} accounts can have up to ${tier.maxReading} books in Currently Reading. Book Lover upgrades are coming soon.`);
+  showToast(t("status.reading_limit", {
+    tier: tier.name,
+    max: tier.maxReading,
+    status: getReadingStatusLabel("reading"),
+  }));
   navigateTo("upgrade");
   return false;
 }
@@ -230,7 +226,6 @@ function checkBookLimit() {
 const state = {
   books: [],
   shelves: [],
-  shelfItems: [],
   session: null,
   profile: null,
   supabase: null,
@@ -254,7 +249,7 @@ const state = {
   catalogLoading: false,
   catalogError: "",
   recommendationPool: [],
-  library: { query: "" },
+  library: { query: "", filter: "" },
   shelfSort: { key: "added", direction: "desc" },
 };
 
@@ -327,10 +322,6 @@ const closeBookProfileBtn = document.getElementById("closeBookProfileBtn");
 const bookProfileContent = document.getElementById("bookProfileContent");
 let cameraStream = null;
 let barcodeLoopTimer = null;
-let readingCoverCycleTimer = null;
-let readingCoverCycleBooks = [];
-let readingCoverCycleIndex = 0;
-let readingCoverCycleKey = "";
 let recommendationRotationTimer = null;
 let lastRecommendationScrollAt = 0;
 const allGenres = [
@@ -430,7 +421,7 @@ function restoreRouteFromLocation() {
       showShelvesPage();
       break;
     case "/library":
-      showLibraryPage();
+      showLibraryPage(params.get("filter") || "");
       break;
     case "/shelf":
       showShelfPage(params.get("name") || "");
@@ -480,12 +471,48 @@ function loadBooks() {
   try {
     const saved = localStorage.getItem(storageKey);
     if (saved) {
-      return JSON.parse(saved).map((book) => ({ ...defaultBookMetadata[book.title], ...book }));
+      return JSON.parse(saved).map(normalizeLocalBook);
     }
   } catch (error) {
     console.warn("Could not read saved library", error);
   }
-  return defaultBooks;
+  return defaultBooks.map(normalizeLocalBook);
+}
+
+function normalizeLocalBook(book) {
+  const { shelf, shelves, liked, disposition, ...fields } = book;
+  const legacyFieldsPresent = ["shelf", "liked", "disposition"].some((key) => Object.hasOwn(book, key));
+  const legacyShelfNames = [...new Set([
+    ...(Array.isArray(shelves) ? shelves : []),
+    ...(shelf ? [shelf] : []),
+  ].filter(Boolean))];
+  const oldDisposition = disposition === "sold" || disposition === "donated" ? disposition : null;
+  return {
+    ...defaultBookMetadata[book.title],
+    ...fields,
+    reading_status: book.reading_status === "completed" ? "read" : book.reading_status || null,
+    ownership_status: oldDisposition || book.ownership_status || null,
+    is_favorite: Boolean(book.is_favorite ?? liked),
+    owned_format: book.owned_format || null,
+    shelves: [],
+    legacy_shelf_names: legacyShelfNames,
+    legacy_fields_present: legacyFieldsPresent,
+  };
+}
+
+function getLegacyShelfKind(name) {
+  const normalized = String(name || "").trim().toLowerCase();
+  if (["liked", "liked books"].includes(normalized)) return "favorite";
+  if (normalized === "wishlist") return "wishlist";
+  if (["currently reading", "reading"].includes(normalized)) return "reading";
+  if (["completed books", "read"].includes(normalized)) return "read";
+  if (["want to read", "next to read"].includes(normalized)) return "next_read";
+  if (["did not finish", "dnf"].includes(normalized)) return "dnf";
+  return "";
+}
+
+function isLegacySystemShelf(shelf) {
+  return Boolean(shelf?.is_wishlist) || Boolean(getLegacyShelfKind(shelf?.name));
 }
 
 function loadLocalShelves() {
@@ -493,19 +520,124 @@ function loadLocalShelves() {
     const saved = localStorage.getItem(shelvesStorageKey);
     if (saved) {
       const shelves = JSON.parse(saved);
-      if (Array.isArray(shelves)) return withWishlistShelf(shelves);
+      if (Array.isArray(shelves)) {
+        migrateLegacyLocalShelfData(shelves);
+        const customShelves = shelves.filter((shelf) => !isLegacySystemShelf(shelf));
+        if (customShelves.length !== shelves.length) {
+          localStorage.setItem(shelvesStorageKey, JSON.stringify(customShelves));
+        }
+        return customShelves;
+      }
       throw new TypeError("Saved shelves must be an array.");
     }
   } catch (error) {
     console.warn("Could not read saved shelves", error);
   }
-  return withWishlistShelf([...new Set(state.books.flatMap((book) => getBookShelfNames(book)))]
-    .map((name) => ({ id: `local:${name}`, name, color: "#8b5e3c" })));
+  const shelves = [...new Set(state.books.flatMap((book) => book.legacy_shelf_names || []))]
+    .filter((name) => !getLegacyShelfKind(name))
+    .map((name) => ({ id: `local:${name}`, name, color: "#8b5e3c" }));
+  migrateLegacyLocalShelfData(shelves);
+  return shelves;
+}
+
+function migrateLegacyLocalShelfData(shelves) {
+  let changed = false;
+  const legacyStatusesByBook = new Map();
+  const customShelfByName = new Map(shelves
+    .filter((shelf) => !isLegacySystemShelf(shelf))
+    .map((shelf) => [shelf.name, shelf]));
+  state.books.forEach((book) => {
+    const names = book.legacy_shelf_names || [];
+    const legacyNames = names.filter((name) => getLegacyShelfKind(name));
+    const statusPriority = ["reading", "read", "next_read", "dnf"];
+    const legacyStatuses = legacyNames.map(getLegacyShelfKind).filter((value) => statusPriority.includes(value));
+    if (legacyStatuses.length) {
+      const key = getBookKey(book);
+      const statuses = legacyStatusesByBook.get(key) || new Set();
+      legacyStatuses.forEach((status) => statuses.add(status));
+      legacyStatusesByBook.set(key, statuses);
+    }
+    if (legacyNames.some((name) => getLegacyShelfKind(name) === "favorite")) book.is_favorite = true;
+    if (!book.ownership_status && legacyNames.some((name) => getLegacyShelfKind(name) === "wishlist")) {
+      book.ownership_status = "wishlist";
+    }
+    book.shelves = [...new Set(names.filter((name) => customShelfByName.has(name)))];
+    delete book.legacy_shelf_names;
+    if (book.legacy_fields_present || legacyNames.length) changed = true;
+    delete book.legacy_fields_present;
+  });
+
+  let legacyItems = [];
+  try {
+    const savedItems = localStorage.getItem(legacyShelfItemsStorageKey);
+    if (savedItems) {
+      legacyItems = JSON.parse(savedItems);
+      if (!Array.isArray(legacyItems)) throw new TypeError("Saved shelf items must be an array.");
+    }
+  } catch (error) {
+    console.warn("Could not migrate saved shelf items", error);
+    return;
+  }
+
+  const itemStatusesByBook = new Map();
+  legacyItems.forEach((item) => {
+    const shelf = shelves.find((entry) => entry.id === item.shelf_id);
+    if (!shelf) {
+      console.warn("Could not migrate a local shelf item because its shelf no longer exists.", item);
+      let book = findOwnedBook(item);
+      if (!book) {
+        book = makeLibraryBook(item);
+        book.added = item.added_at || book.added;
+        state.books.push(book);
+      }
+      changed = true;
+      return;
+    }
+    let book = findOwnedBook(item);
+    if (!book) {
+      book = makeLibraryBook(item);
+      book.added = item.added_at || book.added;
+      state.books.push(book);
+    }
+    if (isLegacySystemShelf(shelf)) {
+      const kind = getLegacyShelfKind(shelf.name) || (shelf.is_wishlist ? "wishlist" : "");
+      if (kind === "favorite") book.is_favorite = true;
+      else if (kind === "wishlist" && !book.ownership_status) book.ownership_status = "wishlist";
+      else if (["reading", "read", "next_read", "dnf"].includes(kind)) {
+        const key = getBookKey(book);
+        const statuses = legacyStatusesByBook.get(key) || new Set();
+        statuses.add(kind);
+        legacyStatusesByBook.set(key, statuses);
+      }
+    } else {
+      book.shelves ||= [];
+      if (!book.shelves.includes(shelf.name)) book.shelves.push(shelf.name);
+    }
+    changed = true;
+  });
+  legacyStatusesByBook.forEach((statuses, key) => {
+    const book = state.books.find((item) => getBookKey(item) === key);
+    if (!book || book.reading_status) return;
+    const priority = ["reading", "read", "next_read", "dnf"];
+    const selected = priority.find((status) => statuses.has(status));
+    if (statuses.size > 1) {
+      console.warn("Conflicting legacy reading shelves; applied status priority.", {
+        title: book.title,
+        statuses: [...statuses],
+        selected,
+      });
+    }
+    if (selected) book.reading_status = selected;
+  });
+  if (!changed && !legacyItems.length) return;
+  localStorage.setItem(storageKey, JSON.stringify(state.books));
+  localStorage.setItem(shelvesStorageKey, JSON.stringify(shelves.filter((shelf) => !isLegacySystemShelf(shelf))));
+  localStorage.removeItem(legacyShelfItemsStorageKey);
 }
 
 function getLibraryBooks() {
   const meta = readBookMeta();
-  return state.books.filter((book) => !book.disposition).map((book) => {
+  return state.books.map((book) => {
     applyBookMeta(book, meta[getBookKey(book)]);
     return book;
   });
@@ -516,26 +648,12 @@ function saveBooks() {
   render();
 }
 
-async function toggleBookLike(book) {
-  const current = state.books.find((item) => getBookKey(item) === getBookKey(book));
-  if (!current) {
-    showToast("Only books in your library can be liked.");
-    return;
-  }
-  const nextLiked = !current.liked;
-  if (state.supabase && state.session) {
-    const query = state.supabase.from("liked_books");
-    const result = nextLiked
-      ? await query.insert({ user_id: state.session.user.id, book_id: current.id })
-      : await query.delete().eq("user_id", state.session.user.id).eq("book_id", current.id);
-    if (result.error) {
-      console.error(result.error);
-      showToast("Could not update liked books. Run the latest Supabase schema first.");
-      return;
-    }
-  }
-  current.liked = nextLiked;
-  if (!state.session) localStorage.setItem(storageKey, JSON.stringify(state.books));
+async function toggleBookFavorite(book) {
+  const existing = findOwnedBook(book);
+  const nextFavorite = !Boolean(existing?.is_favorite);
+  const current = existing || await ensureBookInLibrary(book, { is_favorite: nextFavorite });
+  if (!current) return;
+  if (existing && !await updateBookFields(current, { is_favorite: nextFavorite })) return;
   render();
 }
 
@@ -566,9 +684,8 @@ async function runBookSchemaRetry(operation, payload) {
 
 async function updateBookFields(book, fields) {
   const updatedFields = { ...fields };
-  const willBeReading = (updatedFields.reading_status ?? book.reading_status) === "reading"
-    && !(updatedFields.disposition ?? book.disposition);
-  const isReading = book.reading_status === "reading" && !book.disposition;
+  const willBeReading = (updatedFields.reading_status ?? book.reading_status) === "reading";
+  const isReading = book.reading_status === "reading";
   if (willBeReading && !isReading && !checkReadingLimit(book)) return false;
   if (("current_page" in updatedFields || "page_count" in updatedFields || "reading_status" in updatedFields)
     && !("edition_progress" in updatedFields)) {
@@ -588,13 +705,17 @@ async function updateBookFields(book, fields) {
     }
   }
   if (state.supabase && state.session) {
-    const result = await runBookSchemaRetry(async (candidate) => {
+    const update = async (candidate) => {
       const { error } = await state.supabase.from("books")
         .update(candidate)
         .eq("id", book.id)
         .eq("user_id", state.session.user.id);
       return { error };
-    }, updatedFields);
+    };
+    const statusFields = ["reading_status", "ownership_status", "is_favorite", "owned_format"];
+    const result = statusFields.some((field) => field in updatedFields)
+      ? await update(updatedFields)
+      : await runBookSchemaRetry(update, updatedFields);
 
     if (result.error) {
       console.error(result.error);
@@ -607,45 +728,166 @@ async function updateBookFields(book, fields) {
   return true;
 }
 
-async function setReadingStatus(book, status) {
-  const updated = await updateBookFields(book, { reading_status: status });
-  if (!updated) return;
-  render();
-  showToast(status === "reading" ? "Added to Currently Reading" : "Removed from Currently Reading");
-}
-
-async function markBookAsRead(book) {
-  const pageCount = Number(book.page_count || book.pages);
-  const fields = { reading_status: "completed" };
-  if (Number.isInteger(pageCount) && pageCount > 0) fields.current_page = pageCount;
-  const updated = await updateBookFields(book, fields);
-  if (!updated) return;
-  render();
-  showToast("Marked as complete");
-}
-
-async function readBookAgain(book) {
-  const updated = await updateBookFields(book, {
-    reading_status: "reading",
+function makeLibraryBook(book, fields = {}) {
+  const record = normalizeBookRecord(book);
+  return {
+    id: crypto.randomUUID(),
+    ...record,
+    reading_status: null,
+    ownership_status: null,
+    is_favorite: false,
+    owned_format: null,
     current_page: 0,
-    disposition: null,
-  });
-  if (!updated) return;
-  render();
-  showToast("Moved to Currently Reading");
+    edition_progress: {},
+    bookmarked_at: null,
+    cost: 0,
+    added: new Date().toISOString().slice(0, 10),
+    notes: "",
+    shelves: [],
+    ...fields,
+  };
 }
 
-async function setBookDisposition(book, disposition) {
-  const action = disposition === "sold" ? "sold" : "donated";
-  const confirmed = await showAppConfirm(
-    `Mark “${book.title}” as ${action}? It will stay in Completed Books and be hidden from your active library.`,
-    { title: `Mark book as ${action}`, confirmLabel: `Mark as ${action}` }
-  );
-  if (!confirmed) return;
-  const updated = await updateBookFields(book, { disposition });
-  if (!updated) return;
+async function ensureBookInLibrary(book, initialFields = {}) {
+  const existing = findOwnedBook(book);
+  if (existing) return existing;
+  if (!checkBookLimit()) return null;
+  const record = makeLibraryBook(book, initialFields);
+  if (record.reading_status === "reading" && !checkReadingLimit(record)) return null;
+
+  if (state.session && !state.supabase) {
+    showToast("Your account connection is unavailable. The book was not saved; try again.");
+    return null;
+  }
+  if (state.supabase && state.session) {
+    const payload = {
+      id: record.id,
+      title: record.title,
+      author: record.author || null,
+      isbn: record.isbn || null,
+      genre: record.genre || null,
+      cover_url: record.cover_url || null,
+      page_count: record.page_count || null,
+      reading_status: record.reading_status,
+      ownership_status: record.ownership_status,
+      is_favorite: record.is_favorite,
+      owned_format: record.owned_format,
+      current_page: record.current_page,
+      edition_progress: record.edition_progress,
+      user_id: state.session.user.id,
+    };
+    const { data, error } = await state.supabase.from("books")
+      .insert(payload)
+      .select("id")
+      .single();
+    if (error || !data) {
+      console.error(error || new Error("Supabase did not confirm the library entry."));
+      showToast(getSchemaUpgradeMessage(error) || error?.message || "Could not add this book to your library.");
+      return null;
+    }
+    record.id = data.id;
+  } else {
+    localStorage.setItem(storageKey, JSON.stringify([...state.books, record]));
+  }
+  state.books = [...state.books, record];
+  return record;
+}
+
+async function setReadingStatus(book, status) {
+  const existing = findOwnedBook(book);
+  const fields = { reading_status: status || null };
+  if (status === "reading" && existing?.reading_status !== "reading") fields.current_page = 0;
+  const pageCount = Number(existing?.page_count || book.page_count || book.pages);
+  if (status === "read" && Number.isInteger(pageCount) && pageCount > 0) {
+    fields.current_page = pageCount;
+  }
+  const target = existing || await ensureBookInLibrary(book, fields);
+  if (!target) return;
+  if (existing && !await updateBookFields(target, fields)) return;
   render();
-  showToast(`Marked as ${action}`);
+  if (status) {
+    showToast(status === "read"
+      ? t("status.marked_as_read")
+      : t("status.set", { status: getReadingStatusLabel(status) }));
+  } else showToast(t("status.removed"));
+}
+
+const READING_STATUS_LABELS = {
+  next_read: t("status.next_read"),
+  reading: t("status.reading"),
+  read: t("status.read"),
+  dnf: t("status.dnf"),
+};
+
+const OWNERSHIP_STATUS_LABELS = {
+  wishlist: t("ownership.wishlist"),
+  owned: t("ownership.owned"),
+  sold: t("ownership.sold"),
+  donated: t("ownership.donated"),
+};
+
+const RESERVED_CUSTOM_SHELF_NAMES = new Set([
+  "library",
+  "liked",
+  "liked books",
+  "wishlist",
+  "favorites",
+  "owned",
+  "sold",
+  "donated",
+  "completed books",
+  ...Object.values(READING_STATUS_LABELS).map((label) => label.toLowerCase()),
+]);
+
+function getReadingStatusLabel(status) {
+  return READING_STATUS_LABELS[status] || "";
+}
+
+function getOwnershipStatusLabel(status) {
+  return OWNERSHIP_STATUS_LABELS[status] || "";
+}
+
+async function setOwnershipStatus(book, status) {
+  const existing = findOwnedBook(book);
+  const fields = { ownership_status: status || null };
+  if (status !== "owned") fields.owned_format = null;
+  const target = existing || await ensureBookInLibrary(book, fields);
+  if (!target) return;
+  if (existing && !await updateBookFields(target, fields)) return;
+  render();
+  showToast(status ? `Ownership status set to ${getOwnershipStatusLabel(status)}` : "Ownership status removed");
+}
+
+async function setOwnedFormat(book, format) {
+  const target = findOwnedBook(book);
+  if (!target) return;
+  if (!await updateBookFields(target, { owned_format: format || null })) return;
+  render();
+}
+
+async function shareBook(book) {
+  const link = new URL(createRouteHash("book", {
+    id: book.id || "",
+    title: book.title || "",
+    author: book.author || "",
+    genre: book.genre || "",
+    isbn: Array.isArray(book.isbn) ? book.isbn[0] || "" : book.isbn || "",
+    cover_url: book.cover_url || "",
+  }), window.location.origin).href;
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: book.title || "Book", text: book.author || "", url: link });
+    } else if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(link);
+      showToast("Book link copied");
+    } else {
+      showToast("Sharing is unavailable in this browser.");
+    }
+  } catch (error) {
+    if (error?.name === "AbortError") return;
+    console.error(error);
+    showToast("Could not share this book.");
+  }
 }
 
 async function saveCurrentPage(book, currentPage) {
@@ -685,7 +927,7 @@ async function setBookBookmark(book) {
 }
 
 async function addBookToShelf(book, shelf) {
-  if (!shelf?.id) {
+  if (!shelf?.id || !getCustomShelves().some((item) => item.id === shelf.id)) {
     showToast("Choose a valid shelf.");
     return;
   }
@@ -711,7 +953,6 @@ async function addBookToShelf(book, shelf) {
     }
   }
   book.shelves = [...names, shelf.name];
-  book.shelf ||= shelf.name;
   if (state.session) render();
   else saveBooks();
   if (state.view === "shelf") showShelfPage(state.currentShelf);
@@ -720,11 +961,7 @@ async function addBookToShelf(book, shelf) {
 }
 
 async function removeBookFromShelf(book, shelfName) {
-  if (shelfName === "Library") {
-    await removeBookFromLibrary(book);
-    return;
-  }
-  const shelf = state.shelves.find((item) => item.name === shelfName);
+  const shelf = getCustomShelves().find((item) => item.name === shelfName);
   if (!shelf) {
     showToast("This book is not on a managed shelf.");
     return;
@@ -740,20 +977,8 @@ async function removeBookFromShelf(book, shelfName) {
       showToast("Could not remove book from shelf. Run the latest Supabase schema first.");
       return;
     }
-    if (book.shelf === shelfName && state.supabase) {
-      const { error: updateError } = await state.supabase.from("books")
-        .update({ shelf: null })
-        .eq("id", book.id)
-        .eq("user_id", state.session.user.id);
-      if (updateError) {
-        console.error(updateError);
-        showToast("Removed from shelf, but could not update the legacy shelf field.");
-        return;
-      }
-    }
   }
   book.shelves = getBookShelfNames(book).filter((name) => name !== shelfName);
-  if (book.shelf === shelfName) book.shelf = book.shelves[0] || "";
   if (!state.session) localStorage.setItem(storageKey, JSON.stringify(state.books));
   render();
   if (state.view === "shelf") showShelfPage(state.currentShelf);
@@ -788,8 +1013,8 @@ async function removeBookFromLibrary(book) {
 async function renameShelf(shelf, name) {
   name = name.trim();
   if (!name
-    || shelf.is_wishlist
-    || ["currently reading", "completed books", "wishlist"].includes(name.toLowerCase())
+    || !getCustomShelves().some((item) => item.id === shelf.id)
+    || isReservedShelfName(name)
     || state.shelves.some((item) => item.id !== shelf.id && item.name.toLowerCase() === name.toLowerCase())) {
     throw new Error("Choose a unique shelf name. Built-in shelf names are reserved.");
   }
@@ -811,7 +1036,6 @@ async function renameShelf(shelf, name) {
   shelf.name = name;
   state.books.forEach((book) => {
     book.shelves = getBookShelfNames(book).map((item) => item === oldName ? name : item);
-    if (book.shelf === oldName) book.shelf = name;
   });
   if (!state.session) {
     localStorage.setItem(shelvesStorageKey, JSON.stringify(state.shelves));
@@ -823,7 +1047,9 @@ async function renameShelf(shelf, name) {
 }
 
 async function deleteShelf(shelf) {
-  if (shelf.is_wishlist) throw new Error("The built-in Wishlist cannot be deleted.");
+  if (!getCustomShelves().some((item) => item.id === shelf.id)) {
+    throw new Error("Only custom shelves can be deleted.");
+  }
   if (state.session && !state.supabase) throw new Error("Your account connection is unavailable. Try again.");
   if (state.supabase && state.session) {
     const { error } = await state.supabase.from("shelves")
@@ -838,11 +1064,8 @@ async function deleteShelf(shelf) {
     }
   }
   state.shelves = state.shelves.filter((item) => item.id !== shelf.id);
-  state.shelfItems = state.shelfItems.filter((item) => item.shelf_id !== shelf.id);
-  saveShelfItemsLocally();
   state.books.forEach((book) => {
     book.shelves = getBookShelfNames(book).filter((name) => name !== shelf.name);
-    if (book.shelf === shelf.name) book.shelf = book.shelves[0] || "";
   });
   if (!state.session) {
     localStorage.setItem(shelvesStorageKey, JSON.stringify(state.shelves));
@@ -1086,61 +1309,84 @@ function renderStats() {
 
   document.getElementById("totalBooks").textContent = totalBooks;
   document.getElementById("totalSpent").textContent = formatCurrency(totalSpent);
-  document.getElementById("shelvesCount").textContent = `${state.shelves.length} shelves`;
+  document.getElementById("shelvesCount").textContent = `${getCustomShelves().length} custom shelves`;
 }
 
 function renderShelves() {
   const shelfList = document.getElementById("shelfList");
   const libraryBooks = getLibraryBooks();
-  const shelfCounts = libraryBooks.reduce((acc, book) => {
-    const shelfName = book.shelf || "Library";
-    acc[shelfName] = (acc[shelfName] || 0) + 1;
-    return acc;
-  }, {});
-  const shelvesToRender = state.shelves.length
-    ? state.shelves.map((shelf) => ({
-        name: shelf.name,
-        color: shelf.color || "#8b5e3c",
-        books: getAllBooksOnShelf(shelf.name),
-      }))
-    : Object.entries(shelfCounts).map(([name]) => ({
-        name,
-        color: "#8b5e3c",
-        books: libraryBooks.filter((book) => (book.shelf || "Library") === name),
-      }));
+  const libraryCount = document.getElementById("libraryCount");
+  if (libraryCount) libraryCount.textContent = String(libraryBooks.length);
+  const shelvesToRender = getCustomShelves().map((shelf) => ({
+    ...shelf,
+    color: shelf.color || "#8b5e3c",
+    books: getAllBooksOnShelf(shelf.name),
+  }));
 
   shelfList.replaceChildren();
-  const likedBooks = libraryBooks.filter((book) => book.liked);
-  const currentlyReadingBooks = libraryBooks.filter((book) => book.reading_status === "reading");
-  shelfList.append(createShelfNavigationItem("Liked Books", String(likedBooks.length), "liked", likedBooks));
-  shelfList.append(createShelfNavigationItem(
-    "Currently Reading",
-    String(currentlyReadingBooks.length),
-    "#496c5d",
-    currentlyReadingBooks
-  ));
-  startReadingCoverCycle(currentlyReadingBooks);
-  const completedBooks = state.books.filter((book) => book.reading_status === "completed");
-  shelfList.append(createShelfNavigationItem(
-    "Completed Books",
-    String(completedBooks.length),
-    "#8b5e3c",
-    completedBooks
-  ));
   shelvesToRender.forEach((shelf) => {
     shelfList.append(createShelfNavigationItem(shelf.name, String(shelf.books.length), shelf.color, shelf.books));
   });
-  if (!shelvesToRender.length && libraryBooks.length === 0) {
+  if (!shelvesToRender.length) {
     const empty = document.createElement("p");
     empty.className = "sidebar-empty";
-    empty.textContent = "Your shelves will appear here.";
+    empty.textContent = "Create a shelf to organize your books.";
     shelfList.append(empty);
+  }
+
+  const filterList = document.getElementById("libraryFilterList");
+  if (filterList) {
+    filterList.replaceChildren();
+    getLibraryFilterOptions(libraryBooks).filter(({ key }) => key !== "").forEach((filter) => {
+      filterList.append(createLibraryFilterButton(filter));
+    });
   }
 }
 
 function getBookShelfNames(book) {
-  if (Array.isArray(book.shelves) && book.shelves.length) return book.shelves;
-  return book.shelf ? [book.shelf] : [];
+  return Array.isArray(book.shelves) ? book.shelves : [];
+}
+
+function getCustomShelves() {
+  return state.shelves.filter((shelf) => !isLegacySystemShelf(shelf));
+}
+
+function getLibraryFilterOptions(books = getLibraryBooks()) {
+  return [
+    { key: "", label: "All books", count: books.length },
+    { key: "next_read", label: getReadingStatusLabel("next_read"), count: books.filter((book) => book.reading_status === "next_read").length },
+    { key: "reading", label: getReadingStatusLabel("reading"), count: books.filter((book) => book.reading_status === "reading").length },
+    { key: "read", label: getReadingStatusLabel("read"), count: books.filter((book) => book.reading_status === "read").length },
+    { key: "dnf", label: getReadingStatusLabel("dnf"), count: books.filter((book) => book.reading_status === "dnf").length },
+    { key: "favorites", label: t("favorites.label"), count: books.filter((book) => Boolean(book.is_favorite)).length },
+    { key: "owned", label: getOwnershipStatusLabel("owned"), count: books.filter((book) => book.ownership_status === "owned").length },
+  ];
+}
+
+function createLibraryFilterButton(filter, { category = false } = {}) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = category ? "browse-chip" : "nav-pill library-filter-button";
+  button.dataset.libraryFilter = filter.key;
+  button.dataset.navLabel = filter.label;
+  button.setAttribute("aria-label", `${filter.label}, ${filter.count} books`);
+  button.classList.toggle("active", state.view === "library" && state.library.filter === filter.key);
+  if (!category) {
+    const label = document.createElement("span");
+    label.textContent = filter.label;
+    const count = document.createElement("span");
+    count.className = "library-filter-count";
+    count.textContent = filter.count;
+    count.setAttribute("aria-hidden", "true");
+    button.append(label, count);
+  } else {
+    button.textContent = `${filter.label} · ${filter.count}`;
+  }
+  button.addEventListener("click", () => {
+    if (!category && window.matchMedia("(max-width: 899px)").matches) setLibraryDrawerOpen(false);
+    navigateTo("library", { filter: filter.key });
+  });
+  return button;
 }
 
 function setLibraryDrawerOpen(open) {
@@ -1174,10 +1420,6 @@ function createShelfNavigationItem(name, count, color, books = []) {
       initial: books[Math.min(coverCycleIndex.get(`shelf:${name}`) || 0, books.length - 1) % books.length] || book,
       interval: 12000,
     });
-  } else if (color === "liked") {
-    thumbnail.classList.add("liked-thumbnail");
-    thumbnail.textContent = "♥";
-    thumbnail.setAttribute("aria-hidden", "true");
   } else {
     thumbnail.style.backgroundColor = color;
     thumbnail.textContent = name.slice(0, 1).toUpperCase();
@@ -1189,7 +1431,7 @@ function createShelfNavigationItem(name, count, color, books = []) {
   const title = document.createElement("strong");
   title.textContent = name;
   const subtitle = document.createElement("span");
-  subtitle.textContent = `${name === "Liked Books" ? "Collection" : "Shelf"} · ${count} books`;
+  subtitle.textContent = `Shelf · ${count} books`;
   const itemCount = document.createElement("span");
   itemCount.className = "shelf-item-count";
   itemCount.textContent = count;
@@ -1199,59 +1441,14 @@ function createShelfNavigationItem(name, count, color, books = []) {
   return item;
 }
 
-function startReadingCoverCycle(books) {
-  const cycleKey = books.map((book) => book.id || getBookKey(book)).join("|");
-  if (cycleKey === readingCoverCycleKey) {
-    updateReadingShelfCovers();
-    return;
-  }
-  readingCoverCycleKey = cycleKey;
-  window.clearInterval(readingCoverCycleTimer);
-  readingCoverCycleTimer = null;
-  readingCoverCycleBooks = books.slice();
-  for (let index = readingCoverCycleBooks.length - 1; index > 0; index -= 1) {
-    const randomIndex = Math.floor(Math.random() * (index + 1));
-    [readingCoverCycleBooks[index], readingCoverCycleBooks[randomIndex]] =
-      [readingCoverCycleBooks[randomIndex], readingCoverCycleBooks[index]];
-  }
-  readingCoverCycleIndex = 0;
-  updateReadingShelfCovers();
-  if (readingCoverCycleBooks.length > 1) {
-    readingCoverCycleTimer = window.setInterval(() => {
-      readingCoverCycleIndex = (readingCoverCycleIndex + 1) % readingCoverCycleBooks.length;
-      updateReadingShelfCovers();
-    }, 5000);
-  }
-}
-
-function updateReadingShelfCovers() {
-  const book = readingCoverCycleBooks[readingCoverCycleIndex];
-  if (!book) return;
-  document.querySelectorAll("[data-reading-shelf-cover]").forEach((cover) => {
-    cover.replaceChildren(createBookCover(book, "shelf-thumb-art"));
-  });
-  document.querySelectorAll("[data-reading-shelf-card-cover]").forEach((cover) => {
-    cover.replaceChildren(createBookCover(book));
-  });
-}
-
-function groupBooksByShelf(books) {
-  return books.slice().sort((a, b) => new Date(b.added || b.added_on || 0) - new Date(a.added || a.added_on || 0)).reduce((acc, book) => {
-    const shelfName = book.shelf || "Library";
-    if (!acc[shelfName]) acc[shelfName] = [];
-    acc[shelfName].push(book);
-    return acc;
-  }, {});
-}
-
 function renderShelfOptions() {
   const shelfSelect = bookForm.elements.shelf;
   const selectedShelf = shelfSelect.value;
   shelfSelect.replaceChildren(new Option("Library (no shelf)", ""));
-  state.shelves.forEach((shelf) => {
+  getCustomShelves().forEach((shelf) => {
     shelfSelect.add(new Option(shelf.name, shelf.name));
   });
-  shelfSelect.value = state.shelves.some((shelf) => shelf.name === selectedShelf) ? selectedShelf : "";
+  shelfSelect.value = getCustomShelves().some((shelf) => shelf.name === selectedShelf) ? selectedShelf : "";
 }
 
 function openBookProfile(book) {
@@ -1593,7 +1790,7 @@ function createCurrentlyReadingHomeSection(books, libraryBooks) {
   const heading = document.createElement("div");
   heading.className = "section-heading-row";
   const title = document.createElement("h2");
-  title.textContent = "Currently reading";
+  title.textContent = getReadingStatusLabel("reading");
   heading.append(title);
   if (state.loading) {
     section.append(heading, createBookLoader({ message: "Loading your reading list…", compact: true }));
@@ -1625,7 +1822,7 @@ function createCurrentlyReadingHomeSection(books, libraryBooks) {
   const empty = document.createElement("p");
   empty.className = "row-empty-state";
   empty.textContent = state.loadError
-    || "Ready to start a book? Choose one from your library to add to Currently Reading.";
+    || `Ready to start a book? Choose one from your library to set ${getReadingStatusLabel("reading")}.`;
   section.append(heading, empty);
 
   const booksToStart = libraryBooks.filter((book) => book.reading_status !== "reading");
@@ -1948,52 +2145,28 @@ function createBookCard(book, { compact = false, subtitle = "" } = {}) {
   open.addEventListener("click", () => openBookProfile(book));
   card.append(open);
   const ownedBook = getLibraryBooks().find((owned) => getBookKey(owned) === getBookKey(book));
-  const shelfNames = getAnyShelfNames(book);
+  const customShelfNames = new Set(getCustomShelves().map((shelf) => shelf.name));
+  const shelfNames = getAnyShelfNames(book).filter((name) => customShelfNames.has(name));
   if (ownedBook || shelfNames.length) {
     const tag = document.createElement("span");
     tag.className = `card-shelf-tag${shelfNames.length ? " is-on-shelf" : ""}`;
     tag.textContent = shelfNames.length ? `📚 ${shelfNames.join(", ")}` : "No shelf yet";
     open.append(tag);
   }
-  const likeMenu = document.createElement("details");
-  likeMenu.className = "card-like-menu";
-  const like = document.createElement("summary");
-  like.className = `card-like${ownedBook?.liked ? " is-liked" : ""}`;
-  like.textContent = ownedBook?.liked ? "♥" : "♡";
-  like.setAttribute("aria-label", `Like and wishlist options for ${book.title}`);
-  const likeActions = document.createElement("div");
-  likeActions.className = "card-menu-actions";
-  const toggleLike = document.createElement("button");
-  toggleLike.type = "button";
-  toggleLike.textContent = ownedBook?.liked ? "Unlike" : "Like";
-  toggleLike.addEventListener("click", () => {
-    likeMenu.open = false;
-    toggleBookLike(book);
-  });
-  const wishlist = state.shelves.find((shelf) => shelf.is_wishlist || shelf.name === "Wishlist");
-  const onWishlist = getAnyShelfNames(book).includes(wishlist?.name || "Wishlist");
-  const toggleWishlist = document.createElement("button");
-  toggleWishlist.type = "button";
-  toggleWishlist.textContent = onWishlist ? "Remove from Wishlist" : "Add to Wishlist";
-  toggleWishlist.addEventListener("click", () => {
-    likeMenu.open = false;
-    if (!wishlist) {
-      console.error("The built-in Wishlist shelf is unavailable.");
-      showToast("Could not find your Wishlist. Please reload and try again.");
-      return;
-    }
-    if (onWishlist) removeAnyBookFromShelf(book, wishlist.name);
-    else addAnyBookToShelf(book, wishlist);
-  });
-  likeActions.append(toggleLike, toggleWishlist);
-  likeMenu.append(like, likeActions);
-  wireCardPopover(likeMenu, like, likeActions);
-  card.append(likeMenu);
+  const isFavorite = Boolean(ownedBook?.is_favorite);
+  const like = document.createElement("button");
+  like.type = "button";
+  like.className = `card-like${isFavorite ? " is-liked" : ""}`;
+  like.textContent = isFavorite ? "♥" : "♡";
+  like.setAttribute("aria-label", `${isFavorite ? "Remove" : "Add"} ${t("favorite.label")} ${book.title ? `for ${book.title}` : ""}`.trim());
+  like.setAttribute("aria-pressed", String(isFavorite));
+  like.addEventListener("click", () => toggleBookFavorite(book));
+  card.append(like);
   card.append(createBookCardMenu(book, ownedBook));
   return card;
 }
 
-function normalizeShelfRecord(book) {
+function normalizeBookRecord(book) {
   const isbn = Array.isArray(book.isbn) ? book.isbn[0] || "" : book.isbn || "";
   return {
     title: book.title || "Untitled",
@@ -2006,114 +2179,23 @@ function normalizeShelfRecord(book) {
   };
 }
 
-function shelfKey(book) {
-  return getBookKey(normalizeShelfRecord(book));
+function bookIdentityKey(book) {
+  return getBookKey(normalizeBookRecord(book));
 }
 
 function findOwnedBook(book) {
   if (book.id && state.books.some((item) => item.id === book.id)) return state.books.find((item) => item.id === book.id);
-  const key = shelfKey(book);
+  const key = bookIdentityKey(book);
   return state.books.find((item) => getBookKey(item) === key);
-}
-
-function saveShelfItemsLocally() {
-  if (!state.session) localStorage.setItem(shelfItemsStorageKey, JSON.stringify(state.shelfItems));
-}
-
-function loadLocalShelfItems() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(shelfItemsStorageKey) || "[]");
-    return Array.isArray(saved) ? saved : [];
-  } catch (error) {
-    console.warn("Could not read saved shelf items", error);
-    return [];
-  }
-}
-
-function getShelfItemsFor(book) {
-  const key = shelfKey(book);
-  return state.shelfItems.filter((item) => item.book_key === key);
 }
 
 function getAnyShelfNames(book) {
   const owned = findOwnedBook(book);
-  const names = new Set(owned ? getBookShelfNames(owned) : []);
-  getShelfItemsFor(book).forEach((item) => {
-    const shelf = state.shelves.find((entry) => entry.id === item.shelf_id);
-    if (shelf) names.add(shelf.name);
-  });
-  return [...names];
-}
-
-function getShelfItemBooks(shelfName) {
-  const shelf = state.shelves.find((entry) => entry.name === shelfName);
-  if (!shelf) return [];
-  return state.shelfItems
-    .filter((item) => item.shelf_id === shelf.id)
-    .map((item) => findOwnedBook(item) || {
-      title: item.title,
-      author: item.author || "",
-      isbn: item.isbn || "",
-      genre: item.genre || "",
-      cover_url: item.cover_url || "",
-      page_count: item.page_count || null,
-    });
+  return owned ? getBookShelfNames(owned) : [];
 }
 
 function getAllBooksOnShelf(shelfName) {
-  const books = getLibraryBooks().filter((book) => getBookShelfNames(book).includes(shelfName));
-  const seen = new Set(books.map((book) => getBookKey(book)));
-  getShelfItemBooks(shelfName).forEach((book) => {
-    const key = getBookKey(book);
-    if (seen.has(key)) return;
-    seen.add(key);
-    books.push(book);
-  });
-  return books;
-}
-
-async function addShelfItem(book, shelf) {
-  const record = normalizeShelfRecord(book);
-  const key = getBookKey(record);
-  let item = { ...record, book_key: key, shelf_id: shelf.id };
-  if (state.supabase && state.session) {
-    const { data, error } = await state.supabase.from("shelf_items")
-      .insert({ ...item, user_id: state.session.user.id })
-      .select("*")
-      .single();
-    if (error) {
-      console.error(error);
-      showToast("Could not add this book to the shelf. Run the latest Supabase migration first.");
-      return false;
-    }
-    item = data;
-  } else {
-    item.id = `local:${crypto.randomUUID()}`;
-  }
-  state.shelfItems = [...state.shelfItems, item];
-  saveShelfItemsLocally();
-  render();
-  return true;
-}
-
-async function removeShelfItem(book, shelf) {
-  const matches = getShelfItemsFor(book).filter((item) => item.shelf_id === shelf.id);
-  if (!matches.length) return false;
-  if (state.supabase && state.session) {
-    const { error } = await state.supabase.from("shelf_items")
-      .delete()
-      .in("id", matches.map((item) => item.id))
-      .eq("user_id", state.session.user.id);
-    if (error) {
-      console.error(error);
-      showToast("Could not remove this book from the shelf.");
-      return null;
-    }
-  }
-  const ids = new Set(matches.map((item) => item.id));
-  state.shelfItems = state.shelfItems.filter((item) => !ids.has(item.id));
-  saveShelfItemsLocally();
-  return true;
+  return getLibraryBooks().filter((book) => getBookShelfNames(book).includes(shelfName));
 }
 
 async function addAnyBookToShelf(book, shelf) {
@@ -2121,26 +2203,17 @@ async function addAnyBookToShelf(book, shelf) {
     showToast(`Already on ${shelf.name}.`);
     return;
   }
-  const owned = findOwnedBook(book);
-  if (owned) {
-    await addBookToShelf(owned, shelf);
-    return;
-  }
-  if (await addShelfItem(book, shelf)) showToast(`“${book.title}” added to ${shelf.name} ✓`);
+  const owned = findOwnedBook(book) || await ensureBookInLibrary(book);
+  if (!owned) return;
+  await addBookToShelf(owned, shelf);
 }
 
 async function removeAnyBookFromShelf(book, shelfName) {
-  const shelf = state.shelves.find((item) => item.name === shelfName);
+  const shelf = getCustomShelves().find((item) => item.name === shelfName);
   if (!shelf) return;
   const owned = findOwnedBook(book);
-  const removedItem = await removeShelfItem(book, shelf);
-  if (removedItem === null) return;
-  if (owned && getBookShelfNames(owned).includes(shelfName)) {
-    await removeBookFromShelf(owned, shelfName);
-    return;
-  }
-  render();
-  showToast(`Removed from ${shelf.name}`);
+  if (!owned || !getBookShelfNames(owned).includes(shelfName)) return;
+  await removeBookFromShelf(owned, shelfName);
 }
 
 function promptAddToShelf(book) {
@@ -2169,7 +2242,7 @@ function promptAddToShelf(book) {
   const list = document.createElement("div");
   list.className = "shelf-picker-list";
   const current = getAnyShelfNames(book);
-  state.shelves.forEach((shelf) => {
+  getCustomShelves().forEach((shelf) => {
     const on = current.includes(shelf.name);
     const option = document.createElement("button");
     option.type = "button";
@@ -2211,25 +2284,6 @@ function promptAddToShelf(book) {
   (list.querySelector("button:not(:disabled)") || x).focus();
 }
 
-function markBookAsOwned(book) {
-  openDialog();
-  if (!state.session) return;
-  startManualEntry();
-  bookForm.elements.title.value = book.title || "";
-  bookForm.elements.author.value = Array.isArray(book.author_name)
-    ? book.author_name.join(", ")
-    : book.author || "";
-  bookForm.elements.isbn.value = Array.isArray(book.isbn)
-    ? book.isbn[0] || ""
-    : book.isbn || "";
-  bookForm.elements.cover_url.value = book.cover_url
-    || (book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-L.jpg?default=false` : "");
-  bookForm.elements.genre.value = book.genre || "";
-  bookForm.elements.page_count.value = String(book.page_count || book.pages || "");
-  bookForm.elements.added.value = new Date().toISOString().slice(0, 10);
-  if (!bookForm.elements.cost.value) bookForm.elements.cost.value = "0";
-}
-
 function createBookCardMenu(book, ownedBook) {
   const menu = document.createElement("details");
   menu.className = "card-menu";
@@ -2239,16 +2293,6 @@ function createBookCardMenu(book, ownedBook) {
   const actions = document.createElement("div");
   actions.className = "card-menu-actions";
   wireCardPopover(menu, summary, actions);
-  if (!ownedBook) {
-    const addToLibrary = document.createElement("button");
-    addToLibrary.type = "button";
-    addToLibrary.textContent = "Add to Library";
-    addToLibrary.addEventListener("click", () => {
-      menu.open = false;
-      markBookAsOwned(book);
-    });
-    actions.append(addToLibrary);
-  }
   const addToShelf = document.createElement("button");
   addToShelf.type = "button";
   addToShelf.textContent = getAnyShelfNames(book).length ? "Change shelves" : "Add to a shelf";
@@ -2282,9 +2326,17 @@ function createBookCardMenu(book, ownedBook) {
       openBookProfile(ownedBook);
     });
     actions.append(openBook);
+    const removeFromLibrary = document.createElement("button");
+    removeFromLibrary.type = "button";
+    removeFromLibrary.textContent = "Remove from library";
+    removeFromLibrary.addEventListener("click", () => {
+      menu.open = false;
+      removeBookFromLibrary(ownedBook);
+    });
+    actions.append(removeFromLibrary);
   }
   const isOnCurrentShelf = state.view === "shelf"
-    && state.shelves.some((shelf) => shelf.name === state.currentShelf)
+    && getCustomShelves().some((shelf) => shelf.name === state.currentShelf)
     && getAnyShelfNames(book).includes(state.currentShelf);
   if (isOnCurrentShelf) {
     const removeFromShelf = document.createElement("button");
@@ -2301,7 +2353,7 @@ function createBookCardMenu(book, ownedBook) {
 }
 
 function removeOrphanPopovers() {
-  document.querySelectorAll("body > .card-add-actions, body > .card-menu-actions").forEach((panel) => {
+  document.querySelectorAll("body > .card-add-actions, body > .card-menu-actions, body > .book-status-menu-panel").forEach((panel) => {
     if (!panel.popoverMenu?.isConnected || !panel.popoverMenu.open) panel.remove();
   });
 }
@@ -2339,7 +2391,7 @@ function wireCardPopover(menu, summary, panel) {
   menu.addEventListener("toggle", () => {
     menu.closest(".media-card")?.classList.toggle("card-menu-open", menu.open);
     if (menu.open) {
-      document.querySelectorAll(".card-like-menu[open], .card-menu[open], .book-shelf-menu[open]").forEach((otherMenu) => {
+      document.querySelectorAll(".card-like-menu[open], .card-menu[open], .book-shelf-menu[open], .book-status-menu[open]").forEach((otherMenu) => {
         if (otherMenu !== menu) otherMenu.open = false;
       });
       panel.hidden = false;
@@ -2368,10 +2420,7 @@ function createShelfCard(shelf, { compact = false } = {}) {
   const cover = document.createElement("span");
   cover.className = "shelf-card-art";
   cover.style.setProperty("--shelf-color", shelf.color);
-  if (name === "Currently Reading" && shelf.book) {
-    cover.dataset.readingShelfCardCover = "true";
-    cover.append(createBookCover(shelf.book));
-  } else if (isSuggestion && shelf.books?.length) {
+  if (isSuggestion && shelf.books?.length) {
     cover.classList.add("cover-cycle-host");
     startCoverCycle(cover, { key: `suggested-shelf:${shelf.key}`, getBooks: () => shelf.books });
   } else if (shelf.book) cover.append(createBookCover(shelf.book));
@@ -2393,7 +2442,6 @@ function createShelfCard(shelf, { compact = false } = {}) {
     else navigateTo("shelf", { name });
   });
   card.append(open);
-  if (cover.hasAttribute("data-reading-shelf-card-cover")) updateReadingShelfCovers();
   return card;
 }
 
@@ -2745,7 +2793,7 @@ function showPage(view) {
 
 function updateActiveNavigation(label) {
   const libraryNav = document.getElementById("libraryNavBtn");
-  const libraryActive = label.toLowerCase() === "your library";
+  const libraryActive = ["library", "your library"].includes(label.toLowerCase());
   if (libraryNav) {
     libraryNav.classList.toggle("active", libraryActive);
     if (libraryActive) libraryNav.setAttribute("aria-current", "page");
@@ -2753,7 +2801,15 @@ function updateActiveNavigation(label) {
   }
 
   document.querySelectorAll(".nav-pill").forEach((item) => {
-    const active = item.textContent.trim().toLowerCase() === label.toLowerCase();
+    const active = item.dataset.navLabel
+      ? item.dataset.navLabel.toLowerCase() === label.toLowerCase()
+      : item.textContent.trim().toLowerCase() === label.toLowerCase();
+    item.classList.toggle("active", active);
+    if (active) item.setAttribute("aria-current", "page");
+    else item.removeAttribute("aria-current");
+  });
+  document.querySelectorAll(".library-filter-button").forEach((item) => {
+    const active = libraryActive && item.dataset.libraryFilter === state.library.filter;
     item.classList.toggle("active", active);
     if (active) item.setAttribute("aria-current", "page");
     else item.removeAttribute("aria-current");
@@ -3276,35 +3332,23 @@ function showShelfPage(shelfName) {
   state.currentShelf = shelfName;
   updateActiveNavigation("Your shelves");
   const page = showPage("shelf");
-  const shelf = state.shelves.find((item) => item.name === shelfName);
-  const books = shelfName === "Completed Books"
-    ? state.books.filter((book) => book.reading_status === "completed")
-    : getLibraryBooks().filter((book) => shelfName === "Liked Books"
-      ? book.liked
-      : shelfName === "Currently Reading"
-        ? book.reading_status === "reading"
-        : shelfName === "Library"
-          ? getBookShelfNames(book).length === 0
-          : getBookShelfNames(book).includes(shelfName));
-  if (shelf) {
-    books.length = 0;
-    books.push(...getAllBooksOnShelf(shelfName));
-  }
+  const shelf = getCustomShelves().find((item) => item.name === shelfName);
+  const books = shelf ? getAllBooksOnShelf(shelfName) : [];
   const totalValue = books.reduce((total, book) => total + Number(book.cost || 0), 0);
-  const description = shelfName === "Currently Reading"
-    ? `${books.length} ${books.length === 1 ? "book" : "books"} in progress`
-    : `${books.length} books · ${formatCurrency(totalValue)} total value`;
-  const header = createPageHeader(shelf ? "Shelf" : "Shelf · Your library", shelfName, description);
+  const description = shelf
+    ? `${books.length} ${books.length === 1 ? "book" : "books"} · ${formatCurrency(totalValue)} total value`
+    : "This custom shelf is unavailable.";
+  const header = createPageHeader("My Shelves", shelf?.name || "Shelf not found", description);
 
   const toolbar = document.createElement("div");
   toolbar.className = "page-toolbar";
-  const addBook = document.createElement("button");
-  addBook.type = "button";
-  addBook.className = "action-btn";
-  addBook.textContent = "＋ Add a book";
-  addBook.addEventListener("click", openDialog);
-  toolbar.append(addBook);
-  if (shelf && !shelf.is_wishlist) {
+  if (shelf) {
+    const addBook = document.createElement("button");
+    addBook.type = "button";
+    addBook.className = "action-btn";
+    addBook.textContent = "＋ Add a book";
+    addBook.addEventListener("click", openDialog);
+    toolbar.append(addBook);
     const rename = document.createElement("button");
     rename.type = "button";
     rename.className = "secondary-btn";
@@ -3323,7 +3367,7 @@ function showShelfPage(shelfName) {
     remove.className = "secondary-btn";
     remove.textContent = "Delete shelf";
     remove.addEventListener("click", async () => {
-      await showAppConfirm(`Delete “${shelf.name}”? Books will stay in your library and on other shelves. Items saved only to this shelf will be removed. This cannot be undone.`, {
+      await showAppConfirm(`Delete “${shelf.name}”? Books will stay in your library and on other shelves; this shelf’s memberships will be removed. This cannot be undone.`, {
         title: "Delete shelf",
         confirmLabel: "Delete shelf",
         danger: true,
@@ -3332,18 +3376,9 @@ function showShelfPage(shelfName) {
     });
     toolbar.append(rename, remove);
   }
-  const shelfBrowser = shelfName !== "Currently Reading" && shelfName !== "Completed Books" && books.length
-    ? createShelfBrowser(books)
-    : null;
-  if (shelfName === "Currently Reading") {
-    page.append(header, toolbar, createCurrentlyReadingList(books));
-    return;
-  }
-  if (shelfName === "Completed Books") {
-    page.append(header, createCompletedBooksList(books));
-    return;
-  }
-  page.append(header, toolbar, shelfBrowser || createBookTable(books));
+  page.append(header);
+  if (shelf) page.append(toolbar);
+  page.append(books.length ? createShelfBrowser(books) : createBookTable(books));
 }
 
 const shelfSortOptions = [
@@ -3503,9 +3538,9 @@ function createCompletedBooksList(books) {
     const empty = document.createElement("div");
     empty.className = "empty-state-card";
     const title = document.createElement("h2");
-    title.textContent = "Your completed books will appear here";
+    title.textContent = `Your ${getReadingStatusLabel("read").toLowerCase()} books will appear here`;
     const copy = document.createElement("p");
-    copy.textContent = "Mark a book as complete from Currently Reading to add it to this shelf.";
+    copy.textContent = `Mark a book as ${getReadingStatusLabel("read")} from ${getReadingStatusLabel("reading")} to add it here.`;
     empty.append(title, copy);
     list.append(empty);
     return list;
@@ -3533,8 +3568,8 @@ function createCompletedBooksList(books) {
     author.textContent = book.author || "Unknown author";
     const status = document.createElement("span");
     status.className = "currently-reading-progress";
-    status.textContent = book.disposition
-      ? `Completed · ${book.disposition === "sold" ? "Sold" : "Donated"}`
+    status.textContent = ["sold", "donated"].includes(book.ownership_status)
+      ? `Completed · ${book.ownership_status === "sold" ? "Sold" : "Donated"}`
       : `Completed · ${Number(book.current_page || 0)} pages read`;
     details.append(title, author, status);
 
@@ -3544,10 +3579,10 @@ function createCompletedBooksList(books) {
     readAgain.type = "button";
     readAgain.className = "action-btn";
     readAgain.textContent = "Read again";
-    readAgain.addEventListener("click", () => readBookAgain(book));
+    readAgain.addEventListener("click", () => setReadingStatus(book, "reading"));
     actions.append(readAgain);
 
-    if (!book.disposition) {
+    if (!["sold", "donated"].includes(book.ownership_status)) {
       const options = document.createElement("details");
       options.className = "completed-disposition";
       const summary = document.createElement("summary");
@@ -3601,7 +3636,7 @@ function createCompletedBooksList(books) {
         mark.className = "text-btn disposition-mark";
         const disposition = heading.startsWith("Sell") ? "sold" : "donated";
         mark.textContent = `Mark as ${disposition}`;
-        mark.addEventListener("click", () => setBookDisposition(book, disposition));
+        mark.addEventListener("click", () => setOwnershipStatus(book, disposition));
         option.append(title, copy, linkList, mark);
         optionsGrid.append(option);
       });
@@ -3617,14 +3652,14 @@ function createCompletedBooksList(books) {
 function createCurrentlyReadingList(books) {
   const list = document.createElement("div");
   list.className = "currently-reading-list";
-  list.setAttribute("aria-label", "Books currently being read");
+  list.setAttribute("aria-label", `${getReadingStatusLabel("reading")} books`);
   if (!books.length) {
     const empty = document.createElement("div");
     empty.className = "empty-state-card";
     const title = document.createElement("h2");
     title.textContent = "Nothing on your reading list yet";
     const copy = document.createElement("p");
-    copy.textContent = "Open a book in your library and switch on Currently Reading to add it here.";
+    copy.textContent = t("status.reading_empty", { status: getReadingStatusLabel("reading") });
     empty.append(title, copy);
     list.append(empty);
     return list;
@@ -3697,12 +3732,12 @@ function createCurrentlyReadingControls(book) {
   finishedReading.type = "button";
   finishedReading.className = "action-btn";
   finishedReading.textContent = "Finished reading";
-  finishedReading.addEventListener("click", () => markBookAsRead(book));
+  finishedReading.addEventListener("click", () => setReadingStatus(book, "read"));
   const remove = document.createElement("button");
   remove.type = "button";
   remove.className = "secondary-btn";
   remove.textContent = "Remove";
-  remove.setAttribute("aria-label", `Remove ${book.title} from Currently Reading`);
+  remove.setAttribute("aria-label", `Remove ${book.title} from ${getReadingStatusLabel("reading")}`);
   remove.addEventListener("click", () => setReadingStatus(book, ""));
   const bookmarkedAt = document.createElement("span");
   bookmarkedAt.className = "currently-reading-bookmark-time";
@@ -3714,7 +3749,7 @@ function createCurrentlyReadingControls(book) {
 function showShelvesPage() {
   updateActiveNavigation("Your shelves");
   const page = showPage("shelves");
-  const header = createPageHeader("", "Your shelves", "Your books, gathered into collections.");
+  const header = createPageHeader("", "My Shelves", "Your books, gathered into custom collections.");
   const createShelf = document.createElement("button");
   createShelf.type = "button";
   createShelf.className = "action-btn";
@@ -3725,54 +3760,45 @@ function showShelvesPage() {
   toolbar.append(createShelf);
   page.append(header, toolbar);
   const libraryBooks = getLibraryBooks();
-  const tiles = [
-    {
-      type: "shelf",
-      name: "Library",
-      count: libraryBooks.filter((book) => !getBookShelfNames(book).length).length,
-      color: "#8b5e3c",
-      book: libraryBooks.find((book) => !getBookShelfNames(book).length),
-    },
-    {
-      type: "shelf",
-      name: "Liked Books",
-      count: libraryBooks.filter((book) => book.liked).length,
-      color: "#704052",
-      book: libraryBooks.find((book) => book.liked),
-    },
-    {
-      type: "shelf",
-      name: "Currently Reading",
-      count: libraryBooks.filter((book) => book.reading_status === "reading").length,
-      color: "#496c5d",
-      book: libraryBooks.find((book) => book.reading_status === "reading"),
-    },
-    {
-      type: "shelf",
-      name: "Completed Books",
-      count: state.books.filter((book) => book.reading_status === "completed").length,
-      color: "#8b5e3c",
-      book: state.books.find((book) => book.reading_status === "completed"),
-    },
-    ...state.shelves.map((shelf) => ({
+  const tiles = getCustomShelves().map((shelf) => {
+    const books = libraryBooks.filter((book) => getBookShelfNames(book).includes(shelf.name));
+    return {
       type: "shelf",
       name: shelf.name,
-      count: libraryBooks.filter((book) => getBookShelfNames(book).includes(shelf.name)).length,
+      count: books.length,
       color: shelf.color || "#8b5e3c",
-      book: libraryBooks.find((book) => getBookShelfNames(book).includes(shelf.name)),
-    })),
-  ];
-  page.append(createCardRow("Collections", tiles));
+      book: books[0],
+    };
+  });
+  if (tiles.length) page.append(createCardRow("Custom shelves", tiles));
+  else {
+    const empty = document.createElement("p");
+    empty.className = "row-empty-state";
+    empty.textContent = "Create a shelf to organize your books.";
+    page.append(empty);
+  }
 }
 
 function compareText(a, b) {
   return String(a || "").localeCompare(String(b || ""), undefined, { sensitivity: "base", numeric: true });
 }
 
-function showLibraryPage() {
-  updateActiveNavigation("Your Library");
+function showLibraryPage(filter = state.library.filter || "") {
+  const validFilters = new Set(["", "next_read", "reading", "read", "dnf", "favorites", "owned"]);
+  state.library.filter = validFilters.has(filter) ? filter : "";
+  updateActiveNavigation("Library");
   const page = showPage("library");
-  const header = createPageHeader("", "Your Library", "Every book you've added, all in one place.");
+  const selectedFilter = getLibraryFilterOptions().find((item) => item.key === state.library.filter);
+  const header = createPageHeader("", "Your Library", state.library.filter
+    ? `${selectedFilter.label} · ${selectedFilter.count} ${selectedFilter.count === 1 ? "book" : "books"}`
+    : "Every book you've added, all in one place.");
+  const categories = document.createElement("div");
+  categories.className = "library-category-filters";
+  categories.setAttribute("role", "group");
+  categories.setAttribute("aria-label", "Filter your library");
+  getLibraryFilterOptions().forEach((item) => {
+    categories.append(createLibraryFilterButton(item, { category: true }));
+  });
   const search = document.createElement("input");
   search.type = "search";
   search.className = "library-search";
@@ -3784,18 +3810,29 @@ function showLibraryPage() {
 
   const build = () => {
     const query = state.library.query.trim().toLowerCase();
-    const books = getLibraryBooks()
+    const books = getLibraryBooks().filter((book) => {
+      if (state.library.filter === "favorites") return Boolean(book.is_favorite);
+      if (state.library.filter === "owned") return book.ownership_status === "owned";
+      return !state.library.filter || book.reading_status === state.library.filter;
+    })
       .filter((book) => !query || [book.title, book.author, book.genre].some((v) => String(v || "").toLowerCase().includes(query)));
     results.replaceChildren();
     if (!books.length) {
-      results.append(search);
+      results.append(categories, search);
       const empty = document.createElement("p");
       empty.className = "row-empty-state";
-      empty.textContent = query ? "No books match your search." : "Books you add will appear here.";
+      empty.textContent = query
+        ? "No books match your search."
+        : state.library.filter
+          ? `No books in ${selectedFilter.label.toLowerCase()} yet.`
+          : "Books you add will appear here.";
       results.append(empty);
       return;
     }
-    results.append(createShelfBrowser(books, "library", search));
+    const leading = document.createElement("div");
+    leading.className = "library-browse-leading";
+    leading.append(categories, search);
+    results.append(createShelfBrowser(books, `library:${state.library.filter || "all"}`, leading));
   };
   page.append(header, results);
   search.addEventListener("input", () => {
@@ -3891,14 +3928,10 @@ function createBookTable(books) {
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "table-sort";
-    const isLikedShelf = state.currentShelf === "Liked Books";
-    const isCurrentlyReadingShelf = state.currentShelf === "Currently Reading";
-    remove.textContent = isLikedShelf ? "Unlike" : "Remove";
-    remove.setAttribute("aria-label", `${isLikedShelf ? "Unlike" : "Remove"} ${book.title}`);
+    remove.textContent = "Remove from shelf";
+    remove.setAttribute("aria-label", `Remove ${book.title} from shelf`);
     remove.addEventListener("click", () => {
-      if (isLikedShelf) toggleBookLike(book);
-      else if (isCurrentlyReadingShelf) setReadingStatus(book, "");
-      else removeBookFromShelf(book, state.currentShelf);
+      removeBookFromShelf(book, state.currentShelf);
     });
     actions.append(remove);
     row.append(actions);
@@ -3957,10 +3990,7 @@ function renderBookPage(book) {
     readMore.setAttribute("aria-expanded", String(expanded));
     readMore.textContent = expanded ? "Read less" : "Read more";
   });
-  const genres = document.createElement("div");
-  genres.className = "book-profile-genres";
-  renderBookGenreTags(genres, book.genre ? [book.genre] : []);
-  intro.append(heading, author, rating, description, readMore, genres);
+  intro.append(heading, author, rating, description, readMore);
 
   const content = document.createElement("div");
   content.className = "book-detail-content";
@@ -3983,7 +4013,8 @@ function renderBookPage(book) {
     strong.textContent = label;
     const valueNode = document.createElement("span");
     valueNode.className = "book-detail-value";
-    valueNode.textContent = Array.isArray(value) ? value[0] || "—" : String(value || "—");
+    if (label === "Genre") renderBookGenreTags(valueNode, book.genre ? String(book.genre).split(",") : []);
+    else valueNode.textContent = Array.isArray(value) ? value[0] || "—" : String(value || "—");
     field.append(icon, strong, valueNode);
     metadata.append(field);
   });
@@ -3991,69 +4022,25 @@ function renderBookPage(book) {
 
   const actions = document.createElement("div");
   actions.className = "page-actions";
-  const ownedBook = state.books.find((item) => getBookKey(item) === getBookKey(book));
-  const isActiveLibraryBook = Boolean(ownedBook && !ownedBook.disposition);
+  const ownedBook = findOwnedBook(book);
+  const isLibraryBook = Boolean(ownedBook);
+  const isDisposed = ["sold", "donated"].includes(ownedBook?.ownership_status);
+  layout.classList.toggle("is-disposed", isDisposed);
   const isCurrentlyReading = ownedBook?.reading_status === "reading";
   const moreMenu = createBookMoreMenu(book, ownedBook);
-  if (isActiveLibraryBook) {
-    const currentlyReading = document.createElement("button");
-    currentlyReading.type = "button";
-    currentlyReading.className = `currently-reading-button${isCurrentlyReading ? " is-reading" : ""}`;
-    currentlyReading.setAttribute("aria-pressed", String(isCurrentlyReading));
-    const readingIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    readingIcon.setAttribute("viewBox", "0 0 24 24");
-    readingIcon.setAttribute("aria-hidden", "true");
-    readingIcon.classList.add("currently-reading-icon");
-    const iconPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    iconPath.setAttribute("d", "M12 6.2C9.6 4.8 6.7 4.5 3.5 5.4v13.1c3.2-.9 6.1-.6 8.5.8m0-13.1c2.4-1.4 5.3-1.7 8.5-.8v13.1c-3.2-.9-6.1-.6-8.5.8m0-13.1v13.1");
-    iconPath.setAttribute("fill", "none");
-    iconPath.setAttribute("stroke", "currentColor");
-    iconPath.setAttribute("stroke-linecap", "round");
-    iconPath.setAttribute("stroke-linejoin", "round");
-    iconPath.setAttribute("stroke-width", "1.7");
-    readingIcon.append(iconPath);
-    const toggleText = document.createElement("span");
-    toggleText.textContent = isCurrentlyReading ? "Currently reading" : "Start reading";
-    currentlyReading.append(readingIcon, toggleText);
-    currentlyReading.addEventListener("click", () => setReadingStatus(
-      ownedBook,
-      isCurrentlyReading ? "" : "reading"
-    ));
-    actions.append(currentlyReading);
-  } else {
-    const add = document.createElement("button");
-    add.type = "button";
-    add.className = "action-btn";
-    add.textContent = ownedBook?.disposition ? "In Completed Books" : "＋ Mark as owned";
-    add.disabled = Boolean(ownedBook);
-    add.addEventListener("click", () => {
-      openDialog();
-      if (state.session) {
-        bookForm.elements.title.value = book.title || "";
-        bookForm.elements.author.value = book.author || "";
-        bookForm.elements.isbn.value = book.isbn || "";
-        bookForm.elements.cover_url.value = book.cover_url
-          || (book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-L.jpg?default=false` : "");
-        bookForm.elements.genre.value = book.genre || "";
-        bookForm.elements.page_count.value = String(book.page_count || book.pages || "");
-      }
-    });
-    actions.append(add);
-  }
+  actions.append(createReadingStatusMenu(book, ownedBook));
+  actions.append(createOwnershipStatusMenu(book, ownedBook));
   const like = document.createElement("button");
   like.type = "button";
   like.className = "secondary-btn";
-  like.textContent = ownedBook?.liked ? "♥ Liked" : "♡ Like";
-  like.setAttribute("aria-pressed", String(Boolean(ownedBook?.liked)));
-  like.addEventListener("click", () => {
-    if (ownedBook) toggleBookLike(ownedBook);
-    else showToast("Add this book to your library before liking it.");
-  });
+  const isFavorite = Boolean(ownedBook?.is_favorite);
+  like.textContent = isFavorite ? "♥ Favorite" : "♡ Favorite";
+  like.setAttribute("aria-pressed", String(isFavorite));
+  like.addEventListener("click", () => toggleBookFavorite(book));
   actions.append(like);
-  if (!isActiveLibraryBook) actions.append(createBookShelfMenu(book));
-  if (!isActiveLibraryBook) actions.append(moreMenu);
+  actions.append(createBookShelfMenu(book), moreMenu);
   content.append(createShelfStatus(book, ownedBook), actions);
-  if (isActiveLibraryBook) {
+  if (isLibraryBook) {
     const readingActions = document.createElement("div");
     readingActions.className = "reading-actions";
     const pageCount = Number(ownedBook.page_count || ownedBook.pages);
@@ -4068,8 +4055,7 @@ function renderBookPage(book) {
       continueButton.addEventListener("click", () => setBookBookmark(ownedBook));
       readingActions.append(continueButton);
     }
-    readingActions.append(createBookShelfMenu(ownedBook), moreMenu);
-    content.append(readingActions);
+    if (readingActions.childElementCount) content.append(readingActions);
   }
   layout.append(cover, intro, content);
   page.append(breadcrumb, layout);
@@ -4286,8 +4272,6 @@ function updateBookPageDetails(book, { clearMissingPageCount = false } = {}) {
     else if (value) value.textContent = values[label];
     else field.replaceChildren(field.querySelector("strong"), document.createTextNode(` ${values[label]}`));
   });
-  const introGenres = page.querySelector(".book-profile-genres");
-  if (introGenres && book.genre) renderBookGenreTags(introGenres, String(book.genre).split(","));
   updateBookReadingProgress(book);
 }
 
@@ -4360,7 +4344,7 @@ function updateBookReadingProgress(book, catalogPageCount = null) {
   const ownedBook = state.books.find((item) => getBookKey(item) === getBookKey(book));
   const pageCount = Number(catalogPageCount || ownedBook?.page_count || ownedBook?.pages
     || book.page_count || book.pages);
-  if (!ownedBook || ownedBook.disposition || ownedBook.reading_status !== "reading"
+  if (!ownedBook || ownedBook.reading_status !== "reading"
     || !Number.isInteger(pageCount) || pageCount <= 0) {
     progress?.remove();
     return;
@@ -4372,7 +4356,7 @@ function updateBookReadingProgress(book, catalogPageCount = null) {
 
 function renderBookGenreTags(container, genres) {
   container.replaceChildren();
-  const uniqueGenres = [...new Set(genres.filter(Boolean))].slice(0, 4);
+  const uniqueGenres = [...new Set(genres.map((genre) => String(genre || "").trim()).filter(Boolean))].slice(0, 4);
   if (!uniqueGenres.length) {
     const missing = document.createElement("span");
     missing.textContent = "—";
@@ -4388,7 +4372,9 @@ function renderBookGenreTags(container, genres) {
 }
 
 function getShelfSummaryLabel(book) {
-  const names = getAnyShelfNames(book);
+  const customShelves = getCustomShelves();
+  const names = getAnyShelfNames(book).filter((name) =>
+    customShelves.some((shelf) => shelf.name === name));
   if (!names.length) return "＋  Add to shelf";
   return names.length === 1 ? `📚  On shelf: ${names[0]}` : `📚  On ${names.length} shelves`;
 }
@@ -4398,7 +4384,9 @@ function createBookShelfMenu(book, { compact = false } = {}) {
   menu.className = `book-shelf-menu${compact ? " compact-shelf-menu" : ""}`;
   const summary = document.createElement("summary");
   summary.className = "secondary-btn";
-  const names = getAnyShelfNames(book);
+  const customShelves = getCustomShelves();
+  const names = getAnyShelfNames(book).filter((name) =>
+    customShelves.some((shelf) => shelf.name === name));
   summary.textContent = compact ? (names.length ? "📚" : "＋📚") : getShelfSummaryLabel(book);
   summary.setAttribute("aria-label", names.length
     ? `${book.title} is on ${names.join(", ")}. Change shelves`
@@ -4408,9 +4396,9 @@ function createBookShelfMenu(book, { compact = false } = {}) {
   panel.className = "card-add-actions";
   const heading = document.createElement("p");
   heading.className = "shelf-menu-heading";
-  heading.textContent = state.shelves.length ? "Tap a shelf to add or remove" : "You have no shelves yet";
+  heading.textContent = customShelves.length ? "Tap a shelf to add or remove" : "You have no custom shelves yet";
   panel.append(heading);
-  state.shelves.forEach((shelf) => {
+  customShelves.forEach((shelf) => {
     const on = names.includes(shelf.name);
     const option = document.createElement("button");
     option.type = "button";
@@ -4450,15 +4438,29 @@ function createShelfStatus(book, ownedBook) {
   const box = document.createElement("div");
   box.className = "book-shelf-status";
   box.setAttribute("aria-live", "polite");
-  const label = document.createElement("strong");
-  label.className = "book-shelf-status-label";
-  box.append(label);
-  const names = getAnyShelfNames(book);
+  const summary = document.createElement("p");
+  summary.className = "book-shelf-status-summary";
+  box.append(summary);
+  if (!ownedBook) {
+    box.classList.add("is-off-shelf");
+    summary.textContent = "Not in your Library yet. Setting a reading or ownership status, marking it as a favorite, or adding it to a shelf adds it automatically.";
+    return box;
+  }
+
+  const parts = [];
+  parts.push(t("status.summary", { status: getReadingStatusLabel(ownedBook.reading_status) || t("status.none") }));
+  parts.push(t("ownership.summary", { status: getOwnershipStatusLabel(ownedBook.ownership_status) || t("status.none") }));
+  parts.push(ownedBook.is_favorite ? t("favorite.label") : t("favorite.not"));
+  const customShelves = getCustomShelves();
+  const names = getAnyShelfNames(book).filter((name) =>
+    customShelves.some((shelf) => shelf.name === name));
   if (names.length) {
     box.classList.add("is-on-shelf");
-    label.textContent = names.length === 1 ? "📚 On shelf:" : "📚 On shelves:";
+    parts.push(names.length === 1 ? "On a custom shelf:" : "On custom shelves:");
+    summary.textContent = parts.join(" · ");
     names.forEach((name) => {
       const shelf = state.shelves.find((item) => item.name === name);
+      if (!customShelves.some((item) => item.id === shelf?.id)) return;
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = "book-shelf-chip";
@@ -4470,9 +4472,99 @@ function createShelfStatus(book, ownedBook) {
     });
   } else {
     box.classList.add("is-off-shelf");
-    label.textContent = "Not on any shelf yet — use the shelf button below to organize it.";
+    parts.push("Not on a custom shelf");
+    summary.textContent = parts.join(" · ");
   }
   return box;
+}
+
+function createReadingStatusMenu(book, ownedBook) {
+  const menu = document.createElement("details");
+  menu.className = "book-status-menu";
+  const summary = document.createElement("summary");
+  summary.className = "currently-reading-button";
+  const currentStatus = ownedBook?.reading_status || "";
+  summary.textContent = `${getReadingStatusLabel(currentStatus) || t("library.add_to_library")} ▾`;
+  summary.setAttribute("aria-label", t("status.aria_label", {
+    status: getReadingStatusLabel(currentStatus) || t("status.not_set"),
+  }));
+  const panel = document.createElement("div");
+  panel.className = "book-status-menu-panel";
+  Object.entries(READING_STATUS_LABELS).forEach(([status, label]) => {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.textContent = status === "read" && currentStatus !== "read" ? t("status.mark_as_read") : label;
+    option.setAttribute("aria-pressed", String(currentStatus === status));
+    option.addEventListener("click", () => {
+      menu.open = false;
+      setReadingStatus(book, status);
+    });
+    panel.append(option);
+  });
+  if (currentStatus) {
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "status-remove-option";
+    remove.textContent = "Remove status";
+    remove.addEventListener("click", () => {
+      menu.open = false;
+      setReadingStatus(book, null);
+    });
+    panel.append(remove);
+  }
+  menu.append(summary, panel);
+  wireCardPopover(menu, summary, panel);
+  return menu;
+}
+
+function createOwnershipStatusMenu(book, ownedBook) {
+  const menu = document.createElement("details");
+  menu.className = "book-status-menu ownership-status-menu";
+  const summary = document.createElement("summary");
+  summary.className = "secondary-btn";
+  const currentStatus = ownedBook?.ownership_status || "";
+  summary.textContent = `${getOwnershipStatusLabel(currentStatus) || "Ownership"} ▾`;
+  summary.setAttribute("aria-label", `Ownership status: ${getOwnershipStatusLabel(currentStatus) || "not set"}`);
+  const panel = document.createElement("div");
+  panel.className = "book-status-menu-panel";
+  Object.entries(OWNERSHIP_STATUS_LABELS).forEach(([status, label]) => {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.textContent = label;
+    option.setAttribute("aria-pressed", String(currentStatus === status));
+    option.addEventListener("click", () => {
+      menu.open = false;
+      setOwnershipStatus(book, status);
+    });
+    panel.append(option);
+  });
+  if (currentStatus) {
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "status-remove-option";
+    remove.textContent = "Remove ownership status";
+    remove.addEventListener("click", () => {
+      menu.open = false;
+      setOwnershipStatus(book, null);
+    });
+    panel.append(remove);
+  }
+  menu.append(summary, panel);
+  wireCardPopover(menu, summary, panel);
+  return menu;
+}
+
+function createOwnedFormatPicker(book, ownedBook) {
+  const select = document.createElement("select");
+  select.className = "owned-format-select";
+  select.setAttribute("aria-label", "Owned format");
+  select.add(new Option("Format (optional)", ""));
+  select.add(new Option("Print", "print"));
+  select.add(new Option("eBook", "ebook"));
+  select.add(new Option("Audio", "audio"));
+  select.value = ownedBook?.owned_format || "";
+  select.addEventListener("change", () => setOwnedFormat(book, select.value));
+  return select;
 }
 
 function createBookMoreMenu(book, ownedBook) {
@@ -4483,13 +4575,24 @@ function createBookMoreMenu(book, ownedBook) {
   summary.setAttribute("aria-label", "More book actions");
   const panel = document.createElement("div");
   panel.className = "book-more-menu-panel";
-  if (ownedBook?.reading_status === "reading") {
-    const finished = document.createElement("button");
-    finished.type = "button";
-    finished.textContent = "Mark as finished";
-    finished.addEventListener("click", () => markBookAsRead(ownedBook));
-    panel.append(finished);
-  }
+  const ownershipToggle = document.createElement("button");
+  ownershipToggle.type = "button";
+  ownershipToggle.textContent = ownedBook?.ownership_status === "owned" ? "✓ I own this" : "I own this";
+  ownershipToggle.setAttribute("aria-pressed", String(ownedBook?.ownership_status === "owned"));
+  ownershipToggle.addEventListener("click", () => {
+    menu.open = false;
+    setOwnershipStatus(book, ownedBook?.ownership_status === "owned" ? null : "owned");
+  });
+  panel.append(ownershipToggle);
+  if (ownedBook?.ownership_status === "owned") panel.append(createOwnedFormatPicker(book, ownedBook));
+  const share = document.createElement("button");
+  share.type = "button";
+  share.textContent = "Share";
+  share.addEventListener("click", () => {
+    menu.open = false;
+    shareBook(ownedBook || book);
+  });
+  panel.append(share);
   if (ownedBook) {
     const remove = document.createElement("button");
     remove.type = "button";
@@ -4497,12 +4600,6 @@ function createBookMoreMenu(book, ownedBook) {
     remove.textContent = "Remove from library";
     remove.addEventListener("click", () => removeBookFromLibrary(ownedBook));
     panel.append(remove);
-  } else {
-    const add = document.createElement("button");
-    add.type = "button";
-    add.textContent = "Add to my library";
-    add.addEventListener("click", () => markBookAsOwned(book));
-    panel.append(add);
   }
   menu.append(summary, panel);
   return menu;
@@ -5207,7 +5304,7 @@ function openBookEditionDetails(book, details, section, volumes, returnFocus) {
       fields.current_page = Number(selectedProgress?.current_page) || 0;
       fields.reading_status = selectedProgress?.reading_status || "";
       if (Number.isInteger(pageCount) && pageCount > 0) {
-        fields.current_page = fields.reading_status === "completed"
+        fields.current_page = fields.reading_status === "read"
           ? pageCount
           : Math.min(fields.current_page, pageCount);
       }
@@ -5482,8 +5579,6 @@ async function loadBookProfileCatalog(book, { page, rating, description, readMor
     if (genreField && primary.categories.length) {
       genreField.replaceChildren();
       renderBookGenreTags(genreField, primary.categories);
-      const introGenres = page.querySelector(".book-profile-genres");
-      if (introGenres) renderBookGenreTags(introGenres, primary.categories);
     }
     const publishedField = [...page.querySelectorAll(".book-detail-field")]
       .find((field) => field.querySelector("strong")?.textContent === "Publication date");
@@ -5514,8 +5609,6 @@ async function loadBookProfileCatalog(book, { page, rating, description, readMor
       const genreField = page.querySelector(".book-detail-content .book-detail-field:first-child .book-detail-value");
       if (genreField && fallback.categories.length) {
         renderBookGenreTags(genreField, fallback.categories);
-        const introGenres = page.querySelector(".book-profile-genres");
-        if (introGenres) renderBookGenreTags(introGenres, fallback.categories);
       }
       const publishedField = [...page.querySelectorAll(".book-detail-field")]
         .find((field) => field.querySelector("strong")?.textContent === "Publication date");
@@ -6450,9 +6543,13 @@ function showStatsPage() {
   [
     ["Total books", String(libraryBooks.length)],
     ["Total value", formatCurrency(totalValue)],
-    ["Shelves", String(state.shelves.length)],
+    [t("stats.custom_shelves"), String(getCustomShelves().length)],
     ["Top genre", topEntry(genreCounts)],
     ["Top author", topEntry(authorCounts)],
+    ...Object.keys(READING_STATUS_LABELS).map((status) => [
+      getReadingStatusLabel(status),
+      String(libraryBooks.filter((book) => book.reading_status === status).length),
+    ]),
   ].forEach(([label, value]) => {
     const card = document.createElement("article");
     card.className = "stat-card";
@@ -6569,8 +6666,8 @@ function createLibraryExportCard(books) {
 const LITE_READER_FEATURES = [
   "Up to 100 books in your library",
   "Up to 5 custom shelves",
-  "Up to 5 books in Currently Reading",
-  "Library, Liked Books & Wishlist always included",
+  t("status.reading_limit_feature", { max: 5, status: getReadingStatusLabel("reading") }),
+  t("features.library_and_shelves"),
   "Track your reading progress",
   "Access to your library stats",
 ];
@@ -6578,7 +6675,7 @@ const BOOK_LOVER_FEATURES = [
   "Everything in Lite Reader",
   "Unlimited books",
   "Unlimited shelves",
-  "Unlimited Currently Reading books",
+  t("status.unlimited_reading_feature", { status: getReadingStatusLabel("reading") }),
   "Export insurance-ready library reports (CSV & printable PDF)",
   "Early access to new features",
   "Support the future of Librito",
@@ -6792,7 +6889,7 @@ function showBookLoverWelcome(status, profile, userId) {
     features: [
       "Unlimited books in your library",
       "Unlimited custom shelves",
-      "Unlimited books in Currently Reading",
+      t("status.unlimited_reading_feature", { status: getReadingStatusLabel("reading") }),
       "Library inventory reports to export as CSV or print/save as PDF",
       "Early access to new features",
     ],
@@ -7335,7 +7432,7 @@ function render() {
   }
   else if (state.view === "shelf") showShelfPage(state.currentShelf);
   else if (state.view === "shelves") showShelvesPage();
-  else if (state.view === "library") showLibraryPage();
+  else if (state.view === "library") showLibraryPage(state.library.filter);
   else if (state.view === "suggested-shelf") restoreRouteFromLocation();
   else if (state.view === "search") showSearchPage(state.searchQuery);
   else if (state.view === "stats") showStatsPage();
@@ -7936,11 +8033,7 @@ async function initializeSupabaseOnce() {
         state.loading = false;
         state.loadError = "";
         state.books = loadBooks();
-state.shelfItems = loadLocalShelfItems();
         state.shelves = loadLocalShelves();
-        state.shelfItems = loadLocalShelfItems();
-        state.shelves = loadLocalShelves();
-        state.shelfItems = loadLocalShelfItems();
         render();
       }
     });
@@ -7949,7 +8042,6 @@ state.shelfItems = loadLocalShelfItems();
       state.loading = false;
       state.books = loadBooks();
       state.shelves = loadLocalShelves();
-      state.shelfItems = loadLocalShelfItems();
       render();
       if (!authPrompted) {
         openAuthModal();
@@ -7968,6 +8060,7 @@ state.shelfItems = loadLocalShelfItems();
     state.loading = false;
     state.loadError = "";
     state.books = loadBooks();
+    state.shelves = loadLocalShelves();
     render();
     if (!authPrompted) {
       openAuthModal();
@@ -8038,14 +8131,7 @@ async function loadShelvesFromSupabase() {
     showToast("Could not load your shelves.");
     return;
   }
-  state.shelves = [...(data || [])].sort((a, b) => Number(Boolean(b.is_wishlist)) - Number(Boolean(a.is_wishlist)));
-  const { data: items, error: itemsError } = await state.supabase.from("shelf_items").select("*");
-  if (itemsError) {
-    console.error(itemsError);
-    state.shelfItems = [];
-  } else {
-    state.shelfItems = items || [];
-  }
+  state.shelves = (data || []).filter((shelf) => !isLegacySystemShelf(shelf));
 }
 
 async function createShelfInSupabase() {
@@ -8055,7 +8141,7 @@ async function createShelfInSupabase() {
     showToast("Name your shelf first.");
     return;
   }
-  if (["currently reading", "completed books", "wishlist"].includes(name.toLowerCase())) {
+  if (isReservedShelfName(name)) {
     showToast(`${name} is a built-in shelf. Choose another name.`);
     return;
   }
@@ -8135,9 +8221,10 @@ async function loadFromSupabase() {
     genre: book.genre || "",
     isbn: book.isbn || "",
     cover_url: book.cover_url || "",
-    shelf: book.shelf,
-    reading_status: book.reading_status || "",
-    disposition: book.disposition || "",
+    reading_status: book.reading_status || null,
+    ownership_status: book.ownership_status || null,
+    is_favorite: Boolean(book.is_favorite),
+    owned_format: book.owned_format || null,
     current_page: Number(book.current_page || 0),
     edition_progress: book.edition_progress && typeof book.edition_progress === "object"
       ? book.edition_progress
@@ -8148,39 +8235,23 @@ async function loadFromSupabase() {
     added: book.added_on || book.created_at,
     notes: book.notes || "",
     shelves: [],
-    liked: false,
   }));
   const { data: shelfLinks, error: linksError } = await state.supabase
     .from("book_shelves")
     .select("book_id,shelf_id,shelves(name)");
   if (linksError) {
     console.error(linksError);
-    showToast("Shelf membership needs the latest Supabase schema; showing legacy shelf assignments.");
-    books.forEach((book) => {
-      if (book.shelf) book.shelves.push(book.shelf);
-    });
-  } else {
-    (shelfLinks || []).forEach((link) => {
-      const book = books.find((item) => item.id === link.book_id);
-      const joinedShelf = Array.isArray(link.shelves) ? link.shelves[0] : link.shelves;
-      if (book && joinedShelf?.name && !book.shelves.includes(joinedShelf.name)) book.shelves.push(joinedShelf.name);
-    });
-    books.forEach((book) => {
-      if (!book.shelves.length && book.shelf && state.shelves.some((shelf) => shelf.name === book.shelf)) {
-        book.shelves.push(book.shelf);
-      }
-    });
+    state.loading = false;
+    state.loadError = "Custom shelf memberships could not be loaded. Check your connection and try again.";
+    render();
+    showToast("Could not load your custom shelves.");
+    return false;
   }
-  const { data: likedRows, error: likedError } = await state.supabase
-    .from("liked_books")
-    .select("book_id");
-  if (likedError) {
-    console.error(likedError);
-    showToast("Liked Books needs the latest Supabase schema.");
-  } else {
-    const likedIds = new Set((likedRows || []).map((row) => row.book_id));
-    books.forEach((book) => { book.liked = likedIds.has(book.id); });
-  }
+  (shelfLinks || []).forEach((link) => {
+    const book = books.find((item) => item.id === link.book_id);
+    const joinedShelf = Array.isArray(link.shelves) ? link.shelves[0] : link.shelves;
+    if (book && joinedShelf?.name && !book.shelves.includes(joinedShelf.name)) book.shelves.push(joinedShelf.name);
+  });
   state.books = books;
   state.loading = false;
   state.loadError = "";
@@ -8203,9 +8274,10 @@ async function saveBookToSupabase(book) {
     genre: book.genre || null,
     isbn: book.isbn || null,
     cover_url: book.cover_url || null,
-    shelf: book.shelf || null,
     reading_status: book.reading_status || null,
-    disposition: book.disposition || null,
+    ownership_status: book.ownership_status || null,
+    is_favorite: Boolean(book.is_favorite),
+    owned_format: book.owned_format || null,
     current_page: Number(book.current_page || 0),
     edition_progress: book.edition_progress || {},
     bookmarked_at: book.bookmarked_at || null,
@@ -8231,14 +8303,14 @@ async function saveBookToSupabase(book) {
   }
 
   let shelfMembershipSaved = true;
-  const shelf = state.shelves.find((item) => item.name === book.shelf);
-  if (shelf) {
+  const shelves = getCustomShelves().filter((shelf) => (book.shelves || []).includes(shelf.name));
+  if (shelves.length) {
     try {
-      const { error: shelfError } = await state.supabase.from("book_shelves").insert({
-        book_id: book.id,
+      const { error: shelfError } = await state.supabase.from("book_shelves").insert(shelves.map((shelf) => ({
+        book_id: savedBook.id,
         shelf_id: shelf.id,
         user_id: state.session.user.id,
-      });
+      })));
       if (shelfError) {
         console.error(shelfError);
         shelfMembershipSaved = false;
@@ -8279,7 +8351,7 @@ document.getElementById("topHomeBtn").addEventListener("click", () => {
 
 document.getElementById("libraryNavBtn").addEventListener("click", () => {
   if (window.matchMedia("(max-width: 899px)").matches) setLibraryDrawerOpen(false);
-  navigateTo("library");
+  navigateTo("library", {});
 });
 
 document.getElementById("sidebarAddBookBtn").addEventListener("click", () => {
@@ -8294,9 +8366,9 @@ window.addEventListener("scroll", trackRecommendationScroll, { capture: true, pa
 document.addEventListener("click", (event) => {
   const target = event.target;
   const activeMenu = target instanceof Element
-    ? target.closest(".card-like-menu, .card-menu, .book-shelf-menu, .account-menu")
+    ? target.closest(".card-like-menu, .card-menu, .book-shelf-menu, .book-status-menu, .account-menu")
     : null;
-  document.querySelectorAll(".card-like-menu[open], .card-menu[open], .book-shelf-menu[open], .account-menu[open]").forEach((menu) => {
+  document.querySelectorAll(".card-like-menu[open], .card-menu[open], .book-shelf-menu[open], .book-status-menu[open], .account-menu[open]").forEach((menu) => {
     if (menu !== activeMenu) menu.open = false;
   });
 });
@@ -8480,7 +8552,6 @@ authButton.addEventListener("click", async () => {
     state.profile = null;
     state.books = loadBooks();
     state.shelves = loadLocalShelves();
-    state.shelfItems = loadLocalShelfItems();
     render();
     updateAuthButton();
     showToast("Signed out");
@@ -8653,7 +8724,6 @@ bookForm.addEventListener("submit", async (event) => {
     id: crypto.randomUUID(),
     title: formData.get("title").toString().trim(),
     author: formData.get("author").toString().trim(),
-    shelf: formData.get("shelf").toString().trim(),
     cost: Number(formData.get("cost") || 0),
     added: formData.get("added").toString().trim(),
     notes: formData.get("notes").toString().trim(),
@@ -8661,9 +8731,10 @@ bookForm.addEventListener("submit", async (event) => {
     cover_url: formData.get("cover_url").toString().trim(),
     genre: formData.get("genre").toString().trim(),
     page_count: Number(formData.get("page_count") || 0) || null,
-    shelves: [],
+    shelves: formData.get("shelf").toString().trim()
+      ? [formData.get("shelf").toString().trim()]
+      : [],
   };
-  if (book.shelf) book.shelves.push(book.shelf);
 
   if (!book.title || !book.author || !book.added) {
     showToast("Fill in the essentials first.");

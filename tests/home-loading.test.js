@@ -153,6 +153,7 @@ test("Currently reading shows the book loader while pending, then an honest empt
   const context = {
     document: { createElement: () => new Element() },
     state: { loading: true, loadError: "" },
+    getReadingStatusLabel: (status) => status === "reading" ? "Currently Reading" : "",
     createBookLoader: (options) => ({ loader: true, ...options }),
     openDialog() {},
   };
