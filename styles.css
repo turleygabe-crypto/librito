@@ -2897,6 +2897,15 @@ body {
   box-shadow: 0 2px 6px rgba(9, 5, 3, 0.35);
 }
 
+.sidebar .shelf-thumbnail:not(.status-shelf-thumbnail) {
+  width: 2.2rem;
+  height: 3.05rem;
+  flex-basis: 2.2rem;
+  aspect-ratio: 0.72;
+  border-radius: 0.22rem 0.32rem 0.32rem 0.22rem;
+  box-shadow: inset 2px 0 rgba(255, 246, 230, 0.28), 0 2px 6px rgba(9, 5, 3, 0.35);
+}
+
 .sidebar .shelf-item-count {
   color: #e4bd8b;
 }

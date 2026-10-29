@@ -60,6 +60,13 @@ test("sidebar provides room for readable navigation and shelf text", async () =>
   assert.doesNotMatch(shelfNameRules.at(-1)[1], /font-size:/);
 });
 
+test("sidebar shelf covers use portrait book proportions", async () => {
+  const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  assert.match(css, /\.sidebar \.shelf-thumbnail:not\(\.status-shelf-thumbnail\)\s*\{[^}]*width: 2\.2rem[^}]*height: 3\.05rem[^}]*aspect-ratio: 0\.72/);
+  assert.match(css, /\.shelf-thumb-art\s*\{[^}]*width: 100%[^}]*height: 100%/);
+  assert.match(css, /\.book-cover-art img\s*\{[^}]*object-fit: cover/);
+});
+
 test("sidebar has a leather bookmark finish with tassel details", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const sidebarRules = [...css.matchAll(/\.sidebar\s*\{([^}]+)\}/g)];
