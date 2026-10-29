@@ -2147,20 +2147,6 @@ body {
   border-bottom: 1px solid rgba(245, 221, 201, 0.12);
 }
 
-.sidebar .sidebar-brand h2 {
-  margin: 0;
-  color: #fff8ef;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 2rem;
-  font-weight: 400;
-}
-
-.sidebar-brand p {
-  margin: 0.35rem 0 0;
-  color: #c6a58e;
-  font-size: 0.85rem;
-}
-
 .sidebar .sidebar-library {
   flex: 1 0 auto;
 }
@@ -2782,7 +2768,7 @@ body {
   position: sticky;
   isolation: isolate;
   overflow: hidden;
-  padding: calc((100dvh - 2rem) * 0.085) 1.25rem calc((100dvh - 2rem) * 0.28);
+  padding: calc((100dvh - 2rem) * 0.085) 1.75rem calc((100dvh - 2rem) * 0.28);
   border: 0;
   border-radius: 0;
   background: transparent url("/assets/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel.png") center / 250% 100% no-repeat;
@@ -2805,20 +2791,11 @@ body {
   text-align: center;
 }
 
-.sidebar .sidebar-brand h2 {
-  font-family: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
-  font-size: 2rem;
-  line-height: 1.15;
-  letter-spacing: 0.01em;
-  text-shadow: none;
-}
-
-.sidebar-brand p {
-  color: #e4bd8b;
-  font-family: inherit;
-  font-size: 0.72rem;
-  line-height: 1.5;
-  letter-spacing: 0.025em;
+.sidebar-logo {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 
 .sidebar .sidebar-nav,
@@ -2924,7 +2901,7 @@ body {
 
   .sidebar .mobile-sidebar-close {
     top: calc((100dvh - 2rem) * 0.04);
-    right: 1.25rem;
+    right: 1.75rem;
   }
 }
 
