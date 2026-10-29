@@ -89,7 +89,7 @@ test("sidebar artwork replaces CSS ornaments and reserves room for the eyelet an
   const bookmark = sidebarRules.find((rule) => rule[1].includes("Elegant%20Brown"));
   assert.match(bookmark[1], /transparent url/);
   assert.match(bookmark[1], /250% 100% no-repeat/);
-  assert.match(bookmark[1], /padding: calc\(\(100dvh - 2rem\) \* 0\.085\) 1\.75rem calc\(\(100dvh - 2rem\) \* 0\.28\)/);
+  assert.match(bookmark[1], /padding: calc\(var\(--sidebar-height, calc\(100dvh - 2rem\)\) \* 0\.085\) 1\.75rem calc\(var\(--sidebar-height, calc\(100dvh - 2rem\)\) \* 0\.28\)/);
   assert.match(bookmark[1], /clip-path: none/);
   assert.doesNotMatch(css, /\.sidebar::(?:before|after)/);
   assert.match(sidebarRules.at(-1)[1], /position: fixed/);
@@ -98,7 +98,7 @@ test("sidebar artwork replaces CSS ornaments and reserves room for the eyelet an
   assert.doesNotMatch(html, /sidebar-ornament/);
   assert.match(css, /\.sidebar-content\s*\{[^}]*overflow-y: auto/);
   assert.match(css, /\.sidebar\.is-open\s*\{[^}]*display: flex/);
-  assert.match(css, /top: -2rem;[\s\S]*margin: -2rem 0 1rem;/);
+  assert.match(css, /--sidebar-height: calc\(100dvh \+ 1\.25rem\);[\s\S]*top: -0\.75rem;[\s\S]*height: var\(--sidebar-height\);[\s\S]*margin: -0\.75rem 0 0;/);
 });
 
 test("startup keeps the library pending until account initialization", () => {

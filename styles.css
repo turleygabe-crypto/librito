@@ -2574,10 +2574,11 @@ body {
   }
 
   .sidebar {
+    --sidebar-height: calc(100dvh + 1.25rem);
     align-self: start;
-    top: -2rem;
-    height: calc(100dvh - 2rem);
-    margin: -2rem 0 1rem;
+    top: -0.75rem;
+    height: var(--sidebar-height);
+    margin: -0.75rem 0 0;
     gap: 0.85rem;
     padding: 1rem;
     border: 0;
@@ -2768,7 +2769,7 @@ body {
   position: sticky;
   isolation: isolate;
   overflow: hidden;
-  padding: calc((100dvh - 2rem) * 0.085) 1.75rem calc((100dvh - 2rem) * 0.28);
+  padding: calc(var(--sidebar-height, calc(100dvh - 2rem)) * 0.085) 1.75rem calc(var(--sidebar-height, calc(100dvh - 2rem)) * 0.28);
   border: 0;
   border-radius: 0;
   background: transparent url("/assets/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel.png") center / 250% 100% no-repeat;
