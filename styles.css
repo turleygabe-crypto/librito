@@ -3595,21 +3595,6 @@ body {
   color: #7d4a3b;
 }
 
-.owned-format-select {
-  min-height: 2.3rem;
-  padding: 0.4rem 0.65rem;
-  border: 1px solid #dfd2c5;
-  border-radius: 0.55rem;
-  background: #fffdf9;
-  color: #51463d;
-  font: inherit;
-  font-size: 0.8rem;
-}
-
-.book-more-menu-panel .owned-format-select {
-  width: 100%;
-}
-
 .book-shelf-status {
   display: block;
 }
@@ -6337,11 +6322,6 @@ body {
 .book-profile-actions {
   justify-content: flex-start;
   margin-top: 0;
-}
-
-.book-status-menu-panel .owned-format-select {
-  width: 100%;
-  margin-top: 0.25rem;
 }
 
 @media (max-width: 700px) {

@@ -4660,23 +4660,9 @@ function createOwnershipStatusMenu(book, ownedBook, { compact = false } = {}) {
     });
     panel.append(remove);
   }
-  if (currentStatus === "owned") panel.append(createOwnedFormatPicker(book, ownedBook));
   menu.append(summary, panel);
   wireCardPopover(menu, summary, panel);
   return menu;
-}
-
-function createOwnedFormatPicker(book, ownedBook) {
-  const select = document.createElement("select");
-  select.className = "owned-format-select";
-  select.setAttribute("aria-label", "Owned format");
-  select.add(new Option("Format (optional)", ""));
-  select.add(new Option("Print", "print"));
-  select.add(new Option("eBook", "ebook"));
-  select.add(new Option("Audio", "audio"));
-  select.value = ownedBook?.owned_format || "";
-  select.addEventListener("change", () => setOwnedFormat(book, select.value));
-  return select;
 }
 
 function createBookMoreMenu(book, ownedBook) {

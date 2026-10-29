@@ -6,7 +6,7 @@ import { test } from "node:test";
 const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
 const statusMenuSource = source.slice(
   source.indexOf("function createReadingStatusMenu("),
-  source.indexOf("\nfunction createOwnedFormatPicker("),
+  source.indexOf("\nfunction createBookMoreMenu("),
 );
 
 class Element {
@@ -28,7 +28,6 @@ function createStatusMenus() {
     t: (key, values = {}) => key === "status.aria_label" ? `Reading status: ${values.status}` : key,
     setReadingStatus() {},
     setOwnershipStatus() {},
-    createOwnedFormatPicker: () => new Element(),
     wireCardPopover() {},
   };
   const createMenus = runInNewContext(
@@ -47,6 +46,9 @@ test("reading and ownership menus keep their status text free of duplicate dropd
   assert.equal(reading.children[0].attributes["aria-label"], "Reading status: Currently Reading");
   assert.equal(ownership.children[0].textContent, "Owned");
   assert.equal(ownership.children[0].attributes["aria-label"], "Ownership status: Owned");
+  assert.equal(ownership.children[1].children.length, 2);
+  assert.equal(ownership.children[1].children.some((child) => child.tagName === "SELECT"), false);
+  assert.equal(source.includes("Format (optional)"), false);
 });
 
 test("status controls use warm icon pills and stack on book cards", async () => {
