@@ -32,6 +32,8 @@ The sidebar uses [Elegant Brown Leather Bookmark with Tassel](assets/Elegant%20B
 
 On desktop, the bookmark begins slightly above the viewport and extends to its bottom edge so the tassel nearly touches the bottom of the screen. Content insets scale with the bookmark height to keep the menu clear of the eyelet and pointed base.
 
+The mobile drawer also starts slightly above the viewport, but extends farther below it: the lower cord remains visible while the tassel sits offscreen, leaving more room for navigation. The close button stays inside the visible safe area, and the menu scrolls within the leather body.
+
 Home rows use the bouncing-book loader while the account library or catalog requests are pending (animation respects reduced-motion preferences). Once a new account's empty library has loaded, Currently reading and Recently added show prompts to add books, and author recommendations need books in the library first. These empty states are not ongoing loading states; general recommendations remain available under Picked for your library.
 
 ## Admin dashboard

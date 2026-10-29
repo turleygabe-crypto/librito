@@ -83,6 +83,17 @@ test("sidebar shelf covers use portrait book proportions", async () => {
   assert.match(css, /\.book-cover-art img\s*\{[^}]*object-fit: cover/);
 });
 
+test("mobile bookmark extends beyond both screen edges with the tassel below the viewport", async () => {
+  const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  const sidebar = [...css.matchAll(/\.sidebar\s*\{([^}]+)\}/g)].at(-1)[1];
+  assert.match(sidebar, /--sidebar-height: calc\(\(100dvh \+ 0\.75rem\) \/ 0\.84\)/);
+  assert.match(sidebar, /top: -0\.75rem/);
+  assert.match(sidebar, /bottom: auto/);
+  assert.match(sidebar, /height: var\(--sidebar-height\)/);
+  assert.match(sidebar, /padding-bottom: calc\(var\(--sidebar-height\) \* 0\.26\)/);
+  assert.match(css, /\.sidebar \.mobile-sidebar-close\s*\{[^}]*top: max\(1\.5rem, calc\(env\(safe-area-inset-top\) \+ 1rem\)\)/);
+});
+
 test("sidebar artwork replaces CSS ornaments and reserves room for the eyelet and tassel", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const sidebarRules = [...css.matchAll(/\.sidebar\s*\{([^}]+)\}/g)];

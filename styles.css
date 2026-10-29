@@ -2896,12 +2896,17 @@ body {
 
 @media (max-width: 899px) {
   .sidebar {
+    --sidebar-height: calc((100dvh + 0.75rem) / 0.84);
     position: fixed;
+    top: -0.75rem;
+    bottom: auto;
     width: min(15rem, 86vw);
+    height: var(--sidebar-height);
+    padding-bottom: calc(var(--sidebar-height) * 0.26);
   }
 
   .sidebar .mobile-sidebar-close {
-    top: calc((100dvh - 2rem) * 0.04);
+    top: max(1.5rem, calc(env(safe-area-inset-top) + 1rem));
     right: 1.75rem;
   }
 }
