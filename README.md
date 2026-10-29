@@ -34,7 +34,7 @@ On desktop, the bookmark begins slightly above the viewport and extends to its b
 
 The mobile drawer also starts slightly above the viewport, but extends farther below it: the lower cord remains visible while the tassel sits offscreen, leaving more room for navigation. The close button stays inside the visible safe area, and the menu scrolls within the leather body.
 
-The mobile close control is a brass-trimmed leather clasp with a 44px minimum tap target, a decorative close icon, an accessible label, and a visible keyboard-focus outline.
+The mobile close control uses the subtle Ornate Golden X Medallion artwork, sits inside the stitching beside the eyelet, and keeps a 44px tap target, an accessible label, and a visible keyboard-focus outline.
 
 Home rows use the bouncing-book loader while the account library or catalog requests are pending (animation respects reduced-motion preferences). Once a new account's empty library has loaded, Currently reading and Recently added show prompts to add books, and author recommendations need books in the library first. These empty states are not ongoing loading states; general recommendations remain available under Picked for your library.
 

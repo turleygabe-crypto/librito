@@ -1,7 +1,7 @@
-const CACHE_NAME = "librito-cache-v45";
+const CACHE_NAME = "librito-cache-v46";
 const IMAGE_CACHE = "librito-covers-v1";
 const IMAGE_CACHE_LIMIT = 400;
-const ASSETS = ["/", "/index.html", "/styles.css", "/app.js", "/translations.js", "/cookie-consent.js", "/manifest.webmanifest", "/assets/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel.png", "/assets/Librito%20Digital%20Home%20Library%20Logo.png"];
+const ASSETS = ["/", "/index.html", "/styles.css", "/app.js", "/translations.js", "/cookie-consent.js", "/manifest.webmanifest", "/assets/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel.png", "/assets/Librito%20Digital%20Home%20Library%20Logo.png", "/assets/Ornate%20Golden%20X%20Medallion.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
