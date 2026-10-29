@@ -2891,8 +2891,8 @@ body {
 .sidebar .mobile-sidebar-close {
   z-index: 2;
   place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 3rem;
+  height: 3rem;
   padding: 0;
   border: 0;
   border-radius: 50%;
@@ -2903,8 +2903,8 @@ body {
 
 .sidebar .mobile-sidebar-close-medallion {
   display: block;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 3rem;
+  height: 3rem;
   filter: drop-shadow(0 1px 2px rgba(16, 8, 4, 0.45));
   pointer-events: none;
 }
@@ -2936,8 +2936,8 @@ body {
   }
 
   .sidebar .mobile-sidebar-close {
-    top: max(2.75rem, calc(env(safe-area-inset-top) + 2rem));
-    right: 2.25rem;
+    top: max(2.125rem, calc(env(safe-area-inset-top) + 1.5rem));
+    right: 1.5rem;
   }
 }
 

@@ -92,15 +92,15 @@ test("mobile bookmark extends beyond both screen edges with the tassel below the
   assert.match(sidebar, /height: var\(--sidebar-height\)/);
   assert.match(sidebar, /padding-top: max\(calc\(5\.5rem \+ env\(safe-area-inset-top\)\), calc\(var\(--sidebar-height\) \* 0\.085\)\)/);
   assert.match(sidebar, /padding-bottom: calc\(var\(--sidebar-height\) \* 0\.26\)/);
-  assert.match(css, /\.sidebar \.mobile-sidebar-close\s*\{[^}]*top: max\(2\.75rem, calc\(env\(safe-area-inset-top\) \+ 2rem\)\)[^}]*right: 2\.25rem/);
+  assert.match(css, /\.sidebar \.mobile-sidebar-close\s*\{[^}]*top: max\(2\.125rem, calc\(env\(safe-area-inset-top\) \+ 1\.5rem\)\)[^}]*right: 1\.5rem/);
 });
 
 test("mobile close button is an understated, keyboard-accessible golden medallion", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   assert.match(html, /id="closeLibraryBtn"[^>]*type="button"[^>]*aria-label="Close library">\s*<img class="mobile-sidebar-close-medallion" src="\/assets\/Ornate%20Golden%20X%20Medallion\.png" alt="" aria-hidden="true"/);
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
-  assert.match(css, /\.sidebar \.mobile-sidebar-close\s*\{[^}]*width: 2\.75rem[^}]*height: 2\.75rem[^}]*border: 0[^}]*background: transparent[^}]*opacity: 0\.82/);
-  assert.match(css, /\.sidebar \.mobile-sidebar-close-medallion\s*\{[^}]*width: 2\.5rem/);
+  assert.match(css, /\.sidebar \.mobile-sidebar-close\s*\{[^}]*width: 3rem[^}]*height: 3rem[^}]*border: 0[^}]*background: transparent[^}]*opacity: 0\.82/);
+  assert.match(css, /\.sidebar \.mobile-sidebar-close-medallion\s*\{[^}]*width: 3rem/);
   assert.match(css, /\.sidebar \.mobile-sidebar-close:focus-visible\s*\{[^}]*outline: 2px solid #ffe4b2/);
   const sw = await readFile(new URL("../sw.js", import.meta.url), "utf8");
   assert.match(sw, /"\/assets\/Ornate%20Golden%20X%20Medallion\.png"/);
