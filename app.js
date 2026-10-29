@@ -3266,23 +3266,35 @@ function createGenrePager(page, totalPages, onGo) {
   return nav;
 }
 
-// Prev/next pager plus the per-page selector, shown together on the right above and below results.
-function createPagingBar({ page, totalPages, size, onGo, onSize, leading = null }) {
+// Shared pager toolbar; callers can omit the page-size selector from bottom navigation.
+function createPagingBar({
+  page,
+  totalPages,
+  size,
+  onGo,
+  onSize,
+  leading = null,
+  showSize = true,
+  groupControls = false,
+  paginationOnly = false,
+}) {
   const bar = document.createElement("div");
-  bar.className = "paging-bar";
+  bar.className = `paging-bar${groupControls ? " browse-paging-bar" : ""}${paginationOnly ? " pagination-only-bar" : ""}`;
   if (leading) {
     leading.classList.add("paging-leading");
     bar.append(leading);
   }
   if (totalPages > 1) bar.append(createGenrePager(page, totalPages, onGo));
-  const label = document.createElement("label");
-  label.className = "genre-size-control";
-  label.append("Books per page ");
-  const select = document.createElement("select");
-  genreSizeOptions.forEach((option) => select.add(new Option(String(option), String(option), false, option === size)));
-  select.addEventListener("change", () => onSize(Number(select.value)));
-  label.append(select);
-  bar.append(label);
+  if (showSize) {
+    const label = document.createElement("label");
+    label.className = "genre-size-control";
+    label.append("Books per page ");
+    const select = document.createElement("select");
+    genreSizeOptions.forEach((option) => select.add(new Option(String(option), String(option), false, option === size)));
+    select.addEventListener("change", () => onSize(Number(select.value)));
+    label.append(select);
+    bar.append(label);
+  }
   return bar;
 }
 
@@ -3583,14 +3595,13 @@ function createShelfBrowser(books, scope = `shelf:${state.currentShelf}`, extraL
     summary.textContent = pageBooks.length
       ? `Showing ${start + 1}–${start + pageBooks.length} of ${visible.length} books`
       : "No books match these filters. Books missing year, page, or rating data are hidden when filtering by them.";
-    const leading = document.createElement("div");
-    leading.className = "browse-leading";
-    if (extraLeading) leading.append(extraLeading);
-    leading.append(controls);
-    const bar = (lead = null) => createPagingBar({
+    const bar = (lead = null, showSize = true, groupControls = false, paginationOnly = false) => createPagingBar({
       leading: lead,
       page: shelfBrowse.page,
       totalPages,
+      showSize,
+      groupControls,
+      paginationOnly,
       size,
       onGo: (target) => {
         shelfBrowse.page = target;
@@ -3606,9 +3617,11 @@ function createShelfBrowser(books, scope = `shelf:${state.currentShelf}`, extraL
     const grid = document.createElement("div");
     grid.className = "card-row expanded genre-browse-grid";
     pageBooks.forEach((book) => grid.append(createBookCard(book)));
-    section.replaceChildren(summary, bar(leading));
+    section.replaceChildren(summary);
+    if (extraLeading) section.append(extraLeading);
+    section.append(bar(controls, true, true));
     if (pageBooks.length) section.append(grid);
-    if (totalPages > 1) section.append(bar());
+    if (totalPages > 1) section.append(bar(null, false, false, true));
   };
   render();
   enrichLibraryBooks(books).then((changed) => {

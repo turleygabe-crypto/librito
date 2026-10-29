@@ -122,3 +122,49 @@ test("library route filters books by status and exposes categories for sorting a
   categoryFilters.children[0].events.click();
   assert.deepEqual(JSON.parse(JSON.stringify(routes[0])), ["library", { filter: "" }]);
 });
+
+test("shelf browsers group sorting with page size and show pagination above and below books", () => {
+  const browserSource = source.slice(
+    source.indexOf("function createShelfBrowser("),
+    source.indexOf("\nfunction createCompletedBooksList("),
+  );
+  const pagingBars = [];
+  const extraLeading = new Element();
+  extraLeading.className = "library-browse-leading";
+  const controls = new Element();
+  const context = {
+    document: { createElement: () => new Element() },
+    state: { currentShelf: "Top Shelf" },
+    shelfBrowse: { scope: "", sort: "added", filters: {}, page: 1 },
+    shelfSortOptions: [["added", "Recently added"]],
+    applyBrowseControls: (books) => books,
+    getStoredSearchPageSize: () => 2,
+    createBrowseControls: () => controls,
+    createPagingBar: (options) => {
+      pagingBars.push(options);
+      const bar = new Element();
+      bar.className = "paging-bar";
+      return bar;
+    },
+    createBookCard: (book) => ({ book }),
+    enrichLibraryBooks: async () => false,
+    localStorage: { setItem() {} },
+    searchPageSizeKey: "page-size",
+    console,
+  };
+  runInNewContext(`${browserSource}\nthis.create = createShelfBrowser;`, context);
+
+  const section = context.create([{ title: "One" }, { title: "Two" }, { title: "Three" }], "library:", extraLeading);
+
+  assert.equal(section.children[1], extraLeading);
+  assert.equal(pagingBars.length, 2);
+  assert.equal(pagingBars[0].leading, controls);
+  assert.equal(pagingBars[0].groupControls, true);
+  assert.equal(pagingBars[0].showSize, true);
+  assert.equal(pagingBars[1].leading, null);
+  assert.equal(pagingBars[1].showSize, false);
+  assert.equal(pagingBars[1].paginationOnly, true);
+  assert.equal(section.children[2].className, "paging-bar");
+  assert.equal(section.children[3].className, "card-row expanded genre-browse-grid");
+  assert.equal(section.children[4].className, "paging-bar");
+});
