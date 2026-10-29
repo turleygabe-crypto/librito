@@ -2890,8 +2890,28 @@ body {
 
 .sidebar .mobile-sidebar-close {
   z-index: 2;
-  border: 1px solid rgba(224, 172, 103, 0.4);
-  background: rgba(34, 18, 12, 0.8);
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 1px solid #bc955e;
+  border-radius: 0.55rem;
+  background: linear-gradient(145deg, #61412b, #2c180f);
+  color: #ffe4b2;
+  box-shadow: inset 0 0 0 3px #352116, inset 0 0 0 4px rgba(211, 166, 109, 0.5), 0 3px 6px rgba(16, 8, 4, 0.4);
+  transition: background 150ms ease, box-shadow 150ms ease;
+}
+
+.sidebar .mobile-sidebar-close:hover {
+  background: linear-gradient(145deg, #795234, #402519);
+}
+
+.sidebar .mobile-sidebar-close:active {
+  box-shadow: inset 0 0 0 3px #352116, inset 0 0 0 4px rgba(211, 166, 109, 0.5);
+}
+
+.sidebar .mobile-sidebar-close:focus-visible {
+  outline: 2px solid #ffe4b2;
+  outline-offset: 3px;
 }
 
 @media (max-width: 899px) {
@@ -2902,6 +2922,7 @@ body {
     bottom: auto;
     width: min(15rem, 86vw);
     height: var(--sidebar-height);
+    padding-top: max(calc(4.5rem + env(safe-area-inset-top)), calc(var(--sidebar-height) * 0.085));
     padding-bottom: calc(var(--sidebar-height) * 0.26);
   }
 

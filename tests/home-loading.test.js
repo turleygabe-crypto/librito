@@ -90,8 +90,17 @@ test("mobile bookmark extends beyond both screen edges with the tassel below the
   assert.match(sidebar, /top: -0\.75rem/);
   assert.match(sidebar, /bottom: auto/);
   assert.match(sidebar, /height: var\(--sidebar-height\)/);
+  assert.match(sidebar, /padding-top: max\(calc\(4\.5rem \+ env\(safe-area-inset-top\)\), calc\(var\(--sidebar-height\) \* 0\.085\)\)/);
   assert.match(sidebar, /padding-bottom: calc\(var\(--sidebar-height\) \* 0\.26\)/);
   assert.match(css, /\.sidebar \.mobile-sidebar-close\s*\{[^}]*top: max\(1\.5rem, calc\(env\(safe-area-inset-top\) \+ 1rem\)\)/);
+});
+
+test("mobile close button is a keyboard-accessible brass-trimmed clasp with a generous tap target", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  assert.match(html, /id="closeLibraryBtn"[^>]*type="button"[^>]*aria-label="Close library">\s*<svg[^>]*aria-hidden="true"[^>]*focusable="false"/);
+  const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  assert.match(css, /\.sidebar \.mobile-sidebar-close\s*\{[^}]*width: 2\.75rem[^}]*height: 2\.75rem[^}]*border: 1px solid #bc955e[^}]*border-radius: 0\.55rem/);
+  assert.match(css, /\.sidebar \.mobile-sidebar-close:focus-visible\s*\{[^}]*outline: 2px solid #ffe4b2/);
 });
 
 test("sidebar artwork replaces CSS ornaments and reserves room for the eyelet and tassel", async () => {
