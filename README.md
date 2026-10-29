@@ -28,7 +28,7 @@ Then open http://127.0.0.1:3000/.
 
 ## Branding and home loading states
 
-The sidebar is a simple CSS panel matching the hero's warm brown background, cream text, terracotta accent, and softly rounded corners. It uses text branding without book-cover effects, page edges, or PNG artwork. On desktop and in the mobile library drawer, the content scrolls within the viewport-height panel so navigation and shelves remain accessible on short screens.
+The sidebar is styled as a vintage leather bookmark, with a textured dark-brown finish, brass edging, serif branding, a tassel, and warm highlighted navigation. Branding and shelf covers remain live text and book data rather than static sidebar artwork. On desktop and in the mobile library drawer, the content scrolls within the viewport-height panel so navigation and shelves remain accessible on short screens.
 
 Home rows use the bouncing-book loader while the account library or catalog requests are pending (animation respects reduced-motion preferences). Once a new account's empty library has loaded, Currently reading and Recently added show prompts to add books, and author recommendations need books in the library first. These empty states are not ongoing loading states; general recommendations remain available under Picked for your library.
 

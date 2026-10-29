@@ -4595,7 +4595,7 @@ function createReadingStatusMenu(book, ownedBook, { compact = false } = {}) {
   const summary = document.createElement("summary");
   summary.className = "currently-reading-button";
   const currentStatus = ownedBook?.reading_status || "";
-  summary.textContent = `${getReadingStatusLabel(currentStatus) || (compact ? "Reading status" : t("library.add_to_library"))} ▾`;
+  summary.textContent = getReadingStatusLabel(currentStatus) || (compact ? "Reading status" : t("library.add_to_library"));
   summary.setAttribute("aria-label", t("status.aria_label", {
     status: getReadingStatusLabel(currentStatus) || t("status.not_set"),
   }));
@@ -4634,7 +4634,7 @@ function createOwnershipStatusMenu(book, ownedBook, { compact = false } = {}) {
   const summary = document.createElement("summary");
   summary.className = "secondary-btn";
   const currentStatus = ownedBook?.ownership_status || "";
-  summary.textContent = `${getOwnershipStatusLabel(currentStatus) || "Ownership"} ▾`;
+  summary.textContent = getOwnershipStatusLabel(currentStatus) || "Ownership";
   summary.setAttribute("aria-label", `Ownership status: ${getOwnershipStatusLabel(currentStatus) || "not set"}`);
   const panel = document.createElement("div");
   panel.className = "book-status-menu-panel";

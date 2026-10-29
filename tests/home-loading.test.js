@@ -60,30 +60,21 @@ test("sidebar provides room for readable navigation and shelf text", async () =>
   assert.doesNotMatch(shelfNameRules.at(-1)[1], /font-size:/);
 });
 
-test("sidebar is a basic panel matching the hero without book effects", async () => {
+test("sidebar has a leather bookmark finish with tassel details", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const sidebarRules = [...css.matchAll(/\.sidebar\s*\{([^}]+)\}/g)];
-  const panel = sidebarRules.find((rule) => rule[1].includes("background: #32190e"));
-  assert.ok(panel, "the sidebar uses the hero background color");
-  const hero = css.match(/\.home-hero\s*\{([^}]+)\}/)[1];
-  assert.match(hero, /background-color: #32190e/);
-  assert.match(hero, /border-radius: 0\.45rem/);
-  assert.match(panel[1], /border-radius: 0\.45rem/);
-  assert.match(panel[1], /font-family: inherit/);
-  assert.match(panel[1], /box-shadow: none/);
-  assert.ok(sidebarRules.slice(sidebarRules.indexOf(panel) + 1).every((rule) => !/background:/.test(rule[1])),
-    "responsive rules must preserve the basic panel background");
-  assert.doesNotMatch(css, /\.sidebar::(?:before|after)|sidebar-ornament/);
+  const bookmark = sidebarRules.find((rule) => rule[1].includes("clip-path: polygon"));
+  assert.match(bookmark[1], /repeating-linear-gradient/);
+  assert.match(bookmark[1], /clip-path: polygon/);
+  assert.match(bookmark[1], /#a77a4a/);
+  assert.match(css, /\.sidebar::before\s*\{[^}]*#d2ae6c/);
+  assert.match(css, /\.sidebar::after\s*\{[^}]*#c67b4c/);
+  assert.match(css, /\.sidebar \.sidebar-brand h2\s*\{[^}]*Georgia/);
+  assert.match(css, /\.sidebar \.nav-pill\.active\s*\{[^}]*#df8052/);
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   assert.doesNotMatch(html, /sidebar-ornament/);
-  assert.match(panel[1], /padding: 1rem/);
-  assert.match(panel[1], /color: #fff8ef/);
-  assert.match(css, /\.sidebar \.nav-pill\.active\s*\{[^}]*#b64d2c/);
-  const responsivePanels = sidebarRules.slice(sidebarRules.indexOf(panel) + 1);
-  assert.equal(responsivePanels.length, 2);
-  for (const panel of responsivePanels) {
-    assert.match(panel[1], /height: calc\(100dvh - 2rem\)/);
-  }
+  assert.match(css, /\.sidebar-content\s*\{[^}]*overflow-y: auto/);
+  assert.match(css, /\.sidebar\.is-open\s*\{[^}]*display: flex/);
   assert.match(css, /margin: 1rem 0;/);
 });
 
