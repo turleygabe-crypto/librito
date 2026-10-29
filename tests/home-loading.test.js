@@ -53,7 +53,7 @@ test("sidebar content flows naturally and scrolls on short screens", async () =>
 
 test("sidebar provides room for readable navigation and shelf text", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
-  assert.match(css, /grid-template-columns: clamp\(15rem, 18vw, 19rem\) minmax\(0, 1fr\)/);
+  assert.match(css, /grid-template-columns: clamp\(13\.5rem, 15vw, 15rem\) minmax\(0, 1fr\)/);
   assert.match(css, /\.sidebar button\s*\{[^}]*font-family: inherit/);
   assert.match(css, /\.sidebar \.nav-pill,\s*\.sidebar \.shelf-item-copy strong,\s*\.sidebar \.sidebar-empty\s*\{\s*font-size: 1rem/);
   assert.match(css, /\.sidebar-library-nav \.nav-pill\s*\{[^}]*font-size: 1rem/);
@@ -61,6 +61,20 @@ test("sidebar provides room for readable navigation and shelf text", async () =>
   assert.match(css, /\.shelf-item-count\s*\{[^}]*font-size: 0\.95rem/);
   const shelfNameRules = [...css.matchAll(/\.sidebar \.shelf-item-copy strong\s*\{([^}]+)\}/g)];
   assert.doesNotMatch(shelfNameRules.at(-1)[1], /font-size:/);
+});
+
+test("slim sidebar keeps branding restrained and shelf counts within the content", async () => {
+  const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  const wordmarkRules = [...css.matchAll(/\.sidebar \.sidebar-brand h2\s*\{([^}]+)\}/g)];
+  const wordmark = wordmarkRules.at(-1)[1];
+  assert.match(wordmark, /font-size: 2rem/);
+  assert.match(wordmark, /letter-spacing: 0\.01em/);
+  assert.match(wordmark, /text-shadow: none/);
+  assert.doesNotMatch(wordmark, /clamp\(/);
+  assert.match(css, /\.sidebar \.nav-pill,\s*\.sidebar \.shelf-item-copy strong,\s*\.sidebar \.sidebar-empty\s*\{\s*font-size: 0\.9rem/);
+  assert.match(css, /\.sidebar \.shelf-item-copy\s*\{[^}]*min-width: 0[^}]*flex: 1/);
+  assert.match(css, /\.sidebar \.shelf-item-count\s*\{[^}]*flex-shrink: 0/);
+  assert.match(css, /\.sidebar\s*\{[^}]*position: fixed[^}]*width: min\(15rem, 86vw\)/);
 });
 
 test("sidebar shelf covers use portrait book proportions", async () => {
@@ -76,7 +90,7 @@ test("sidebar artwork replaces CSS ornaments and reserves room for the eyelet an
   const bookmark = sidebarRules.find((rule) => rule[1].includes("Elegant%20Brown"));
   assert.match(bookmark[1], /transparent url/);
   assert.match(bookmark[1], /250% 100% no-repeat/);
-  assert.match(bookmark[1], /padding: calc\(\(100dvh - 2rem\) \* 0\.085\) 1\.5rem calc\(\(100dvh - 2rem\) \* 0\.25\)/);
+  assert.match(bookmark[1], /padding: calc\(\(100dvh - 2rem\) \* 0\.085\) 1\.25rem calc\(\(100dvh - 2rem\) \* 0\.28\)/);
   assert.match(bookmark[1], /clip-path: none/);
   assert.doesNotMatch(css, /\.sidebar::(?:before|after)/);
   assert.match(sidebarRules.at(-1)[1], /position: fixed/);

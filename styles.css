@@ -2583,7 +2583,7 @@ body {
 
 @media (min-width: 900px) {
   .app-shell {
-    grid-template-columns: clamp(15rem, 18vw, 19rem) minmax(0, 1fr);
+    grid-template-columns: clamp(13.5rem, 15vw, 15rem) minmax(0, 1fr);
     gap: 0;
   }
 
@@ -2779,10 +2779,10 @@ body {
 }
 
 .sidebar {
-  position: relative;
+  position: sticky;
   isolation: isolate;
   overflow: hidden;
-  padding: calc((100dvh - 2rem) * 0.085) 1.5rem calc((100dvh - 2rem) * 0.25);
+  padding: calc((100dvh - 2rem) * 0.085) 1.25rem calc((100dvh - 2rem) * 0.28);
   border: 0;
   border-radius: 0;
   background: transparent url("/assets/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel.png") center / 250% 100% no-repeat;
@@ -2793,25 +2793,32 @@ body {
 .sidebar-content {
   position: relative;
   z-index: 1;
+  min-width: 0;
+  gap: 0.6rem;
+  overflow-x: hidden;
   padding-bottom: 0.75rem;
 }
 
 .sidebar .sidebar-brand {
-  padding: 0.75rem 0.65rem 1.25rem;
+  padding: 0.5rem 0 0.9rem;
   border-bottom-color: rgba(224, 172, 103, 0.42);
   text-align: center;
 }
 
 .sidebar .sidebar-brand h2 {
-  font-size: clamp(2rem, 3vw, 2.65rem);
-  letter-spacing: -0.04em;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  font-family: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+  font-size: 2rem;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  text-shadow: none;
 }
 
 .sidebar-brand p {
   color: #e4bd8b;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 0.95rem;
+  font-family: inherit;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  letter-spacing: 0.025em;
 }
 
 .sidebar .sidebar-nav,
@@ -2823,12 +2830,29 @@ body {
 .sidebar .shelf-item-copy strong,
 .sidebar .sidebar-empty,
 .sidebar .sidebar-create-shelf {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: inherit;
+}
+
+.sidebar .nav-pill,
+.sidebar .shelf-item-copy strong,
+.sidebar .sidebar-empty {
+  font-size: 0.9rem;
 }
 
 .sidebar .nav-pill {
-  font-size: 1rem;
+  min-width: 0;
+  gap: 0.5rem;
+  padding: 0.55rem 0.4rem;
   line-height: 1.5;
+}
+
+.sidebar .nav-pill::before {
+  flex: 0 0 1.15rem;
+}
+
+.sidebar .library-heading-btn {
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .sidebar .nav-pill.active {
@@ -2845,12 +2869,20 @@ body {
 
 .sidebar .sidebar-shelf-heading h2 {
   color: #d3a66d !important;
-  font-family: Georgia, "Times New Roman", serif;
-  letter-spacing: 0.18em;
+  font-family: inherit;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.1em;
 }
 
 .sidebar .shelf-item {
+  gap: 0.5rem;
+  padding: 0.35rem 0.25rem;
   border-radius: 0.55rem;
+}
+
+.sidebar .shelf-item-copy {
+  min-width: 0;
+  flex: 1;
 }
 
 .sidebar .shelf-item.active {
@@ -2874,6 +2906,8 @@ body {
 
 .sidebar .shelf-item-count {
   color: #e4bd8b;
+  flex-shrink: 0;
+  font-size: 0.8rem;
 }
 
 .sidebar .mobile-sidebar-close {
@@ -2885,11 +2919,12 @@ body {
 @media (max-width: 899px) {
   .sidebar {
     position: fixed;
+    width: min(15rem, 86vw);
   }
 
   .sidebar .mobile-sidebar-close {
-    top: calc((100dvh - 2rem) * 0.085);
-    right: 1.5rem;
+    top: calc((100dvh - 2rem) * 0.04);
+    right: 1.25rem;
   }
 }
 
