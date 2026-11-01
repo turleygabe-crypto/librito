@@ -1844,7 +1844,7 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
 
 .book-cover-gallery {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.75rem;
   width: min(100%, 11rem);
   min-width: 0;
   justify-self: center;
@@ -1859,25 +1859,39 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
   position: relative;
   width: 100%;
   aspect-ratio: 2 / 3;
+  border: 3px solid #fffaf3;
+  border-radius: 0.8rem;
+  background: #e6d0ba;
+  box-shadow: 0 0 0 1px #eddfd0, 0 8px 20px rgba(50, 31, 20, 0.12);
 }
 
 .book-cover-gallery-stage > .book-detail-cover {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0.35rem;
+  width: calc(100% - 0.7rem);
+  height: calc(100% - 0.7rem);
+  border-radius: 0.35rem;
+  box-shadow: none;
+}
+
+.book-cover-gallery-stage > .book-detail-cover img {
+  object-fit: contain;
 }
 
 .book-cover-gallery-image {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0.35rem;
+  width: calc(100% - 0.7rem);
+  height: calc(100% - 0.7rem);
   object-fit: contain;
-  border-radius: 0.18rem;
+  border-radius: 0.35rem;
   background: #f4e2cf;
 }
 
 .book-photo-badge {
   position: absolute;
-  top: 0.35rem;
-  right: 0.35rem;
+  bottom: 0.55rem;
+  left: 0.55rem;
   padding: 0.2rem 0.35rem;
   border-radius: 0.3rem;
   background: #302720;
@@ -1887,25 +1901,137 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
 
 .book-photo-navigation {
   position: absolute;
-  bottom: 0.35rem;
-  left: 50%;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  transform: translateX(-50%);
-  border-radius: 999px;
-  background: #302720;
-  color: #fffaf3;
-  font-size: 0.7rem;
+  inset: 0;
+  pointer-events: none;
 }
 
 .book-photo-navigation button {
+  position: absolute;
+  top: 50%;
+  width: 2rem;
+  height: 2rem;
   min-width: 2rem;
   min-height: 2rem;
-  padding: 0.25rem;
+  display: grid;
+  place-items: center;
+  padding: 0.35rem;
+  border: 1px solid #e8d2be;
+  border-radius: 50%;
+  background: #f9eddf;
+  color: #492a1d;
+  transform: translateY(-50%);
+  pointer-events: auto;
+}
+
+.book-photo-navigation button:first-child {
+  left: -1.15rem;
+}
+
+.book-photo-navigation button:last-child {
+  right: -1.15rem;
+}
+
+.book-photo-counter {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.45rem;
+  border-radius: 999px;
+  background: #492a1de6;
+  color: #fffaf3;
+  font-size: 0.75rem;
+}
+
+.book-photo-icon {
+  display: inline-flex;
+  width: 1.1em;
+  height: 1.1em;
+  flex: 0 0 auto;
+}
+
+.book-photo-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.book-photo-add {
+  display: inline-flex;
+  justify-self: center;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.85rem;
+  border: 1.5px solid #9d452b;
+  border-radius: 999px;
+  background: #fffaf3;
+  color: #492a1d;
+  font-size: 0.9rem;
+}
+
+.book-photo-add:hover,
+.book-photo-navigation button:hover {
+  background: #f4e2cf;
+}
+
+.book-photo-expand {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  display: grid;
+  place-items: center;
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0.35rem;
   border: 0;
-  background: transparent;
-  color: inherit;
+  border-radius: 0.4rem;
+  background: #fffaf3;
+  color: #492a1d;
+}
+
+.book-photo-lightbox {
+  width: min(90vw, 38rem);
+  max-height: 90dvh;
+  padding: 1rem;
+  border: 1px solid #e8d2be;
+  border-radius: 1rem;
+  background: #fffaf3;
+  color: #492a1d;
+  text-align: center;
+}
+
+.book-photo-lightbox::backdrop {
+  background: rgba(36, 22, 17, 0.7);
+}
+
+.book-photo-lightbox > img {
+  display: block;
+  max-width: 100%;
+  max-height: 70dvh;
+  margin: 0.75rem auto;
+  object-fit: contain;
+}
+
+.book-photo-lightbox > .book-detail-cover {
+  width: min(100%, 22rem);
+  max-height: 70dvh;
+  margin: 0.75rem auto;
+}
+
+.book-photo-lightbox > .book-detail-cover img {
+  object-fit: contain;
+}
+
+.book-photo-lightbox-close {
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  border: 1px solid #e8d2be;
+  border-radius: 999px;
+  background: #f9eddf;
+  color: #492a1d;
 }
 
 .private-book-photo-upload {
@@ -1915,6 +2041,37 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
   color: #9d452b;
   font-size: 0.8rem;
   cursor: pointer;
+}
+
+.book-photo-upload-options {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.1rem;
+}
+
+.book-photo-camera {
+  display: none;
+}
+
+@media (any-pointer: coarse), (max-width: 899px) {
+  .book-photo-camera {
+    display: inline-flex;
+  }
+
+  .private-book-photo-upload,
+  .book-photo-navigation button,
+  .book-photo-expand,
+  .book-photo-add {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .private-book-photo-upload {
+    align-items: center;
+    justify-content: center;
+    display: inline-flex;
+  }
 }
 
 .book-photo-file-input {
@@ -1937,6 +2094,8 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
   gap: 0.35rem;
   overflow-x: auto;
   padding: 0.2rem;
+  justify-self: center;
+  max-width: 100%;
 }
 
 .book-photo-thumbnail {
@@ -1945,7 +2104,7 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
   height: 3.5rem;
   padding: 0.15rem;
   border: 2px solid transparent;
-  border-radius: 0.25rem;
+  border-radius: 0.6rem;
   background: transparent;
 }
 
@@ -1958,7 +2117,7 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
   width: 100%;
   height: 100%;
   object-fit: contain;
-  border-radius: 0.1rem;
+  border-radius: 0.35rem;
 }
 
 .book-photo-thumbnail-cover .book-cover-placeholder {
@@ -4646,6 +4805,7 @@ body {
     grid-template-columns: minmax(0, 1fr);
     gap: 1.1rem;
     padding: 1rem;
+    background: radial-gradient(circle at 50% 5.5rem, #f4e2cf 0, #f4e2cf 5rem, transparent 5.05rem), linear-gradient(115deg, #fffaf3, #fcf3e8);
   }
 
   .book-detail-cover,
@@ -4654,13 +4814,31 @@ body {
     grid-row: auto;
   }
 
+  .book-photo-navigation button:first-child {
+    left: -2.65rem;
+  }
+
+  .book-photo-navigation button:last-child {
+    right: -2.65rem;
+  }
+
   .book-profile-intro {
     align-items: flex-start;
     text-align: left;
+    min-width: 0;
+  }
+
+  .book-profile-title {
+    font-size: clamp(1.6rem, 7vw, 2rem);
+    overflow-wrap: anywhere;
   }
 
   .book-detail-content {
     grid-column: auto;
+    min-width: 0;
+    min-height: 0;
+    padding-left: 0;
+    border-left: 0;
   }
 
   .book-detail-content .page-actions {

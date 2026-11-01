@@ -1,7 +1,12 @@
 const english = Object.freeze({
   "photos.privacy": "Only you can see these photos. They are separate from the book cover and are available only while this book is in your library.",
   "photos.gallery": "Book cover and your private photos",
+  "photos.add": "Add Photos",
+  "photos.expand": "Expand book image",
+  "photos.close": "Close image",
   "photos.upload_short": "+ Upload",
+  "photos.camera": "+ Camera",
+  "photos.camera_hint": "Take a private book photo (JPEG, PNG, or WebP, up to 5 MB). Camera availability depends on your device and browser.",
   "photos.your_photo": "Your photo",
   "photos.primary": "Show primary book cover",
   "photos.previous": "Previous book image",

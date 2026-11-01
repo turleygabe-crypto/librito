@@ -165,6 +165,10 @@ class Element {
   removeAttribute(name) { delete this.attributes[name]; if (name === "src") delete this.src; }
   setAttribute(name, value) { this.attributes[name] = value; }
   addEventListener(name, callback) { this.events[name] = callback; }
+  showModal() { this.open = true; }
+  close() { this.open = false; this.events.close?.(); }
+  remove() { this.removed = true; }
+  focus() { this.focused = true; }
   querySelectorAll(selector) {
     return this.children.flatMap((child) => child instanceof Element
       ? [...(selector === "button" && child.tagName === "BUTTON" ? [child] : []), ...child.querySelectorAll(selector)]
@@ -186,6 +190,7 @@ async function galleryHarness({ loadError = false, empty = false } = {}) {
   const context = {
     state, t: translate,
     document: {
+      body: new Element(),
       createElement: (tag) => new Element(tag), createTextNode: (text) => text,
       getElementById: () => new Element(),
     },
@@ -225,11 +230,14 @@ async function galleryHarness({ loadError = false, empty = false } = {}) {
   const create = runInNewContext(`${gallerySource}\ncreatePrivateBookPhotoGallery`, context);
   const section = create({ id: book, title: "My book" });
   await start();
-  const [stage, label, grid, remove, status, retry] = section.children;
-  const [primary, uploaded, badge, navigation] = stage.children;
+  const [stage, grid, addPhotos, uploadOptions, remove, status, retry] = section.children;
+  const [label, cameraLabel] = uploadOptions.children;
+  const [primary, uploaded, badge, navigation, expand] = stage.children;
   return {
     section, state, writes, revoked, observe: () => observe(), context,
-    stage, primary, uploaded, badge, navigation, input: label.children[1], label, grid, remove, status, retry,
+    stage, primary, uploaded, badge, navigation, input: label.children[1], label,
+    cameraLabel, cameraInput: cameraLabel.children[1], grid, remove, status, retry,
+    addPhotos, uploadOptions, expand,
   };
 }
 
@@ -266,18 +274,22 @@ test("cover thumbnails and arrow controls cycle with wraparound and a badge only
   const { grid, primary, uploaded, badge, navigation, section } = await galleryHarness();
   const [previous, position, next] = navigation.children;
   assert.equal(navigation.hidden, false);
-  assert.equal(position.textContent, "1 / 2");
+  assert.equal(position.children.at(-1), "1 / 2");
   assert.equal(grid.children[0].attributes["aria-pressed"], "true");
   next.events.click();
   assert.equal(primary.hidden, true);
   assert.equal(uploaded.hidden, false);
   assert.equal(badge.hidden, false);
   assert.equal(badge.textContent, "Your photo");
-  assert.equal(position.textContent, "2 / 2");
+  assert.equal(position.children.at(-1), "2 / 2");
+  assert.equal(position.children.length, 2);
+  assert.equal(position.children[0].className, "book-photo-icon");
+  assert.equal(position.title, "Your photo");
   assert.equal(grid.children[1].attributes["aria-pressed"], "true");
   next.events.click();
   assert.equal(primary.hidden, false);
   assert.equal(badge.hidden, true);
+  assert.equal(position.children.length, 1);
   previous.events.click();
   assert.equal(badge.hidden, false);
   grid.children[0].events.click();
@@ -380,7 +392,7 @@ test("failed uploads and deletions surface errors and restore enabled controls w
   assert.equal(harness.primary.hidden, true);
 });
 
-test("gallery stays frameless and has compact thumbnails at desktop and mobile sizes", async () => {
+test("gallery uses a framed image, side arrows, counter and compact thumbnails at desktop and mobile sizes", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   assert.doesNotMatch(css, /\.private-book-photos\s*\{/);
   assert.match(css, /\.book-cover-gallery\s*\{[^}]*width: min\(100%, 11rem\)/);
@@ -389,6 +401,133 @@ test("gallery stays frameless and has compact thumbnails at desktop and mobile s
   assert.match(css, /\.book-cover-gallery \[hidden\]\s*\{[^}]*display: none/);
   assert.match(css, /@media \(max-width: 1150px\)[\s\S]*?\.book-detail-cover,\s*\.book-cover-gallery\s*\{[^}]*grid-row: span 2/);
   assert.match(css, /@media \(max-width: 680px\)[\s\S]*?\.book-detail-cover,\s*\.book-cover-gallery\s*\{[^}]*width: min\(58vw, 12rem\);[^}]*grid-row: auto/);
+  assert.match(css, /\.book-cover-gallery-stage\s*\{[^}]*border: 3px solid #fffaf3;[^}]*border-radius: 0\.8rem/);
+  assert.match(css, /\.book-photo-counter\s*\{[^}]*top: 0\.4rem;[^}]*right: 0\.4rem/);
+  assert.match(css, /\.book-photo-navigation button:first-child\s*\{[^}]*left: -1\.15rem/);
+});
+
+test("camera and file upload remain separate and use the same private upload flow", async () => {
+  const harness = await galleryHarness({ empty: true });
+  assert.equal(harness.cameraLabel.children[0], "+ Camera");
+  assert.equal(harness.cameraInput.attributes.capture, "environment");
+  assert.equal(harness.input.attributes.capture, undefined);
+  assert.equal(harness.cameraInput.accept, harness.input.accept);
+  const photo = { type: "image/jpeg" };
+  harness.cameraInput.files = [photo];
+  await harness.cameraInput.events.change();
+  assert.equal(harness.writes[0][0], "upload");
+  assert.equal(harness.writes[0][2], user);
+  assert.equal(harness.writes[0][3], book);
+  assert.equal(harness.writes[0][4], photo);
+  assert.equal(harness.badge.hidden, false);
+  assert.equal(harness.cameraInput.value, "");
+  assert.equal(harness.input.disabled, false);
+  assert.equal(harness.cameraInput.disabled, false);
+});
+
+test("camera uploads disable both pickers while pending and cannot upload after library removal", async () => {
+  const harness = await galleryHarness({ empty: true });
+  let finish;
+  harness.context.uploadBookPhoto = () => new Promise((resolve) => { finish = resolve; });
+  harness.cameraInput.files = [{}];
+  const pending = harness.cameraInput.events.change();
+  assert.equal(harness.cameraInput.disabled, true);
+  assert.equal(harness.input.disabled, true);
+  harness.input.files = [{}];
+  await harness.input.events.change();
+  finish("photo-path");
+  await pending;
+  assert.equal(harness.cameraInput.disabled, false);
+  assert.equal(harness.input.disabled, false);
+  let writes = 0;
+  harness.context.uploadBookPhoto = async () => { writes++; };
+  harness.state.books = [];
+  await harness.cameraInput.events.change();
+  assert.equal(writes, 0);
+});
+
+test("camera errors restore both pickers and cancellation does not upload", async () => {
+  const harness = await galleryHarness({ empty: true });
+  await harness.cameraInput.events.change();
+  assert.equal(harness.writes.length, 0);
+  harness.cameraInput.files = [{}];
+  harness.context.uploadBookPhoto = async () => { throw new Error("Photo exceeds 5 MB"); };
+  await harness.cameraInput.events.change();
+  assert.equal(harness.status.textContent, "Photo exceeds 5 MB");
+  assert.equal(harness.cameraInput.disabled, false);
+  assert.equal(harness.input.disabled, false);
+});
+
+test("mobile profiles keep decoration behind the compact cover and remove desktop column styling", async () => {
+  const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  const mobile = css.slice(css.indexOf("@media (max-width: 680px)"));
+  assert.match(mobile, /\.book-detail-layout\s*\{[^}]*circle at 50% 5\.5rem/);
+  assert.match(mobile, /\.book-detail-content\s*\{[^}]*min-width: 0;[^}]*min-height: 0;[^}]*padding-left: 0;[^}]*border-left: 0/);
+  assert.match(mobile, /\.book-profile-title\s*\{[^}]*font-size: clamp\(1\.6rem, 7vw, 2rem\);[^}]*overflow-wrap: anywhere/);
+  assert.match(css, /@media \(any-pointer: coarse\), \(max-width: 899px\)\s*\{[\s\S]*?\.book-photo-camera\s*\{[^}]*display: inline-flex/);
+  assert.match(css, /\.book-cover-gallery-stage > \.book-detail-cover\s*\{[^}]*position: absolute;[^}]*inset: 0\.35rem/);
+});
+
+test("Add Photos toggles camera and file options and is disabled while uploading", async () => {
+  const harness = await galleryHarness({ empty: true });
+  assert.equal(harness.addPhotos.children[1], "Add Photos");
+  assert.equal(harness.uploadOptions.hidden, true);
+  harness.addPhotos.events.click();
+  assert.equal(harness.uploadOptions.hidden, false);
+  assert.equal(harness.addPhotos.attributes["aria-expanded"], "true");
+  harness.addPhotos.events.click();
+  assert.equal(harness.uploadOptions.hidden, true);
+  let finish;
+  harness.context.uploadBookPhoto = () => new Promise((resolve) => { finish = resolve; });
+  harness.input.files = [{}];
+  const pending = harness.input.events.change();
+  assert.equal(harness.addPhotos.disabled, true);
+  harness.addPhotos.events.click();
+  assert.equal(harness.uploadOptions.hidden, true);
+  finish("photo-path");
+  await pending;
+  assert.equal(harness.addPhotos.disabled, false);
+});
+
+test("expanded images show the selected upload privately and are cleaned up when signing out", async () => {
+  const harness = await galleryHarness();
+  harness.grid.children[1].events.click();
+  harness.expand.events.click();
+  const dialog = harness.context.document.body.children.at(-1);
+  assert.equal(dialog.open, true);
+  assert.equal(dialog.children[1].src, harness.uploaded.src);
+  assert.equal(dialog.children[2].textContent, "Your photo");
+  harness.state.session = null;
+  harness.observe();
+  assert.equal(dialog.open, false);
+  assert.equal(dialog.removed, true);
+  assert.equal(harness.section.children.length, 0);
+});
+
+test("expanded primary images use the selected edition and close on Escape with focus restored", async () => {
+  const harness = await galleryHarness();
+  const edition = { title: "My edition" };
+  harness.section.events["book-cover-update"]({ detail: edition });
+  harness.expand.events.click();
+  const dialog = harness.context.document.body.children.at(-1);
+  assert.equal(dialog.children[1].book, edition);
+  let prevented = false;
+  dialog.events.cancel({ preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(dialog.removed, true);
+  assert.equal(harness.expand.focused, true);
+});
+
+test("refreshing photos closes expanded uploads before revoking their private object URLs", async () => {
+  const harness = await galleryHarness();
+  harness.grid.children[1].events.click();
+  harness.expand.events.click();
+  const dialog = harness.context.document.body.children.at(-1);
+  await harness.retry.events.click();
+  assert.equal(dialog.open, false);
+  assert.equal(dialog.removed, true);
+  assert.deepEqual(harness.revoked, ["blob:private"]);
+  assert.equal(harness.badge.hidden, false);
 });
 
 test("failed gallery loads surface a retry, and removing a library book prevents further uploads", async () => {
