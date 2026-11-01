@@ -90,6 +90,8 @@ test("membership page renders all tiers and directs active subscribers to the ex
     assert.match(buttonText(annualCta), /\$24\.99\/year/);
     assert.match(buttonText(proCta), /\$19\.99\/month/);
     assert.match(buttonText(proAnnualCta), /\$199\.99\/year Save \$39\.89 vs monthly/);
+    assert.doesNotMatch(buttonText(proCta), /\$0\.00/);
+    assert.doesNotMatch(buttonText(proAnnualCta), /\$0\.00/);
     assert.equal(elements.some((element) => element.textContent === "Free"), true);
     assert.equal(elements.some((element) => element.textContent === "Bookshop Pro"), true);
     assert.equal(elements.some((element) => element.textContent === "Coming soon" && !element.hidden), mode !== "plans-open");
@@ -99,6 +101,8 @@ test("membership page renders all tiers and directs active subscribers to the ex
     assert.equal(elements.some((element) => element.textContent === "Refresh billing status"), false);
     assert.equal(refreshInterval, mode === "signed-out" ? undefined : 10_000);
     assert.equal(cta.disabled, mode !== "plans-open");
+    assert.equal(annualCta.disabled, mode !== "plans-open");
+    assert.equal(proCta.disabled, mode !== "plans-open");
     assert.equal(proAnnualCta.disabled, mode !== "plans-open");
     assert.equal(panel.hidden, ["lite", "signed-out", "plans-open"].includes(mode));
     const visibility = elements.find((element) => element.className === "secondary-btn upgrade-plan-visibility");

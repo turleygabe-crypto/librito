@@ -3,7 +3,7 @@ import { subscriptionTiming, subscriptionTimingMessage } from "./lib/billing-sta
 import { translate as t } from "./translations.js";
 import { listBookPhotos, uploadBookPhoto, downloadBookPhoto, removeBookPhotos } from "./lib/book-photos.js";
 import { normalizePlan, PLAN_LIMITS } from "./lib/entitlements.js";
-import { MEMBERSHIP_PRICING } from "./lib/membership-pricing.js";
+import { MEMBERSHIP_PRICING } from "./lib/membership-pricing.js?v=2";
 import { renderMarketplacePage } from "./lib/marketplace-ui.js";
 import { escapeCsvCell } from "./lib/csv.js";
 

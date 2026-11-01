@@ -63,7 +63,7 @@ test("Vercel static deployment includes every browser library imported by the ap
     .filter((entry) => entry.use === "@vercel/static")
     .map((entry) => entry.src);
   const app = await read("app.js");
-  const importedLibraries = [...app.matchAll(/from ["']\.\/lib\/([^"']+\.js)["']/g)]
+  const importedLibraries = [...app.matchAll(/from ["']\.\/lib\/([^"'?]+\.js)(?:\?[^"']*)?["']/g)]
     .map(([, path]) => path);
   assert.ok(importedLibraries.length > 0);
   for (const library of importedLibraries) {
