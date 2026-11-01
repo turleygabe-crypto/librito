@@ -56,3 +56,20 @@ test("support is reachable from the account menu, footer, sign-in and upgrade pa
     assert.match(text, /support@librito.casa/);
   }
 });
+
+test("Vercel static deployment includes every browser library imported by the app", async () => {
+  const deployment = JSON.parse(await read("vercel.json"));
+  const staticPatterns = deployment.builds
+    .filter((entry) => entry.use === "@vercel/static")
+    .map((entry) => entry.src);
+  const app = await read("app.js");
+  const importedLibraries = [...app.matchAll(/from ["']\.\/lib\/([^"']+\.js)["']/g)]
+    .map(([, path]) => path);
+  assert.ok(importedLibraries.length > 0);
+  for (const library of importedLibraries) {
+    assert.ok(
+      staticPatterns.some((pattern) => pattern.includes(library.replace(/\.js$/, ""))),
+      `Vercel static config must include ${library}`,
+    );
+  }
+});
