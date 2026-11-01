@@ -14,7 +14,10 @@ import { createAccountHandler } from "../api/account.js";
 
 const sql = new PGlite();
 const userId = "11111111-1111-4111-8111-111111111111";
-const config = { livemode: false, origin: "https://librito.casa", prices: { monthly: "price_month", annual: "price_year" } };
+const config = {
+  livemode: false, origin: "https://librito.casa", membershipPlansAvailable: true,
+  prices: { monthly: "price_month", annual: "price_year" },
+};
 const user = { id: userId, email: "reader@example.test" };
 
 before(async () => {
@@ -45,6 +48,7 @@ before(async () => {
   await sql.exec(await readFile(new URL("../supabase/migrations/20261024250000_stripe_billing.sql", import.meta.url), "utf8"));
   await sql.exec(await readFile(new URL("../supabase/migrations/20261024260000_stripe_billing_modes.sql", import.meta.url), "utf8"));
   await sql.exec(await readFile(new URL("../supabase/migrations/20261025010000_account_deletion.sql", import.meta.url), "utf8"));
+  await sql.exec("alter table public.billing_accounts add column subscription_plan text");
 });
 
 after(() => sql.close());
@@ -53,6 +57,9 @@ function database() {
   return {
     rpc: async (name, args) => {
       try {
+        if (["marketplace_assert_account_deletable", "marketplace_delete_account_data"].includes(name)) {
+          return { data: null };
+        }
         const params = name === "billing_assert_mode" ? [args.target_livemode]
           : [args.target_user, args.owner, args.target_livemode];
         if (args.allow_deletion !== undefined) params.push(args.allow_deletion);
@@ -61,6 +68,13 @@ function database() {
       } catch (error) { return { error }; }
     },
     from(table) {
+      if (table === "marketplace_listing_photos") {
+        return {
+          select() { return this; },
+          eq() { return this; },
+          range() { return Promise.resolve({ data: [] }); },
+        };
+      }
       let operation = "select";
       let values;
       let columns = "*";
@@ -109,6 +123,7 @@ function stripeMock(subscriptions = []) {
     }) },
     checkout: { sessions: {
       create: async () => ({ id: "cs_reader", url: "https://checkout.stripe.com/test" }),
+      expire: async () => ({ id: "cs_reader", status: "expired" }),
     } },
   };
 }
@@ -136,6 +151,8 @@ test("billing config validates origin and requires both configured prices", () =
   assert.throws(() => billingConfig({ ...env, APP_URL: "http://librito.casa" }), BillingError);
   assert.throws(() => billingConfig({ ...env, STRIPE_PRICE_ANNUAL: "" }), BillingError);
   assert.equal(billingConfig(env).origin, "http://localhost:3000");
+  assert.equal(billingConfig(env).membershipPlansAvailable, false);
+  assert.equal(billingConfig({ ...env, MEMBERSHIP_PLANS_AVAILABLE: "true" }).membershipPlansAvailable, true);
 });
 
 test("billing requires an explicit mode matching a server-side test or live key", () => {
@@ -353,7 +370,7 @@ test("exhausted lock contention remains retryable and is logged as a warning", (
     console.warn = originalWarn;
   }
 });
-test("checkout uses server Prices and verified user, validates amount, reuses open sessions and blocks duplicate subscriptions", async () => {
+test("checkout uses configured server Prices and verified user, reuses open sessions and blocks duplicate subscriptions", async () => {
   const stripe = stripeMock();
   const account = {};
   const save = async (values) => Object.assign(account, values);
@@ -369,7 +386,7 @@ test("checkout uses server Prices and verified user, validates amount, reuses op
   assert.equal(created.client_reference_id, userId);
   assert.equal(created.success_url, "https://librito.casa/#/upgrade?checkout=success");
   assert.equal(created.payment_method_types, undefined);
-  stripe.checkout.sessions.retrieve = async () => ({ status: "open", metadata: { billing: "annual" }, url: "https://checkout.stripe.com/existing" });
+  stripe.checkout.sessions.retrieve = async () => ({ status: "open", metadata: { billing: "annual", plan: "book_lover" }, url: "https://checkout.stripe.com/existing" });
   assert.equal(await startCheckout({ stripe, config }, user, account, save, "annual"), "https://checkout.stripe.com/existing");
   stripe.subscriptions = stripeMock([subscription("active")]).subscriptions;
   await assert.rejects(startCheckout({ stripe, config }, user, account, save, "monthly"), { status: 409 });
@@ -489,14 +506,13 @@ test("webhook processing failures return non-2xx so Stripe retries, and unconfig
   assert.equal(missing.code, 503);
 });
 
-test("billing endpoint rejects methods, cross-origin requests and missing auth; provides portal and safe setup errors", async () => {
-  const db = database();
-  db.auth = { getUser: async () => ({ data: { user } }) };
-  const stripe = { ...stripeMock(), billingPortal: { sessions: { create: async (params) => {
-    assert.equal(params.customer, "cus_reader");
+test("billing endpoint validates requests and uses the existing portal and authenticated checkout", async () => {
+  const fixture = await lifecycleFixture("88888888-8888-4888-8888-888888888888", "cus_endpoint");
+  fixture.stripe.billingPortal = { sessions: { create: async (params) => {
+    assert.equal(params.customer, "cus_endpoint");
     return { url: "https://billing.stripe.com/test" };
-  } } } };
-  const handler = createHandler(() => ({ db, stripe, config }));
+  } } };
+  const handler = createHandler(() => ({ db: fixture.db, stripe: fixture.stripe, config }));
   for (const [req, status] of [
     [{ method: "DELETE", headers: {} }, 405],
     [{ method: "POST", headers: { origin: "https://evil.example" } }, 403],
@@ -507,10 +523,12 @@ test("billing endpoint rejects methods, cross-origin requests and missing auth; 
   ]) {
     const res = response();
     await handler(req, res);
-    assert.equal(res.code, status);
+    assert.equal(res.code, req.body?.action === "checkout" ? 200 : status);
     assert.equal(res.headers["Cache-Control"], "no-store");
     if (req.body?.action === "portal") assert.equal(res.body.url, "https://billing.stripe.com/test");
+    if (req.body?.action === "checkout") assert.equal(res.body.url, "https://checkout.stripe.com/test");
   }
+  assert.equal(await fixture.tier(), "lite_reader");
   const res = response();
   await createHandler(() => { throw new BillingError(503, "Billing is not configured yet."); })({ method: "GET", headers: {} }, res);
   assert.equal(res.code, 503);
@@ -530,8 +548,8 @@ test("status refresh replaces a stale renewal flag with Stripe cancellation even
   assert.equal(res.body.cancelAtPeriodEnd, true);
   assert.equal(res.body.hasSubscription, true);
   assert.equal(new Date(res.body.periodEnd).toISOString(), new Date(sub.cancel_at * 1000).toISOString());
-  assert.equal((await sql.query("select cancel_at_period_end from billing_accounts")).rows[0].cancel_at_period_end, true);
-  assert.equal((await sql.query("select tier from profiles")).rows[0].tier, "book_lover");
+  assert.equal((await sql.query("select cancel_at_period_end from billing_accounts where user_id = $1", [userId])).rows[0].cancel_at_period_end, true);
+  assert.equal((await sql.query("select tier from profiles where id = $1", [userId])).rows[0].tier, "book_lover");
 });
 
 test("status refresh does not return stale renewal information if Stripe is unavailable", async () => {
@@ -592,8 +610,8 @@ test("cancel endpoint targets the authenticated account and preserves compliment
   }, res);
   assert.equal(res.code, 200);
   assert.deepEqual(res.body, { canceled: true });
-  assert.equal((await sql.query("select complimentary_book_lover, tier from profiles")).rows[0].complimentary_book_lover, true);
-  assert.equal((await sql.query("select tier from profiles")).rows[0].tier, "book_lover");
+  assert.equal((await sql.query("select complimentary_book_lover, tier from profiles where id = $1", [userId])).rows[0].complimentary_book_lover, true);
+  assert.equal((await sql.query("select tier from profiles where id = $1", [userId])).rows[0].tier, "book_lover");
   const rejected = response();
   await createHandler(() => ({ db, stripe, config }))({
     method: "POST", headers: { origin: "https://evil.example" }, body: { action: "cancel" },
@@ -634,37 +652,179 @@ async function lifecycleFixture(id, customer, price = "price_month") {
   };
 }
 
-test("checkout pause works without Stripe configuration or authentication and never loads dependencies", async () => {
-  const handler = createHandler(() => assert.fail("Paused checkout must not contact Stripe or Supabase."));
-  for (const billing of ["monthly", "annual", "invalid", undefined]) {
+test("checkout rejects invalid billing intervals without changing access", async () => {
+  const fixture = await lifecycleFixture("99999999-9999-4999-8999-999999999999", "cus_invalid_interval");
+  const handler = createHandler(() => ({ db: fixture.db, stripe: fixture.stripe, config }));
+  for (const billing of ["invalid", undefined]) {
     const res = response();
-    await handler({ method: "POST", headers: {}, body: { action: "checkout", billing } }, res);
-    assert.equal(res.code, 503);
-    assert.match(res.body.error, /Book Lover is coming soon/);
+    await handler({
+      method: "POST",
+      headers: { authorization: "Bearer invalid-test", origin: config.origin },
+      body: { action: "checkout", billing },
+    }, res);
+    assert.equal(res.code, 400);
     assert.equal(res.headers["Cache-Control"], "no-store");
     assert.equal(res.body.url, undefined);
+    assert.equal(await fixture.tier(), "lite_reader");
   }
 });
 
+test("paid membership checkout is disabled unless explicitly enabled", async () => {
+  const fixture = await lifecycleFixture("99999999-9999-4999-8999-999999999998", "cus_memberships_paused");
+  fixture.stripe.checkout.sessions.create = async () => assert.fail("Paused memberships must not create Checkout sessions");
+  const handler = createHandler(() => ({
+    db: fixture.db, stripe: fixture.stripe, config: { ...config, membershipPlansAvailable: false },
+  }));
+  const res = response();
+  await handler({
+    method: "POST",
+    headers: { authorization: "Bearer paused-test-token", origin: config.origin },
+    body: { action: "checkout", plan: "book_lover", billing: "monthly" },
+  }, res);
+  assert.equal(res.code, 503);
+  assert.match(res.body.error, /coming soon/i);
+});
+
 for (const billing of ["monthly", "annual"]) {
-  test(`${billing} authenticated checkout is blocked without changing access; existing signed webhooks still grant access`, async () => {
+  test(`${billing} authenticated checkout uses its configured Book Lover Price and webhooks grant access`, async () => {
     const id = billing === "monthly" ? "22222222-2222-4222-8222-222222222222" : "33333333-3333-4333-8333-333333333333";
     const fixture = await lifecycleFixture(id, `cus_${billing}_test`, config.prices[billing]);
-    fixture.stripe.checkout.sessions.create = async () => assert.fail("Checkout is paused.");
+    fixture.stripe.checkout.sessions.create = async (params) => {
+      assert.equal(params.line_items[0].price, config.prices[billing]);
+      return { id: `cs_${billing}_test`, url: `https://checkout.stripe.com/${billing}` };
+    };
     const res = response();
     await createHandler(() => ({ db: fixture.db, stripe: fixture.stripe, config }))({
       method: "POST", headers: { origin: config.origin, authorization: "Bearer valid" },
       body: { action: "checkout", billing, price: "price_attacker", userId },
     }, res);
-    assert.equal(res.code, 503);
-    assert.match(res.body.error, /coming soon/);
-    assert.equal(res.body.url, undefined);
+    assert.equal(res.code, 200);
+    assert.equal(res.body.url, `https://checkout.stripe.com/${billing}`);
     assert.equal(await fixture.tier(), "lite_reader");
     // Signed confirmation, not the browser redirect, enables Book Lover.
     await fixture.deliver("invoice.paid", "active");
     assert.equal(await fixture.tier(), "book_lover");
   });
 }
+
+test("authenticated checkout starts Book Lover and Bookshop Pro subscriptions using only configured Stripe Prices", async () => {
+  const cases = [
+    { plan: "book_lover", billing: "monthly", price: config.prices.monthly },
+    { plan: "book_lover", billing: "annual", price: config.prices.annual },
+    { plan: "bookshop_pro", billing: "monthly", price: "price_pro_month" },
+  ];
+  for (const [index, item] of cases.entries()) {
+    const id = `77777777-7777-4777-8777-77777777777${index}`;
+    const fixture = await lifecycleFixture(id, `cus_checkout_${index}`);
+    const planConfig = {
+      ...config,
+      planPrices: {
+        book_lover: { monthly: config.prices.monthly, annual: config.prices.annual },
+        bookshop_pro: { monthly: "price_pro_month" },
+      },
+    };
+    fixture.stripe.prices.retrieve = async (priceId) => ({
+      id: priceId, livemode: false, active: true, currency: "usd",
+      unit_amount: priceId === "price_pro_month" ? 1999 : priceId === "price_month" ? 299 : 2499,
+      recurring: { interval: priceId === "price_year" ? "year" : "month", interval_count: 1 },
+    });
+    fixture.stripe.checkout.sessions.create = async (params) => {
+      assert.equal(params.line_items[0].price, item.price);
+      assert.equal(params.metadata.plan, item.plan);
+      assert.equal(params.metadata.billing, item.billing);
+      assert.equal(params.subscription_data.metadata.librito_plan, item.plan);
+      return { id: `cs_checkout_${index}`, url: "https://checkout.stripe.com/test" };
+    };
+    const res = response();
+    await createHandler(() => ({ db: fixture.db, stripe: fixture.stripe, config: planConfig }))({
+      method: "POST",
+      headers: { origin: config.origin, authorization: "Bearer checkout-test" },
+      body: { action: "checkout", plan: item.plan, billing: item.billing, price: "price_attacker" },
+    }, res);
+    assert.equal(res.code, 200);
+    assert.equal(res.body.url, "https://checkout.stripe.com/test");
+    assert.equal(await fixture.tier(), "lite_reader");
+  }
+});
+
+test("signed webhooks reconcile Book Lover -> Bookshop Pro -> Book Lover on the same subscription and cancel Pro to Free", async () => {
+  const migration = await readFile(new URL("../supabase/migrations/20261101180000_membership_marketplace.sql", import.meta.url), "utf8");
+  // Apply the membership schema in isolation without changing legacy billing fixtures.
+  await sql.exec(migration.slice(0, migration.indexOf("create table public.marketplace_settings")));
+  try {
+    const id = randomUUID();
+    const customer = "cus_plan_changes";
+    const fixture = await lifecycleFixture(id, customer);
+    const planConfig = {
+      ...config,
+      planPrices: {
+        book_lover: config.prices,
+        bookshop_pro: { monthly: "price_pro_month" },
+      },
+    };
+    const sub = { ...subscription("active"), id: "sub_plan_changes", customer, cancel_at_period_end: false };
+    fixture.stripe.subscriptions.list = (params) => {
+      assert.equal(params.customer, customer);
+      assert.equal(params.status, "all");
+      return (async function* () { yield sub; })();
+    };
+    fixture.stripe.customers.create = async () => assert.fail("Plan changes must reuse the existing Customer");
+    fixture.stripe.checkout.sessions.create = async () => assert.fail("Plan changes must not create a new Checkout");
+    const signing = new Stripe("sk_test_placeholder");
+    const secret = "whsec_plan_changes_placeholder";
+    const handler = createWebhookHandler(() => ({
+      db: fixture.db, stripe: fixture.stripe, config: planConfig,
+    }), () => secret);
+    let sequence = 0;
+    async function deliver(type = "customer.subscription.updated") {
+      const payload = JSON.stringify({
+        id: `evt_plan_changes_${++sequence}`, livemode: false, type, data: { object: sub },
+      });
+      const req = Readable.from([Buffer.from(payload)]);
+      req.method = "POST";
+      req.headers = { "stripe-signature": signing.webhooks.generateTestHeaderString({ payload, secret }) };
+      const res = response();
+      await handler(req, res);
+      assert.equal(res.code, 200, JSON.stringify(res.body));
+    }
+    async function assertState(tier, plan, hasAccess = true, hasSubscription = true) {
+      assert.equal(await fixture.tier(), tier);
+      const { rows } = await sql.query(
+        "select customer_id, subscription_plan, has_access, has_subscription from billing_accounts where user_id = $1",
+        [id],
+      );
+      assert.deepEqual(rows, [{
+        customer_id: customer, subscription_plan: plan, has_access: hasAccess, has_subscription: hasSubscription,
+      }]);
+      assert.equal(sub.id, "sub_plan_changes");
+    }
+    assert.deepEqual((await sql.query(
+      "select complimentary_book_lover, complimentary_bookshop_pro from profiles where id = $1", [id],
+    )).rows[0], { complimentary_book_lover: false, complimentary_bookshop_pro: false });
+    await assertState("free", null, false, false);
+    await deliver("customer.subscription.created");
+    await assertState("book_lover", "book_lover");
+
+    sub.items.data[0].price.id = "price_pro_month";
+    await deliver();
+    await assertState("bookshop_pro", "bookshop_pro");
+    sub.items.data[0].price.id = "price_month";
+    await deliver();
+    await assertState("book_lover", "book_lover");
+
+    sub.items.data[0].price.id = "price_pro_month";
+    await deliver();
+    await assertState("bookshop_pro", "bookshop_pro");
+    sub.cancel_at_period_end = true;
+    await deliver();
+    await assertState("bookshop_pro", "bookshop_pro");
+    sub.status = "canceled";
+    await deliver("customer.subscription.deleted");
+    await assertState("free", null, false, false);
+  } finally {
+    await sql.exec("rollback");
+  }
+});
 
 test("signed failed-payment lifecycle denies initial access, retains access during retries, and downgrades after exhaustion without deleting library data", async () => {
   const id = "44444444-4444-4444-8444-444444444444";
@@ -768,7 +928,10 @@ test("switching to live preserves sandbox history and grants, isolates checkout 
     };
     stripe.checkout.sessions.create = async (params, options) => {
       assert.equal(params.customer, "cus_mode_live");
-      assert.equal(options.idempotencyKey, `librito-checkout-live-${id}-first-monthly`);
+      assert.ok([
+        `librito-checkout-live-${id}-first-book_lover-monthly`,
+        `librito-checkout-live-${id}-cs_mode_live-book_lover-monthly`,
+      ].includes(options.idempotencyKey));
       return { id: "cs_mode_live", url: "https://checkout.stripe.com/live" };
     };
     const deps = { db: fixture.db, stripe, config: liveConfig };
@@ -786,10 +949,10 @@ test("switching to live preserves sandbox history and grants, isolates checkout 
     stripe.prices.retrieve = async (price) => ({ ...await retrieve(price), livemode: true });
     const checkout = response();
     await handler(req, checkout);
-    assert.equal(checkout.code, 503);
-    assert.match(checkout.body.error, /coming soon/);
-    assert.equal(creates, 0);
-    // Retained checkout internals still isolate modes, but the public route is paused.
+    assert.equal(checkout.code, 200);
+    assert.equal(checkout.body.url, "https://checkout.stripe.com/live");
+    assert.equal(creates, 1);
+    stripe.checkout.sessions.retrieve = async () => ({ status: "expired" });
     await withAccount(fixture.db, id, (account, save) =>
       startCheckout(deps, { id, email: user.email }, account, save, "monthly"), true);
     assert.equal(creates, 1);
@@ -1003,7 +1166,7 @@ test("Stripe failure retains the account and library, persists the deletion barr
     method: "POST", headers: { origin: config.origin, authorization: "Bearer valid" },
     body: { action: "checkout", billing: "monthly" },
   }, checkout);
-  assert.equal(checkout.code, 503);
+  assert.equal(checkout.code, 409);
   fixture.failCancellation(false);
   assert.equal((await fixture.request()).code, 200);
 });

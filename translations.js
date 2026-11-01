@@ -43,7 +43,7 @@ const english = Object.freeze({
   "status.set": "Status set to {status}",
   "status.removed": "Reading status removed",
   "status.moved_to_reading": "Moved to {status}",
-  "status.reading_limit": "{tier} accounts can have up to {max} books in {status}. Book Lover upgrades are coming soon.",
+  "status.reading_limit": "{tier} accounts can have up to {max} books in {status}. Book Lover includes unlimited current reads.",
   "status.reading_limit_feature": "Up to {max} books in {status}",
   "status.unlimited_reading_feature": "Unlimited books in {status}",
   "status.reading_empty": "Open a book in your library and set its status to {status} to add it here.",

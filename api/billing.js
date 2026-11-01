@@ -1,5 +1,5 @@
 import {
-  authenticate, billingDependencies, BillingError, cancelRenewal, checked, respondError, resumeRenewal, subscriptionSnapshot, withAccount,
+  authenticate, billingDependencies, BillingError, cancelRenewal, checked, respondError, resumeRenewal, startCheckout, subscriptionSnapshot, withAccount,
 } from "../lib/server/billing.js";
 
 export function createHandler(dependencies = billingDependencies) {
@@ -10,9 +10,6 @@ export function createHandler(dependencies = billingDependencies) {
       return res.status(405).json({ error: "Method not allowed" });
     }
     try {
-      if (req.method === "POST" && req.body?.action === "checkout") {
-        throw new BillingError(503, "Book Lover is coming soon. Paid upgrades are not available yet.");
-      }
       const deps = dependencies();
       const { db, stripe, config } = deps;
       if (req.method === "POST" && req.headers.origin !== config.origin) {
@@ -22,7 +19,7 @@ export function createHandler(dependencies = billingDependencies) {
       checked(await db.rpc("billing_assert_mode", { target_livemode: config.livemode }));
       if (req.method === "GET") {
         let account = checked(await db.from("billing_accounts")
-          .select("customer_id, has_subscription, subscription_status, cancel_at_period_end, period_end, deletion_pending")
+          .select("customer_id, has_access, has_subscription, subscription_plan, subscription_status, cancel_at_period_end, period_end, deletion_pending")
           .eq("user_id", user.id).eq("livemode", config.livemode).maybeSingle());
         if (account?.deletion_pending) {
           throw new BillingError(409, "Account deletion is in progress. Retry Delete account, or contact support@librito.casa.");
@@ -36,14 +33,22 @@ export function createHandler(dependencies = billingDependencies) {
         return res.status(200).json({
           canManage: Boolean(account?.customer_id),
           hasSubscription: account?.has_subscription || false,
+          plan: account?.subscription_plan || "free",
           status: account?.subscription_status || null,
           cancelAtPeriodEnd: account?.cancel_at_period_end || false,
           periodEnd: account?.period_end || null,
+          membershipPlansAvailable: config.membershipPlansAvailable === true,
         });
       }
       const { action } = req.body || {};
-      if (!["portal", "resume", "cancel"].includes(action)) throw new BillingError(400, "Invalid billing action.");
+      if (!["checkout", "portal", "resume", "cancel"].includes(action)) throw new BillingError(400, "Invalid billing action.");
+      if (action === "checkout" && config.membershipPlansAvailable !== true) {
+        throw new BillingError(503, "Paid memberships are coming soon.");
+      }
       const url = await withAccount(db, user.id, async (account, save) => {
+        if (action === "checkout") {
+          return startCheckout(deps, user, account, save, req.body.billing, req.body.plan || "book_lover");
+        }
         if (action === "resume") {
           await resumeRenewal(deps, account, save);
           return null;

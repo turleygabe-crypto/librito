@@ -53,6 +53,7 @@ test("admin shortcuts are hidden unless the current signed-in user has verified 
   const adminFunction = source.slice(source.indexOf("async function updateAdminLink("), source.indexOf("\nfunction getDefaultBookLanguage("));
   for (const outcome of ["admin", "reader", "signed-out", "error", "network-error", "changed-user", "signed-out-during-check"]) {
     const links = [{ hidden: false }, { hidden: false }];
+    const marketplaceLink = { dataset: { navLabel: "Marketplace" }, textContent: "Marketplace" };
     let calls = 0;
     const errors = [];
     const state = {
@@ -69,13 +70,15 @@ test("admin shortcuts are hidden unless the current signed-in user has verified 
     };
     const context = {
       state, document: { querySelectorAll: (selector) => {
-        assert.equal(selector, "[data-admin-link]");
-        return links;
+        if (selector === "[data-admin-link]") return links;
+        if (selector === ".nav-pill") return [marketplaceLink];
+        assert.fail(`Unexpected selector: ${selector}`);
       } }, console: { error: (...args) => errors.push(args) },
     };
     runInNewContext(`${adminFunction}\nthis.update = updateAdminLink;`, context);
     await context.update();
     assert.ok(links.every((link) => link.hidden === (outcome !== "admin")));
+    assert.equal(marketplaceLink.textContent, outcome === "admin" ? "Marketplace" : "Marketplace · Coming soon");
     assert.equal(calls, outcome === "signed-out" ? 0 : 1);
     assert.equal(errors.length, ["error", "network-error"].includes(outcome) ? 1 : 0);
   }

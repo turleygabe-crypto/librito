@@ -2,6 +2,10 @@ import { createSupabaseClient } from "./lib/supabase-client.js";
 import { subscriptionTiming, subscriptionTimingMessage } from "./lib/billing-status.js";
 import { translate as t } from "./translations.js";
 import { listBookPhotos, uploadBookPhoto, downloadBookPhoto, removeBookPhotos } from "./lib/book-photos.js";
+import { normalizePlan, PLAN_LIMITS } from "./lib/entitlements.js";
+import { MEMBERSHIP_PRICING } from "./lib/membership-pricing.js";
+import { renderMarketplacePage } from "./lib/marketplace-ui.js";
+import { escapeCsvCell } from "./lib/csv.js";
 
 const storageKey = "librito-library-v1";
 const shelvesStorageKey = "librito-shelves-v1";
@@ -181,12 +185,13 @@ const defaultBookMetadata = Object.fromEntries(defaultBooks.map((book) => [book.
 }]));
 
 const ACCOUNT_TIERS = {
-  lite_reader: { name: "Lite Reader", premium: false, maxBooks: Infinity, maxShelves: Infinity, maxReading: 5 },
-  book_lover: { name: "Book Lover", premium: true, maxBooks: Infinity, maxShelves: Infinity, maxReading: Infinity },
+  free: { name: "Free", premium: false, ...PLAN_LIMITS.free },
+  book_lover: { name: "Book Lover", premium: true, ...PLAN_LIMITS.book_lover },
+  bookshop_pro: { name: "Bookshop Pro", premium: true, ...PLAN_LIMITS.bookshop_pro },
 };
 
 function getAccountTier() {
-  return ACCOUNT_TIERS[state.profile?.tier] || ACCOUNT_TIERS.lite_reader;
+  return ACCOUNT_TIERS[normalizePlan(state.profile?.tier)] || ACCOUNT_TIERS.free;
 }
 
 function countLimitedShelves() {
@@ -200,7 +205,7 @@ function isReservedShelfName(name) {
 function checkShelfLimit(name) {
   const tier = getAccountTier();
   if (countLimitedShelves() < tier.maxShelves) return true;
-  showToast(`${tier.name} accounts can have up to ${tier.maxShelves} shelves. Book Lover upgrades are coming soon.`);
+  showToast(`${tier.name} accounts have reached the shelf limit. Visit Membership plans to review available features.`);
   navigateTo("upgrade");
   return false;
 }
@@ -221,7 +226,7 @@ function checkReadingLimit(book) {
 function checkBookLimit() {
   const tier = getAccountTier();
   if (state.books.length < tier.maxBooks) return true;
-  showToast(`${tier.name} accounts can hold up to ${tier.maxBooks} books. Book Lover upgrades are coming soon.`);
+  showToast(`${tier.name} accounts have reached the library limit. Visit Membership plans to review available features.`);
   navigateTo("upgrade");
   return false;
 }
@@ -233,6 +238,7 @@ const state = {
   session: null,
   profile: null,
   supabase: null,
+  marketplaceAdmin: false,
   view: "home",
   currentShelf: "",
   currentBook: null,
@@ -465,6 +471,16 @@ function restoreRouteFromLocation() {
       break;
     case "/purchase":
       showPurchasePage(params);
+      break;
+    case "/marketplace":
+    case "/marketplace-listing":
+    case "/marketplace-sell":
+    case "/marketplace-orders":
+    case "/marketplace-messages":
+    case "/marketplace-wishlist":
+    case "/marketplace-storefront":
+    case "/marketplace-pro":
+      showMarketplacePage(path.slice(1), params);
       break;
     default:
       showHomePage();
@@ -1173,16 +1189,20 @@ function updateAuthButton() {
 async function updateAdminLink() {
   const links = document.querySelectorAll("[data-admin-link]");
   links.forEach((link) => { link.hidden = true; });
-  if (!links.length) return;
+  const marketplaceLink = [...document.querySelectorAll(".nav-pill")]
+    .find((link) => (link.dataset.navLabel || link.textContent).toLowerCase().includes("marketplace"));
+  state.marketplaceAdmin = false;
+  if (marketplaceLink) marketplaceLink.textContent = "Marketplace · Coming soon";
   if (!state.supabase || !state.session) return;
   const userId = state.session.user.id;
   const supabase = state.supabase;
   try {
     const { data, error } = await supabase.rpc("is_admin");
     if (error) throw error;
-    if (data === true && state.session?.user.id === userId && state.supabase === supabase) {
-      links.forEach((link) => { link.hidden = false; });
-    }
+    if (state.session?.user.id !== userId || state.supabase !== supabase) return;
+    state.marketplaceAdmin = data === true;
+    if (marketplaceLink) marketplaceLink.textContent = state.marketplaceAdmin ? "Marketplace" : "Marketplace · Coming soon";
+    links.forEach((link) => { link.hidden = data !== true; });
   } catch (error) {
     console.error("Could not verify admin access", error);
   }
@@ -2942,6 +2962,51 @@ function showPage(view) {
   page.classList.remove("hidden");
   page.replaceChildren();
   return page;
+}
+
+function showMarketplacePage(route = "marketplace", params = new URLSearchParams()) {
+  updateActiveNavigation("Marketplace");
+  const page = showPage(route);
+  const comingSoon = () => {
+    if (state.view !== route) return;
+    page.replaceChildren();
+    const header = createPageHeader("Marketplace coming soon", "The Librito marketplace is not open to the public yet.");
+    const message = document.createElement("p");
+    message.className = "page-description";
+    message.textContent = "We’re preparing a safe way for readers and bookstores to buy and sell books. Please check back soon.";
+    page.append(header, message);
+  };
+  if (!state.supabase || !state.session) {
+    comingSoon();
+    return;
+  }
+  page.replaceChildren();
+  page.append(createPageHeader("Marketplace", "Checking access…"));
+  const userId = state.session.user.id;
+  const client = state.supabase;
+  client.rpc("is_admin").then(({ data, error }) => {
+    if (error) throw error;
+    if (state.view !== route || state.session?.user.id !== userId || state.supabase !== client) return;
+    state.marketplaceAdmin = data === true;
+    if (!state.marketplaceAdmin) {
+      comingSoon();
+      return;
+    }
+    renderMarketplacePage({
+      page,
+      client,
+      user: state.session.user,
+      profile: state.profile,
+      route,
+      params,
+      navigate: navigateTo,
+      openAuth: openAuthModal,
+      toast: showToast,
+    });
+  }).catch((error) => {
+    console.error("Could not verify marketplace access", error);
+    comingSoon();
+  });
 }
 
 function updateActiveNavigation(label) {
@@ -7222,10 +7287,7 @@ function escapeHtml(value) {
 }
 
 function escapeCsv(value) {
-  const text = String(value ?? "");
-  // Prefix formula-like values so spreadsheets don't execute them.
-  const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
-  return `"${safe.replace(/"/g, '""')}"`;
+  return escapeCsvCell(value);
 }
 
 function getLibraryReportRows(books) {
@@ -7309,7 +7371,7 @@ function createLibraryExportCard(books) {
     const upgrade = document.createElement("button");
     upgrade.type = "button";
     upgrade.className = "action-btn";
-    upgrade.textContent = "Book Lover - coming soon";
+    upgrade.textContent = "Upgrade to Book Lover";
     upgrade.addEventListener("click", () => navigateTo("upgrade"));
     actions.append(upgrade);
   }
@@ -7318,21 +7380,31 @@ function createLibraryExportCard(books) {
 }
 
 const LITE_READER_FEATURES = [
-  "Unlimited books in your library",
-  "Unlimited custom shelves",
-  "Shop in the Marketplace when it launches - no paid plan required",
-  t("status.reading_limit_feature", { max: 5, status: getReadingStatusLabel("reading") }),
-  t("features.library_and_shelves"),
-  "Track your reading progress",
-  "Access to your library stats",
+  "Personal library, reading status, and progress tracking for up to five current reads",
+  "Shelves, collections, and basic library statistics",
+  "Book discovery and recommendations",
+  "Marketplace browsing, buying, and selling (coming soon)",
+  "Marketplace messaging and notifications (coming soon)",
+  "Standard marketplace commission when it opens",
 ];
 const BOOK_LOVER_FEATURES = [
-  "Everything in Lite Reader",
-  t("status.unlimited_reading_feature", { status: getReadingStatusLabel("reading") }),
-  "List books in the Marketplace when it launches",
-  "Export insurance-ready library reports (CSV & printable PDF)",
-  "Early access to new features",
-  "Support the future of Librito",
+  "Everything in Free",
+  "Track an unlimited number of current reads",
+  "CSV, PDF, and Excel exports where supported",
+  "Insurance, moving, and estate inventory reports",
+  "Collection statistics, insights, and advanced organization",
+  "Marketplace sales and purchase reports",
+  "Collection value tracking when reliable data is available",
+  "Advanced reading history and statistics",
+];
+const BOOKSHOP_PRO_FEATURES = [
+  "Everything in Book Lover",
+  "Professional seller storefront and business profile",
+  "Bulk listing and inventory management",
+  "CSV inventory import and export",
+  "Sales, revenue, and listing performance analytics",
+  "Order management, business reports, and notifications",
+  "Priority seller support",
 ];
 
 function createUpgradeFeatureList(features) {
@@ -7442,6 +7514,10 @@ async function deleteAccount(button) {
 }
 
 async function openBilling(button, body) {
+  if (!state.session) {
+    openAuthModal();
+    return;
+  }
   const label = button.textContent;
   button.disabled = true;
   button.textContent = "Opening secure billing...";
@@ -7451,7 +7527,7 @@ async function openBilling(button, body) {
     if (destination.protocol !== "https:" || !["checkout.stripe.com", "billing.stripe.com"].includes(destination.hostname)) {
       throw new Error("Billing returned an invalid destination.");
     }
-    if (body.action === "checkout") {
+    if (body.action === "checkout" && (body.plan || "book_lover") === "book_lover") {
       sessionStorage.setItem(`librito-book-lover-welcome:${state.session.user.id}`, "pending");
     }
     window.location.assign(destination.href);
@@ -7466,10 +7542,11 @@ async function openBilling(button, body) {
 async function resumeBilling(button, status, onSuccess) {
   button.disabled = true;
   try {
+    const planName = normalizePlan(status.plan) === "bookshop_pro" ? "Bookshop Pro" : "Book Lover";
     const confirmed = await showAppConfirm(
-      `Your Book Lover subscription is canceled. Your remaining access ends on ${formatDate(status.periodEnd)}, and no further payments are scheduled. If you choose Renew subscription, automatic renewal will resume on that date at your existing price and billing interval. Choose Continue cancellation to leave your plan canceled.`,
+      `Your ${planName} subscription is canceled. Your remaining access ends on ${formatDate(status.periodEnd)}, and no further payments are scheduled. If you choose Renew subscription, automatic renewal will resume on that date at your existing price and billing interval. Choose Continue cancellation to leave your plan canceled.`,
       {
-        title: "Renew your Book Lover subscription?",
+        title: `Renew your ${planName} subscription?`,
         confirmLabel: "Renew subscription",
         cancelLabel: "Continue cancellation",
         onConfirm: () => billingRequest({ action: "resume" }),
@@ -7479,7 +7556,7 @@ async function resumeBilling(button, status, onSuccess) {
     await refreshAfterBillingChange(onSuccess);
     await showAppDialog({
       title: "So glad you're staying!",
-      message: `Your Book Lover subscription has been renewed. Automatic renewal is back on, with your next scheduled billing date on ${formatDate(status.periodEnd)}. Thank you for making Librito part of your reading life.`,
+      message: `Your ${planName} subscription has been renewed. Automatic renewal is back on, with your next scheduled billing date on ${formatDate(status.periodEnd)}. Thank you for making Librito part of your reading life.`,
       confirmLabel: "Done",
       cancelLabel: null,
     });
@@ -7503,13 +7580,14 @@ async function refreshAfterBillingChange(onSuccess) {
 async function cancelBilling(button, status, complimentary, onSuccess) {
   button.disabled = true;
   try {
+    const planName = normalizePlan(status.plan) === "bookshop_pro" ? "Bookshop Pro" : "Book Lover";
     const access = complimentary
-      ? "Your complimentary Book Lover access will remain unchanged."
-      : `Your Book Lover access will continue until ${formatDate(status.periodEnd)}. After that, your account will switch to Lite Reader. Your books and shelves will stay saved.`;
+      ? `Your complimentary ${planName} access will remain unchanged.`
+      : `Your ${planName} access will continue until ${formatDate(status.periodEnd)}. After that, your account will switch to Free. Your books and shelves will stay saved.${planName === "Bookshop Pro" ? " Business listings will be paused until you reactivate Pro." : ""}`;
     const confirmed = await showAppConfirm(
       `${access} Canceling stops automatic renewal; it does not refund past payments. No new renewal payments will be scheduled. Any outstanding balance is still due.`,
       {
-        title: "Cancel your Book Lover subscription?",
+        title: `Cancel your ${planName} subscription?`,
         confirmLabel: "Cancel subscription",
         cancelLabel: "Keep subscription",
         danger: true,
@@ -7564,12 +7642,13 @@ async function refreshSubscriptionReminder(force = false) {
     banner = document.createElement("section");
     banner.id = "subscriptionReminder";
     banner.className = "subscription-reminder";
-    banner.setAttribute("aria-label", "Book Lover reminder");
+    banner.setAttribute("aria-label", "Membership reminder");
     banner.setAttribute("role", "status");
     banner.hidden = true;
     document.querySelector("main").prepend(banner);
   }
-  if (!userId || reminderUserId !== userId || state.profile?.complimentary_book_lover) banner.hidden = true;
+  if (!userId || reminderUserId !== userId
+    || state.profile?.complimentary_book_lover || state.profile?.complimentary_bookshop_pro) banner.hidden = true;
   if (!userId) {
     reminderUserId = null;
     reminderCheckedAt = 0;
@@ -7584,7 +7663,8 @@ async function refreshSubscriptionReminder(force = false) {
       if (state.session?.user.id !== userId) return;
       const timing = subscriptionTiming(status);
       banner.replaceChildren();
-      banner.hidden = !timing?.milestone || Boolean(state.profile?.complimentary_book_lover);
+      banner.hidden = !timing?.milestone
+        || Boolean(state.profile?.complimentary_book_lover || state.profile?.complimentary_bookshop_pro);
       if (banner.hidden) return;
       const key = `librito-billing-reminder:${userId}:${status.periodEnd}:${timing.canceled}:${timing.milestone}`;
       if (sessionStorage.getItem(key)) {
@@ -7794,18 +7874,32 @@ function showUpgradePage() {
   updateActiveNavigation("");
   const page = showPage("upgrade");
   page.classList.add("upgrade-page");
-  const isBookLover = getAccountTier().premium;
+  const currentPlan = normalizePlan(state.profile?.tier);
   let currentBillingStatus = null;
+  let paidPlansAvailable = false;
+  const choosePlan = (button, plan, billing) => {
+    if (!paidPlansAvailable) return;
+    if (!state.session) {
+      openAuthModal();
+      return;
+    }
+    if (currentBillingStatus?.hasSubscription
+      && normalizePlan(currentBillingStatus.plan) !== plan) {
+      openBilling(button, { action: "portal" });
+      return;
+    }
+    openBilling(button, { action: "checkout", plan, billing });
+  };
 
   const hero = document.createElement("section");
   hero.className = "home-hero upgrade-hero";
   const heroCopy = document.createElement("div");
   heroCopy.className = "home-hero-copy";
   const title = document.createElement("h1");
-  title.textContent = "Book Lover is coming soon";
+  title.textContent = "Choose your Librito plan";
   const intro = document.createElement("p");
   intro.className = "page-description";
-  intro.textContent = "Paid upgrades aren't available yet. Keep enjoying Lite Reader for free. Complimentary Book Lover access granted by an admin remains available.";
+  intro.textContent = "Paid memberships and the marketplace are coming soon to the public. Existing subscribers can still manage their billing below.";
   heroCopy.append(title, intro);
   hero.append(heroCopy);
 
@@ -7815,45 +7909,90 @@ function showUpgradePage() {
   const lite = document.createElement("article");
   lite.className = "upgrade-plan";
   const liteName = document.createElement("h2");
-  liteName.textContent = "Lite Reader";
+  liteName.textContent = "Free";
   const litePrice = document.createElement("p");
   litePrice.className = "upgrade-price";
   litePrice.textContent = "Free";
   const liteCopy = document.createElement("p");
-  liteCopy.textContent = "A great way to get started. Build your library and keep track of what you read.";
+  liteCopy.textContent = "Everything needed for a personal reading life. Marketplace access is coming soon.";
   const liteStatus = document.createElement("button");
   liteStatus.type = "button";
   liteStatus.className = "upgrade-cta is-current";
   liteStatus.disabled = true;
-  liteStatus.textContent = isBookLover ? "Free plan" : "Your current plan";
+  liteStatus.textContent = currentPlan === "free" ? "Your current plan" : "Free plan";
   lite.append(liteName, litePrice, liteCopy, createUpgradeFeatureList(LITE_READER_FEATURES), liteStatus);
 
   const premium = document.createElement("article");
   premium.className = "upgrade-plan is-featured";
   const popular = document.createElement("span");
   popular.className = "upgrade-popular";
-  popular.textContent = "Coming soon";
+  popular.textContent = "For readers & collectors";
   const premiumName = document.createElement("h2");
   premiumName.textContent = "Book Lover";
+  const premiumComingSoon = document.createElement("span");
+  premiumComingSoon.className = "upgrade-coming-soon";
+  premiumComingSoon.textContent = "Coming soon";
   const premiumCopy = document.createElement("p");
-  premiumCopy.textContent = "Everyone can shop in the upcoming Marketplace without a paid plan. Book Lover will be required to list books.";
+  premiumCopy.textContent = "A personal library and collection-management subscription. When the marketplace opens, buying and selling will not require Book Lover.";
+  const premiumPrice = document.createElement("p");
+  premiumPrice.className = "upgrade-price";
+  premiumPrice.textContent = `${formatCurrency(MEMBERSHIP_PRICING.book_lover.monthlyCents / 100)}/month · ${formatCurrency(MEMBERSHIP_PRICING.book_lover.annualCents / 100)}/year`;
   const cta = document.createElement("button");
   cta.type = "button";
   cta.className = "upgrade-cta";
-  cta.disabled = true;
-  cta.textContent = "Coming soon";
-  if (isBookLover) {
+  cta.textContent = currentPlan === "book_lover" ? "Your current plan" : "Coming soon";
+  cta.disabled = currentPlan === "book_lover" || !paidPlansAvailable;
+  cta.addEventListener("click", () => choosePlan(cta, "book_lover", "monthly"));
+  const annualCta = document.createElement("button");
+  annualCta.type = "button";
+  annualCta.className = "upgrade-cta upgrade-annual-cta";
+  annualCta.textContent = currentPlan === "book_lover" ? "Your current plan" : "Coming soon";
+  annualCta.disabled = currentPlan === "book_lover" || !paidPlansAvailable;
+  annualCta.addEventListener("click", () => choosePlan(annualCta, "book_lover", "annual"));
+  if (currentPlan === "book_lover") {
     cta.textContent = state.profile?.complimentary_book_lover ? "Your complimentary plan" : "Your current plan";
+    annualCta.textContent = cta.textContent;
     cta.classList.add("is-current");
+    annualCta.classList.add("is-current");
   }
-  premium.append(popular, premiumName, premiumCopy, createUpgradeFeatureList(BOOK_LOVER_FEATURES), cta);
+  premium.append(
+    popular, premiumName, premiumComingSoon, premiumCopy, premiumPrice,
+    createUpgradeFeatureList(BOOK_LOVER_FEATURES), cta, annualCta,
+  );
 
-  plans.append(lite, premium);
+  const professional = document.createElement("article");
+  professional.className = "upgrade-plan";
+  const professionalName = document.createElement("h2");
+  professionalName.textContent = "Bookshop Pro";
+  const professionalComingSoon = document.createElement("span");
+  professionalComingSoon.className = "upgrade-coming-soon";
+  professionalComingSoon.textContent = "Coming soon";
+  const professionalCopy = document.createElement("p");
+  professionalCopy.textContent = `Professional tools for independent bookstores. Proposed starting price: ${formatCurrency(MEMBERSHIP_PRICING.bookshop_pro.proposedMonthlyCents / 100)}/month; the configured Stripe Price determines the amount charged.`;
+  const professionalPrice = document.createElement("p");
+  professionalPrice.className = "upgrade-price";
+  professionalPrice.textContent = "Monthly · configured price";
+  const professionalCta = document.createElement("button");
+  professionalCta.type = "button";
+  professionalCta.className = "upgrade-cta";
+  professionalCta.textContent = currentPlan === "bookshop_pro" ? "Your current plan" : "Coming soon";
+  professionalCta.disabled = currentPlan === "bookshop_pro" || !paidPlansAvailable;
+  professionalCta.addEventListener("click", () => choosePlan(professionalCta, "bookshop_pro", "monthly"));
+  if (currentPlan === "bookshop_pro") {
+    professionalCta.classList.add("is-current");
+    if (state.profile?.complimentary_bookshop_pro) professionalCta.textContent = "Your complimentary plan";
+  }
+  professional.append(
+    professionalName, professionalComingSoon, professionalPrice, professionalCopy,
+    createUpgradeFeatureList(BOOKSHOP_PRO_FEATURES), professionalCta,
+  );
+
+  plans.append(lite, premium, professional);
   const tagline = document.createElement("p");
   tagline.className = "upgrade-tagline";
   tagline.textContent = "More books. More shelves. A library that's truly yours.";
   const planOptions = document.createElement("section");
-  planOptions.id = "bookLoverPlanOptions";
+  planOptions.id = "membershipPlanOptions";
   planOptions.className = "upgrade-plan-options";
   planOptions.append(plans, tagline);
   const planVisibility = document.createElement("button");
@@ -7901,7 +8040,7 @@ function showUpgradePage() {
   cancel.textContent = "Cancel subscription";
   cancel.hidden = true;
   cancel.addEventListener("click", () => cancelBilling(cancel, currentBillingStatus,
-    Boolean(state.profile?.complimentary_book_lover), async () => {
+    Boolean(state.profile?.complimentary_book_lover || state.profile?.complimentary_bookshop_pro), async () => {
       await loadBillingStatus();
       await refreshSubscriptionReminder(true);
     }));
@@ -7920,32 +8059,52 @@ function showUpgradePage() {
       if (state.session?.user.id !== userId || !page.isConnected || !page.contains(manage)) return;
       state.profile = profile;
       currentBillingStatus = status;
+      paidPlansAvailable = status.membershipPlansAvailable === true;
+      premiumComingSoon.hidden = paidPlansAvailable;
+      professionalComingSoon.hidden = paidPlansAvailable;
       updateAuthButton();
       manage.hidden = !status.canManage;
       billingHelp.hidden = !status.canManage;
       resume.hidden = !subscriptionTiming(status)?.canceled;
       cancel.hidden = !subscriptionTiming(status) || status.cancelAtPeriodEnd;
-      billingPanel.hidden = !status.canManage && !profile.complimentary_book_lover && !checkout;
+      billingPanel.hidden = !status.canManage && !profile.complimentary_book_lover
+        && !profile.complimentary_bookshop_pro && !checkout;
       refresh.hidden = billingPanel.hidden;
-      const premiumAccess = getAccountTier().premium;
-      liteStatus.textContent = premiumAccess ? "Free plan" : "Your current plan";
-      cta.disabled = true;
-      cta.classList.toggle("is-current", premiumAccess);
-      cta.textContent = profile.complimentary_book_lover ? "Your complimentary plan"
-        : premiumAccess ? "Your current plan" : "Coming soon";
+        const activePlan = normalizePlan(status.plan || profile.tier);
+        const hasPaidSubscription = status.hasSubscription;
+        liteStatus.textContent = activePlan === "free" ? "Your current plan" : "Free plan";
+        for (const [plan, controls] of [
+          ["book_lover", [cta, annualCta]],
+          ["bookshop_pro", [professionalCta]],
+        ]) {
+          const isCurrent = activePlan === plan;
+          for (const control of controls) {
+            control.disabled = isCurrent || !paidPlansAvailable;
+            control.classList.toggle("is-current", isCurrent);
+            if (isCurrent) control.textContent = profile[`complimentary_${plan}`]
+              ? "Your complimentary plan" : "Your current plan";
+            else if (!paidPlansAvailable) control.textContent = "Coming soon";
+            else if (hasPaidSubscription) control.textContent = `${plan === "book_lover" ? "Book Lover" : "Bookshop Pro"} · switch in Manage billing`;
+            else control.textContent = plan === "book_lover"
+              ? `Book Lover · ${formatCurrency(MEMBERSHIP_PRICING.book_lover[control === cta ? "monthlyCents" : "annualCents"] / 100)}${control === cta ? "/month" : "/year"}`
+              : "Bookshop Pro · monthly";
+          }
+        }
       billingStatus.textContent = status.cancelAtPeriodEnd && subscriptionTiming(status)
         ? subscriptionTimingMessage(status)
         : status.status === "past_due"
           ? "Payment needs attention. Book Lover remains available during payment retries; update your payment method below."
-          : profile.complimentary_book_lover
-            ? "You have complimentary Book Lover access."
+          : profile.complimentary_bookshop_pro
+            ? "You have complimentary Bookshop Pro access."
+            : profile.complimentary_book_lover
+              ? "You have complimentary Book Lover access."
             : status.status === "active" || status.status === "trialing"
-              ? subscriptionTimingMessage(status) || "Your Book Lover subscription is active."
+              ? subscriptionTimingMessage(status) || `Your ${activePlan === "bookshop_pro" ? "Bookshop Pro" : "Book Lover"} subscription is active.`
               : status.hasSubscription ? "Your subscription needs attention. Open Manage billing to review it."
                 : status.canManage ? "Your subscription has ended. You can still view your billing history."
                   : checkout === "success" ? "Your payment is being confirmed. Refresh your status shortly."
                     : checkout === "canceled" ? "Checkout canceled. No plan change was made." : "";
-      if (checkout === "success") showBookLoverWelcome(status, profile, userId);
+      if (checkout === "success" && activePlan === "book_lover") showBookLoverWelcome(status, profile, userId);
     } catch (error) {
       console.error("Could not load billing status", error);
       currentBillingStatus = null;
@@ -7974,7 +8133,7 @@ function showUpgradePage() {
     billingPanel.hidden = false;
     billingStatus.textContent = "Checkout canceled. No plan change was made.";
   }
-  if (state.session) loadBillingStatus();
+  if (state.session) return loadBillingStatus();
 }
 
 function showPurchasePage(params = new URLSearchParams(window.location.hash.split("?")[1] || "")) {
@@ -8092,6 +8251,7 @@ function render() {
   else if (state.view === "stats") showStatsPage();
   else if (state.view === "book") renderBookRoute();
   else if (state.view === "purchase") showPurchasePage();
+  else if (state.view.startsWith("marketplace")) restoreRouteFromLocation();
   else if (state.view === "upgrade") showUpgradePage();
   else if (state.view === "account") showAccountPage(new URLSearchParams(window.location.hash.split("?")[1] || "").get("section") || "overview");
 }
@@ -9052,6 +9212,7 @@ document.querySelectorAll(".nav-pill").forEach((item) => {
     if (item.textContent.includes("Your shelves")) navigateTo("shelves");
     if (item.textContent.includes("Discover")) runNaturalSearch("");
     if (item.textContent.includes("Stats")) navigateTo("stats");
+    if (item.textContent.includes("Marketplace")) navigateTo("marketplace");
   });
 });
 

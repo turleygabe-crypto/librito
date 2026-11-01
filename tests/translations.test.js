@@ -24,7 +24,7 @@ test("reading status translator notes preserve the requested semantic guidance",
 test("translation strings interpolate parameters and preserve unknown placeholders", () => {
   assert.equal(
     translate("status.reading_limit", { tier: "Lite Reader", max: 5, status: "Currently Reading" }),
-    "Lite Reader accounts can have up to 5 books in Currently Reading. Book Lover upgrades are coming soon."
+    "Lite Reader accounts can have up to 5 books in Currently Reading. Book Lover includes unlimited current reads."
   );
   assert.equal(translate("unknown.key"), "unknown.key");
   assert.equal(translate("status.set", { status: "Read" }), "Status set to Read");

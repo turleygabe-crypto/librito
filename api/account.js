@@ -2,6 +2,15 @@ import {
   authenticate, billingDependencies, BillingError, checked, respondError, withAccount,
 } from "../lib/server/billing.js";
 import { removeAccountBookPhotos } from "../lib/book-photos.js";
+import { removeAccountMarketplaceListingPhotos } from "../lib/marketplace-photos.js";
+
+async function marketplaceDeletionRpc(db, functionName, userId) {
+  const result = await db.rpc(functionName, { target_user: userId });
+  if (result.error?.code === "55000") {
+    throw new BillingError(409, "This account has live or unresolved marketplace transactions that must be resolved before deletion. Contact support@librito.casa.");
+  }
+  checked(result);
+}
 
 async function stopAccountBilling(stripe, account, save) {
   if (!account.customer_id) return;
@@ -52,7 +61,10 @@ export function createAccountHandler(dependencies = billingDependencies) {
         }
         await save({ deletion_pending: true });
         await stopAccountBilling(stripe, account, save);
+        await marketplaceDeletionRpc(db, "marketplace_assert_account_deletable", user.id);
+        await removeAccountMarketplaceListingPhotos(db, user.id);
         await removeAccountBookPhotos(db, user.id);
+        await marketplaceDeletionRpc(db, "marketplace_delete_account_data", user.id);
         // Recheck the lease after external calls before the irreversible Auth deletion.
         await save({ deletion_pending: true });
         const removed = checked(await db.auth.admin.deleteUser(user.id, false));

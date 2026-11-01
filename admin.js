@@ -1,4 +1,5 @@
 import { createSupabaseClient } from "/lib/supabase-client.js";
+import { escapeCsvCell } from "/lib/csv.js";
 
 const root = document.getElementById("root");
 const supabase = createSupabaseClient();
@@ -16,6 +17,7 @@ const ago = (v) => {
 const PAGES = [
   ["overview", "Overview"],
   ["users", "Users"],
+  ["marketplace", "Marketplace reports"],
   ["books", "Books"],
   ["shelves", "Shelves"],
   ["engagement", "Engagement"],
@@ -23,13 +25,14 @@ const PAGES = [
 const SUBTITLES = {
   overview: "Your little corner of the reading world.",
   users: "Everyone who has joined Librito.",
+  marketplace: "Review reports about listings, sellers, and messages.",
   books: "What readers are adding to their libraries.",
   shelves: "How readers organize their books.",
   engagement: "Likes, reading progress, and weekly rhythm.",
 };
 const COLORS = ["#8b5e3c", "#d8b898", "#b88a64", "#5e4332", "#e7cbb7", "#a67c52"];
 
-const view = { page: "overview", days: 30, stats: null, users: null, search: "" };
+const view = { page: "overview", days: 30, stats: null, users: null, reports: null, search: "" };
 
 function loginForm(message = "") {
   root.innerHTML = `<div class="center"><h1>Librito Admin</h1><form id="f">
@@ -104,7 +107,19 @@ function usersPage() {
   const rows = (view.users || []).filter((u) => !q || (u.email || "").toLowerCase().includes(q));
   return `<div class="card"><div class="tools" style="margin-bottom:10px"><input id="search" type="search" placeholder="Search by email…" value="${esc(view.search)}"><span class="s">${rows.length} users</span></div>
     <div class="tablewrap"><table><thead><tr><th>USER</th><th>JOINED</th><th>LAST ACTIVE</th><th>BOOKS</th><th>SHELVES</th><th>LIKES</th><th>ROLE</th><th>PLAN</th><th>COMPLIMENTARY ACCESS</th></tr></thead><tbody>
-    ${rows.map((u) => `<tr><td>${esc(u.email || u.id)}</td><td>${fmtDate(u.created_at)}</td><td>${fmtDate(u.last_sign_in_at)}</td><td>${u.books}</td><td>${u.shelves}</td><td>${u.likes}</td><td>${u.is_admin ? "<span class='pill warn'>Admin</span>" : "<span class='pill'>Reader</span>"}</td><td>${u.tier === "book_lover" ? "Book Lover" : "Lite Reader"}</td><td><select class="tier-select" data-user="${esc(u.id)}" aria-label="Complimentary access for ${esc(u.email || u.id)}"><option value="lite_reader" ${u.complimentary_book_lover ? "" : "selected"}>None</option><option value="book_lover" ${u.complimentary_book_lover ? "selected" : ""}>Book Lover</option></select></td></tr>`).join("")}
+    ${rows.map((u) => {
+      const currentPlan = { lite_reader: "Free", free: "Free", book_lover: "Book Lover", bookshop_pro: "Bookshop Pro" }[u.tier] || "Free";
+      const complimentary = u.complimentary_bookshop_pro ? "bookshop_pro"
+        : u.complimentary_book_lover ? "book_lover" : "free";
+      return `<tr><td>${esc(u.email || u.id)}</td><td>${fmtDate(u.created_at)}</td><td>${fmtDate(u.last_sign_in_at)}</td><td>${u.books}</td><td>${u.shelves}</td><td>${u.likes}</td><td>${u.is_admin ? "<span class='pill warn'>Admin</span>" : "<span class='pill'>Reader</span>"}</td><td>${esc(currentPlan)}</td><td><select class="tier-select" data-user="${esc(u.id)}" aria-label="Complimentary access for ${esc(u.email || u.id)}"><option value="free" ${complimentary === "free" ? "selected" : ""}>None</option><option value="book_lover" ${complimentary === "book_lover" ? "selected" : ""}>Book Lover</option><option value="bookshop_pro" ${complimentary === "bookshop_pro" ? "selected" : ""}>Bookshop Pro</option></select></td></tr>`;
+    }).join("")}
+    </tbody></table></div></div>`;
+}
+
+function marketplaceReportsPage() {
+  const rows = view.reports || [];
+  return `<div class="card"><div class="tablewrap"><table><thead><tr><th>REPORTED</th><th>TYPE</th><th>REASON</th><th>STATUS</th><th>ACTIONS</th></tr></thead><tbody>
+    ${rows.map((report) => `<tr><td>${fmtDate(report.created_at)}</td><td>${report.listing_id ? "Listing" : report.seller_id ? "Seller" : "Message"}</td><td>${esc(report.reason)}</td><td>${esc(report.status)}</td><td>${report.status === "open" || report.status === "reviewing" ? `<button class="btn marketplace-report-action" data-id="${esc(report.id)}" data-decision="actioned">Action report</button> <button class="btn ghost marketplace-report-action" data-id="${esc(report.id)}" data-decision="dismissed">Dismiss</button>` : "Reviewed"}</td></tr>`).join("") || "<tr><td colspan='5'>No marketplace reports.</td></tr>"}
     </tbody></table></div></div>`;
 }
 
@@ -131,12 +146,7 @@ function engagementPage(d) {
 }
 
 function csv(rows) {
-  const cell = (v) => {
-    let s = String(v ?? "");
-    if (/^[=+\-@]/.test(s)) s = `'${s}`;
-    return `"${s.replace(/"/g, '""')}"`;
-  };
-  return rows.map((r) => r.map(cell).join(",")).join("\n");
+  return rows.map((r) => r.map(escapeCsvCell).join(",")).join("\n");
 }
 
 function exportCsv() {
@@ -145,6 +155,9 @@ function exportCsv() {
   if (view.page === "users") {
     rows = [["email", "joined", "last_active", "books", "shelves", "likes", "admin"],
       ...(view.users || []).map((u) => [u.email, u.created_at, u.last_sign_in_at, u.books, u.shelves, u.likes, u.is_admin])];
+  } else if (view.page === "marketplace") {
+    rows = [["created_at", "status", "reason", "listing_id", "seller_id", "message_id"],
+      ...(view.reports || []).map((r) => [r.created_at, r.status, r.reason, r.listing_id, r.seller_id, r.message_id])];
   } else {
     const d = view.stats;
     rows = [["day", "signups", "books_added"]];
@@ -168,7 +181,7 @@ function shell(content) {
       ${PAGES.map(([k, l]) => `<button data-page="${k}" class="${k === view.page ? "active" : ""}">${l}</button>`).join("")}
       <div class="spacer"></div><a href="/">← Back to Librito</a><button id="out">Sign out</button></aside>
     <main><div class="top"><div><h1>${title}</h1><p>${SUBTITLES[view.page]}</p></div>
-      <div class="tools">${view.page === "users" ? "" : `<select id="range">${[7, 30, 90, 365].map((n) => `<option value="${n}" ${n === view.days ? "selected" : ""}>Last ${n} days</option>`).join("")}</select>`}
+      <div class="tools">${["users", "marketplace"].includes(view.page) ? "" : `<select id="range">${[7, 30, 90, 365].map((n) => `<option value="${n}" ${n === view.days ? "selected" : ""}>Last ${n} days</option>`).join("")}</select>`}
       <button id="export" class="btn ghost">Export CSV</button></div></div>${content}</main></div>`;
 
   root.querySelectorAll("[data-page]").forEach((b) => b.addEventListener("click", () => { view.page = b.dataset.page; show(); }));
@@ -178,7 +191,8 @@ function shell(content) {
   if (range) range.addEventListener("change", () => { view.days = Number(range.value); view.stats = null; show(); });
   root.querySelectorAll(".tier-select").forEach((select) => select.addEventListener("change", async () => {
     const user = (view.users || []).find((u) => u.id === select.dataset.user);
-    const previous = user?.complimentary_book_lover ? "book_lover" : "lite_reader";
+    const previous = user?.complimentary_bookshop_pro ? "bookshop_pro"
+      : user?.complimentary_book_lover ? "book_lover" : "free";
     select.disabled = true;
     const { data, error } = await supabase.rpc("admin_set_tier", { target_user: select.dataset.user, new_tier: select.value });
     select.disabled = false;
@@ -190,7 +204,22 @@ function shell(content) {
     if (user) {
       user.tier = data;
       user.complimentary_book_lover = select.value === "book_lover";
+      user.complimentary_bookshop_pro = select.value === "bookshop_pro";
     }
+    show();
+  }));
+  root.querySelectorAll(".marketplace-report-action").forEach((action) => action.addEventListener("click", async () => {
+    action.disabled = true;
+    const { error } = await supabase.rpc("marketplace_admin_review_report", {
+      target_report: action.dataset.id,
+      decision: action.dataset.decision,
+    });
+    if (error) {
+      action.disabled = false;
+      alert(`Could not review this report: ${error.message}`);
+      return;
+    }
+    view.reports = null;
     show();
   }));
   const search = document.getElementById("search");
@@ -214,6 +243,13 @@ async function show() {
 }
 
 async function showPage() {
+  if (view.page === "marketplace") {
+    const { data, error } = await supabase.from("marketplace_reports").select("*")
+      .order("created_at", { ascending: false }).limit(200);
+    if (error) throw new Error(`Could not load marketplace reports: ${error.message}`);
+    view.reports = data || [];
+    return shell(marketplaceReportsPage());
+  }
   if (view.page === "users") {
     if (!view.users) {
       const { data, error } = await supabase.rpc("admin_users");

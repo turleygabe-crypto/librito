@@ -36,7 +36,9 @@ Your library content remains yours. You authorize us to store, process, display 
 
 ## 4. Plans and recurring payments
 
-Lite Reader is free and includes unlimited books and shelves, with a limit of 5 books in Currently Reading. When the Marketplace launches, shopping will not require a paid plan; listing books will require Book Lover. Book Lover has no Currently Reading limit. Book Lover is offered at $2.99 USD per month or $24.99 USD per year. The checkout summary states the selected price, billing interval and any applicable tax before payment.
+Free includes a personal library, shelves, reading progress, and reader-to-reader marketplace features without a subscription. Free currently has a limit of 5 books in Currently Reading. Book Lover is for personal library and collection-management features, including unlimited books in Currently Reading, reports, exports and insights. It is offered at $2.99 USD per month or $24.99 USD per year. Bookshop Pro is for independent bookstores and professional sellers, includes Book Lover features, and has a proposed starting price of $19.99 USD per month; its actual price will be disclosed before purchase. Buying or selling personal marketplace listings does not require either paid plan.
+
+Marketplace listings, messaging and test-only order simulations may be available, but live marketplace charges, seller onboarding and payouts are not enabled. A test simulation is not a purchase, payment, shipment or promise of delivery. Before live transactions are enabled, Librito must publish reviewed marketplace terms that explain fees, shipping, returns, refunds, disputes, seller verification and payment timing. Any marketplace commission is separate from the membership subscription and will be disclosed before a transaction.
 
 A paid subscription renews automatically at the selected interval until canceled. By purchasing, you authorize recurring charges under the terms disclosed at checkout. A parent or legal guardian must authorize purchases for users under 18.
 
@@ -46,7 +48,7 @@ We will disclose material price or subscription changes in advance as required b
 
 ## 5. Cancellation, refunds and failed payments
 
-You can cancel through the plan page in Librito or through Manage billing. Normal cancellation stops future renewals and preserves paid access until the end of the paid period. After cancellation, your library remains saved; the Lite Reader Currently Reading limit applies when paid access ends.
+You can cancel through the plan page in Librito or through Manage billing. Normal cancellation stops future renewals and preserves paid access until the end of the paid period. After cancellation, your library remains saved; the Free Currently Reading limit applies when paid access ends.
 
 We do not routinely refund unused portions of billing periods or renewal charges. Cancellation does not automatically issue a refund or forgive an outstanding balance. Contact support@librito.casa to report billing errors, duplicate or unauthorized charges, or exceptional circumstances for review.
 

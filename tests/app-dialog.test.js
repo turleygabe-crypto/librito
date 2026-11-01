@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 import { test } from "node:test";
 import { translate } from "../translations.js";
+import { normalizePlan } from "../lib/entitlements.js";
 
 class Element {
   children = [];
@@ -184,6 +185,7 @@ test("resume control uses Librito confirmation and never calls a browser prompt"
   let request;
   let refreshed = false;
   const context = {
+    normalizePlan,
     showAppConfirm: async (message, value) => { confirmationMessage = message; options = value; await value.onConfirm(); return true; },
     billingRequest: async (body) => { request = body; },
     formatDate: () => "October 24, 2027", showToast() {}, console,
@@ -194,7 +196,7 @@ test("resume control uses Librito confirmation and never calls a browser prompt"
   };
   runInNewContext(`${functionSource}\nthis.resume = resumeBilling;`, context);
   const button = { disabled: false };
-  await context.resume(button, { periodEnd: "2027-10-24" }, async () => { refreshed = true; });
+  await context.resume(button, { plan: "book_lover", periodEnd: "2027-10-24" }, async () => { refreshed = true; });
   assert.equal(options.confirmLabel, "Renew subscription");
   assert.equal(options.cancelLabel, "Continue cancellation");
   assert.match(confirmationMessage, /subscription is canceled/);
@@ -216,6 +218,7 @@ test("cancel confirmation is explicit and a successful change is not reported as
   let successOptions;
   let confirmations = 0;
   const context = {
+    normalizePlan,
     showAppConfirm: async (text, value) => {
       confirmations++;
       if (confirmations % 2 === 0) {
@@ -235,7 +238,7 @@ test("cancel confirmation is explicit and a successful change is not reported as
   };
   runInNewContext(`${functions}\nthis.cancel = cancelBilling;`, context);
   const button = { disabled: false };
-  await context.cancel(button, { periodEnd: "2027-10-24" }, false,
+  await context.cancel(button, { plan: "book_lover", periodEnd: "2027-10-24" }, false,
     async () => { throw new Error("Refresh failed"); });
   assert.equal(request.action, "cancel");
   assert.equal(options.confirmLabel, "Cancel subscription");
@@ -246,7 +249,7 @@ test("cancel confirmation is explicit and a successful change is not reported as
   assert.match(toasts[0], /Your change was saved/);
   assert.equal(successOptions.confirmLabel, "Renew subscription");
   assert.equal(button.disabled, false);
-  await context.cancel(button, {}, true, async () => {});
+  await context.cancel(button, { plan: "book_lover" }, true, async () => {});
   assert.match(message, /complimentary Book Lover access will remain unchanged/);
 });
 

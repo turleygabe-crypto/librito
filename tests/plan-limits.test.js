@@ -3,10 +3,11 @@ import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { runInNewContext } from "node:vm";
 import { PGlite } from "@electric-sql/pglite";
+import { normalizePlan, PLAN_LIMITS } from "../lib/entitlements.js";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-test("plan UI permits unlimited free books and shelves, free Marketplace shopping, and Book Lover listings", async () => {
+test("plan UI keeps the current-read limit and marks marketplace access as coming soon", async () => {
   const source = await read("../app.js");
   const tierSource = source.slice(source.indexOf("const ACCOUNT_TIERS ="), source.indexOf("\nconst state = {"));
   const state = {
@@ -15,7 +16,7 @@ test("plan UI permits unlimited free books and shelves, free Marketplace shoppin
   };
   const notices = [];
   const actions = {
-    state,
+    state, normalizePlan, PLAN_LIMITS,
     t: (_key, values) => `${values.tier} accounts can have up to ${values.max} books in ${values.status}`,
     getReadingStatusLabel: (status) => status,
     getCustomShelves: () => Array.from({ length: 100 }, () => ({})),
@@ -24,9 +25,9 @@ test("plan UI permits unlimited free books and shelves, free Marketplace shoppin
   };
   runInNewContext(`${tierSource}\nthis.tiers = ACCOUNT_TIERS; this.canAddBook = checkBookLimit; this.canAddShelf = checkShelfLimit; this.canAddReading = checkReadingLimit;`, actions);
 
-  assert.equal(actions.tiers.lite_reader.maxBooks, Infinity);
-  assert.equal(actions.tiers.lite_reader.maxShelves, Infinity);
-  assert.equal(actions.tiers.lite_reader.maxReading, 5);
+  assert.equal(actions.tiers.free.maxBooks, Infinity);
+  assert.equal(actions.tiers.free.maxShelves, Infinity);
+  assert.equal(actions.tiers.free.maxReading, 5);
   assert.equal(actions.canAddBook(), true);
   assert.equal(actions.canAddShelf("Another shelf"), true);
   assert.equal(actions.canAddReading({}), false);
@@ -38,12 +39,50 @@ test("plan UI permits unlimited free books and shelves, free Marketplace shoppin
     t: (_key, values = {}) => values.max ? `${values.max} books in ${values.status}` : "Feature",
     getReadingStatusLabel: (status) => status,
   };
-  runInNewContext(`${featureSource}\nthis.lite = LITE_READER_FEATURES; this.bookLover = BOOK_LOVER_FEATURES;`, features);
-  assert.ok(features.lite.includes("Unlimited books in your library"));
-  assert.ok(features.lite.includes("Unlimited custom shelves"));
-  assert.ok(features.lite.includes("Shop in the Marketplace when it launches - no paid plan required"));
-  assert.ok(features.bookLover.includes("List books in the Marketplace when it launches"));
-  assert.equal(features.lite.some((feature) => feature.includes("List books in the Marketplace")), false);
+  runInNewContext(`${featureSource}\nthis.lite = LITE_READER_FEATURES; this.bookLover = BOOK_LOVER_FEATURES; this.bookshopPro = BOOKSHOP_PRO_FEATURES;`, features);
+  assert.ok(features.lite.includes("Marketplace browsing, buying, and selling (coming soon)"));
+  assert.ok(features.bookLover.includes("Everything in Free"));
+  assert.equal(features.bookLover.some((feature) => feature.includes("Marketplace listings")), false);
+  assert.ok(features.bookshopPro.includes("Bulk listing and inventory management"));
+});
+
+test("library export report offers the active Book Lover upgrade rather than a paused checkout message", async () => {
+  const source = await read("../app.js");
+  const cardSource = source.slice(
+    source.indexOf("function createLibraryExportCard("),
+    source.indexOf("\nconst LITE_READER_FEATURES ="),
+  );
+  const createContext = (premium) => {
+    const elements = [];
+    const navigations = [];
+    const context = {
+      document: {
+        createElement(tag) {
+          const element = {
+            tag, children: [], events: {}, textContent: "", append(...items) { this.children.push(...items); },
+            addEventListener(name, callback) { this.events[name] = callback; },
+          };
+          elements.push(element);
+          return element;
+        },
+      },
+      getAccountTier: () => ({ premium }),
+      navigateTo: (route) => navigations.push(route),
+    };
+    runInNewContext(`${cardSource}\nthis.createCard = createLibraryExportCard;`, context);
+    return { context, elements, navigations };
+  };
+  const free = createContext(false);
+  free.context.createCard([]);
+  const upgrade = free.elements.find((element) => element.textContent === "Upgrade to Book Lover");
+  assert.ok(upgrade);
+  upgrade.events.click();
+  assert.deepEqual(free.navigations, ["upgrade"]);
+
+  const paid = createContext(true);
+  paid.context.createCard([]);
+  assert.ok(paid.elements.some((element) => element.textContent === "Download CSV"));
+  assert.ok(paid.elements.some((element) => element.textContent === "Print / save as PDF"));
 });
 
 test("free library books and shelves are unlimited while Currently Reading stays capped at five", async () => {
