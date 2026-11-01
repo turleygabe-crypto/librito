@@ -7,14 +7,20 @@ import { translate } from "../translations.js";
 const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
 const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
 const renderSource = source.slice(source.indexOf("function renderBookPage("), source.indexOf("\nfunction createPrivateBookPhotoGallery("));
+const genreSource = source.slice(source.indexOf("function renderBookGenreTags("), source.indexOf("\nfunction getShelfSummaryLabel("));
 
 class Element {
   children = [];
   attributes = {};
   events = {};
-  classList = { toggle() {} };
+  classList = {
+    add: (name) => { this.className = `${this.className} ${name}`.trim(); },
+    remove: (name) => { this.className = this.className.split(/\s+/).filter((item) => item !== name).join(" "); },
+    toggle() {},
+  };
   constructor(className = "") { this.className = className; }
   append(...children) { this.children.push(...children); }
+  replaceChildren(...children) { this.children = children; }
   setAttribute(name, value) { this.attributes[name] = value; }
   addEventListener(name, callback) { this.events[name] = callback; }
   get childElementCount() { return this.children.length; }
@@ -108,4 +114,19 @@ test("profile uses a compact warm hero, top-right actions, and responsive horizo
   assert.match(css, /\.edition-cover-choices\s*\{[^}]*repeat\(auto-fill, minmax\(min\(100%, 26rem\), 1fr\)\)/);
   assert.match(css, /\.edition-cover-choice\s*\{[^}]*grid-template-columns: 4\.5rem minmax\(0, 1fr\);[^}]*align-items: center/);
   assert.match(css, /@media \(max-width: 680px\)\s*\{\s*\.book-detail-layout\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\)/);
+});
+
+test("genre bubbles wrap as a group without wrapping text inside each bubble", () => {
+  const context = { document: { createElement: () => new Element() } };
+  const renderGenres = runInNewContext(`${genreSource}\nrenderBookGenreTags`, context);
+  const value = new Element("book-detail-value");
+  renderGenres(value, ["Free will and determinism bestseller", "New York Times bestseller"]);
+  assert.ok(value.className.includes("book-detail-value--genres"));
+  assert.equal(value.children.length, 2);
+  renderGenres(value, []);
+  assert.ok(!value.className.includes("book-detail-value--genres"));
+  assert.equal(value.children[0].textContent, "—");
+
+  assert.match(css, /\.book-detail-content \.book-detail-value--genres\s*\{[^}]*display: flex;[^}]*flex-wrap: wrap;[^}]*gap: 0\.3rem/);
+  assert.match(css, /\.book-profile-genre\s*\{[^}]*white-space: nowrap/);
 });

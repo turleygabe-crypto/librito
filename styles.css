@@ -4178,6 +4178,8 @@ body {
 }
 
 .book-profile-genre {
+  display: inline-flex;
+  max-width: 100%;
   margin: 0;
   padding: 0.3rem 0.65rem;
   border: 1px solid #e9d9c9;
@@ -4185,7 +4187,9 @@ body {
   background: #f7eee4;
   color: #73513c;
   font-size: 0.75rem;
-  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .book-detail-content {
@@ -4238,8 +4242,15 @@ body {
   color: #302720;
 }
 
+.book-detail-content .book-detail-value--genres {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+
 .book-detail-content .book-detail-value .book-profile-genre {
-  margin: 0 0.3rem 0.2rem 0;
+  margin: 0;
 }
 
 .book-detail-content .page-actions {

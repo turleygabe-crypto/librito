@@ -5260,11 +5260,13 @@ function renderBookGenreTags(container, genres) {
   container.replaceChildren();
   const uniqueGenres = [...new Set(genres.map((genre) => String(genre || "").trim()).filter(Boolean))].slice(0, 4);
   if (!uniqueGenres.length) {
+    container.classList.remove("book-detail-value--genres");
     const missing = document.createElement("span");
     missing.textContent = "—";
     container.append(missing);
     return;
   }
+  container.classList.add("book-detail-value--genres");
   uniqueGenres.forEach((genre) => {
     const tag = document.createElement("span");
     tag.className = "book-profile-genre";
