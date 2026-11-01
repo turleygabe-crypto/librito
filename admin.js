@@ -32,7 +32,7 @@ const SUBTITLES = {
 };
 const COLORS = ["#8b5e3c", "#d8b898", "#b88a64", "#5e4332", "#e7cbb7", "#a67c52"];
 
-const view = { page: "overview", days: 30, stats: null, users: null, reports: null, search: "" };
+const view = { page: "overview", days: 30, stats: null, users: null, reports: null, search: "", userId: null };
 
 function loginForm(message = "") {
   root.innerHTML = `<div class="center"><h1>Librito Admin</h1><form id="f">
@@ -45,7 +45,7 @@ function loginForm(message = "") {
       email: document.getElementById("e").value,
       password: document.getElementById("p").value,
     });
-    if (error) loginForm("Sign-in failed.");
+    if (error) loginForm(`Sign-in failed: ${error.message}`);
     else init();
   });
 }
@@ -106,14 +106,112 @@ function usersPage() {
   const q = view.search.toLowerCase();
   const rows = (view.users || []).filter((u) => !q || (u.email || "").toLowerCase().includes(q));
   return `<div class="card"><div class="tools" style="margin-bottom:10px"><input id="search" type="search" placeholder="Search by email…" value="${esc(view.search)}"><span class="s">${rows.length} users</span></div>
-    <div class="tablewrap"><table><thead><tr><th>USER</th><th>JOINED</th><th>LAST ACTIVE</th><th>BOOKS</th><th>SHELVES</th><th>LIKES</th><th>ROLE</th><th>PLAN</th><th>COMPLIMENTARY ACCESS</th></tr></thead><tbody>
+    <div class="tablewrap"><table><thead><tr><th>USER</th><th>JOINED</th><th>LAST ACTIVE</th><th>BOOKS</th><th>SHELVES</th><th>LIKES</th><th>ROLE</th><th>PLAN</th><th>COMPLIMENTARY ACCESS</th><th>TEST ACCOUNT</th></tr></thead><tbody>
     ${rows.map((u) => {
       const currentPlan = { lite_reader: "Free", free: "Free", book_lover: "Book Lover", bookshop_pro: "Bookshop Pro" }[u.tier] || "Free";
       const complimentary = u.complimentary_bookshop_pro ? "bookshop_pro"
         : u.complimentary_book_lover ? "book_lover" : "free";
-      return `<tr><td>${esc(u.email || u.id)}</td><td>${fmtDate(u.created_at)}</td><td>${fmtDate(u.last_sign_in_at)}</td><td>${u.books}</td><td>${u.shelves}</td><td>${u.likes}</td><td>${u.is_admin ? "<span class='pill warn'>Admin</span>" : "<span class='pill'>Reader</span>"}</td><td>${esc(currentPlan)}</td><td><select class="tier-select" data-user="${esc(u.id)}" aria-label="Complimentary access for ${esc(u.email || u.id)}"><option value="free" ${complimentary === "free" ? "selected" : ""}>None</option><option value="book_lover" ${complimentary === "book_lover" ? "selected" : ""}>Book Lover</option><option value="bookshop_pro" ${complimentary === "bookshop_pro" ? "selected" : ""}>Bookshop Pro</option></select></td></tr>`;
+      return `<tr><td>${esc(u.email || u.id)}</td><td>${fmtDate(u.created_at)}</td><td>${fmtDate(u.last_sign_in_at)}</td><td>${u.books}</td><td>${u.shelves}</td><td>${u.likes}</td><td><select class="role-select" data-user="${esc(u.id)}" aria-label="Role for ${esc(u.email || u.id)}" ${u.id === view.userId ? 'disabled title="Ask another admin to change your role"' : ""}><option value="reader" ${!u.is_admin ? "selected" : ""}>Reader</option><option value="admin" ${u.is_admin ? "selected" : ""}>Admin</option></select></td><td>${esc(currentPlan)}</td><td><select class="tier-select" data-user="${esc(u.id)}" aria-label="Complimentary access for ${esc(u.email || u.id)}"><option value="free" ${complimentary === "free" ? "selected" : ""}>None</option><option value="book_lover" ${complimentary === "book_lover" ? "selected" : ""}>Book Lover</option><option value="bookshop_pro" ${complimentary === "bookshop_pro" ? "selected" : ""}>Bookshop Pro</option></select></td><td>${u.is_test_account ? `<button class="btn ghost test-login" data-user="${esc(u.id)}">Sign in</button>` : ""}</td></tr>`;
     }).join("")}
     </tbody></table></div></div>`;
+}
+
+function accountDialog(content) {
+  const dialog = document.createElement("dialog");
+  dialog.className = "account-dialog";
+  dialog.setAttribute("aria-labelledby", "account-dialog-title");
+  dialog.innerHTML = `${content}<p class="err" role="alert"></p><button type="button" class="btn ghost dialog-close">Close</button>`;
+  const busy = () => Boolean(dialog.querySelector('[type="submit"]')?.disabled);
+  dialog.querySelector(".dialog-close").addEventListener("click", () => { if (!busy()) dialog.close(); });
+  dialog.addEventListener("cancel", (event) => { if (busy()) event.preventDefault(); });
+  dialog.addEventListener("close", () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+  return dialog;
+}
+
+function testAccountLogin(user) {
+  const dialog = accountDialog(`<h2 id="account-dialog-title">Sign in to test account</h2>
+    <p class="s">This replaces your admin session in this browser and opens Librito as this account. To return, sign out and sign in with your admin credentials.</p>
+    <form><label>Email<input name="email" type="email" value="${esc(user.email)}" readonly autocomplete="username"></label>
+    <label>Password<input name="password" type="password" required autocomplete="current-password"></label>
+    <button type="submit" class="btn">Sign in and open Librito</button></form>`);
+  const form = dialog.querySelector("form");
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submit = form.querySelector('[type="submit"]');
+    submit.disabled = true;
+    dialog.querySelector(".err").textContent = "";
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: user.email, password: form.elements.password.value,
+      });
+      if (error) throw error;
+      if (data?.session?.user?.id !== user.id) throw new Error("Test account sign-in could not be confirmed.");
+      form.reset();
+      window.location.assign("/");
+    } catch (error) {
+      console.error(error);
+      dialog.querySelector(".err").textContent = `Could not sign in: ${error.message}`;
+    } finally {
+      submit.disabled = false;
+    }
+  });
+}
+
+function createTestAccount() {
+  const dialog = accountDialog(`<h2 id="account-dialog-title">Create test account</h2>
+    <p class="s">A real Reader account with a unique support+test-…@librito.casa alias. No new mailbox or email confirmation is needed. Save the email and password for later sign-ins. Password-reset delivery depends on your mailbox supporting plus-addressing.</p>
+    <form><label>Account name<input name="name" required maxlength="24" pattern="[a-z0-9]([a-z0-9-]{0,22}[a-z0-9])?" placeholder="reader-one" autocomplete="off"></label>
+    <label>Plan<select name="plan"><option value="free">Free</option><option value="book_lover">Book Lover</option><option value="bookshop_pro">Bookshop Pro</option></select></label>
+    <label>Password<input name="password" type="password" required minlength="12" maxlength="128" autocomplete="new-password"></label>
+    <p class="s">Use 12-128 characters and follow your Supabase project's password policy.</p>
+    <p class="s">Paid-plan features are granted as complimentary access, without creating a subscription or charging a card. Test accounts remain Readers; marketplace preview still requires an Admin role.</p>
+    <button type="submit" class="btn">Create account</button></form>
+    <div class="test-account-result" hidden></div>`);
+  const form = dialog.querySelector("form");
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submit = form.querySelector('[type="submit"]');
+    submit.disabled = true;
+    dialog.querySelector(".err").textContent = "";
+    const account = { name: form.elements.name.value, password: form.elements.password.value, plan: form.elements.plan.value };
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      if (!session) throw new Error("Sign in again to create test accounts.");
+      const response = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify(account),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Test account creation failed.");
+      if (!result.user?.id || !result.user.email || result.user.is_test_account !== true || result.user.tier !== account.plan) {
+        throw new Error("Account creation could not be confirmed. Refresh Users before retrying.");
+      }
+      form.reset();
+      form.hidden = true;
+      const output = dialog.querySelector(".test-account-result");
+      output.hidden = false;
+      output.innerHTML = `<p role="status">${esc({ free: "Free", book_lover: "Book Lover", bookshop_pro: "Bookshop Pro" }[result.user.tier])} test account created. Save this email and the password you chose:</p>
+        <label>Email<input value="${esc(result.user.email)}" readonly></label>
+        <p class="s">You can change its role and complimentary access in Users.</p>
+        <button type="button" class="btn">Sign in to this account</button>`;
+      output.querySelector("button").addEventListener("click", () => {
+        dialog.close();
+        testAccountLogin(result.user);
+      });
+      view.users = null;
+      view.stats = null;
+      await show();
+    } catch (error) {
+      console.error(error);
+      dialog.querySelector(".err").textContent = `Could not create test account: ${error.message}`;
+    } finally {
+      submit.disabled = false;
+    }
+  });
 }
 
 function marketplaceReportsPage() {
@@ -153,8 +251,8 @@ function exportCsv() {
   let rows;
   let name = `librito-${view.page}.csv`;
   if (view.page === "users") {
-    rows = [["email", "joined", "last_active", "books", "shelves", "likes", "admin"],
-      ...(view.users || []).map((u) => [u.email, u.created_at, u.last_sign_in_at, u.books, u.shelves, u.likes, u.is_admin])];
+    rows = [["email", "joined", "last_active", "books", "shelves", "likes", "admin", "test_account"],
+      ...(view.users || []).map((u) => [u.email, u.created_at, u.last_sign_in_at, u.books, u.shelves, u.likes, u.is_admin, u.is_test_account])];
   } else if (view.page === "marketplace") {
     rows = [["created_at", "status", "reason", "listing_id", "seller_id", "message_id"],
       ...(view.reports || []).map((r) => [r.created_at, r.status, r.reason, r.listing_id, r.seller_id, r.message_id])];
@@ -182,11 +280,39 @@ function shell(content) {
       <div class="spacer"></div><a href="/">← Back to Librito</a><button id="out">Sign out</button></aside>
     <main><div class="top"><div><h1>${title}</h1><p>${SUBTITLES[view.page]}</p></div>
       <div class="tools">${["users", "marketplace"].includes(view.page) ? "" : `<select id="range">${[7, 30, 90, 365].map((n) => `<option value="${n}" ${n === view.days ? "selected" : ""}>Last ${n} days</option>`).join("")}</select>`}
+      ${view.page === "users" ? '<button id="create-test-account" class="btn">Create test account</button>' : ""}
       <button id="export" class="btn ghost">Export CSV</button></div></div>${content}</main></div>`;
 
   root.querySelectorAll("[data-page]").forEach((b) => b.addEventListener("click", () => { view.page = b.dataset.page; show(); }));
   document.getElementById("out").addEventListener("click", async () => { await supabase.auth.signOut(); init(); });
   document.getElementById("export").addEventListener("click", exportCsv);
+  document.getElementById("create-test-account")?.addEventListener("click", createTestAccount);
+  root.querySelectorAll(".test-login").forEach((button) => button.addEventListener("click", () => {
+    const user = (view.users || []).find((u) => u.id === button.dataset.user);
+    if (user?.is_test_account) testAccountLogin(user);
+  }));
+  root.querySelectorAll(".role-select").forEach((select) => select.addEventListener("change", async () => {
+    const user = (view.users || []).find((u) => u.id === select.dataset.user);
+    const previous = user?.is_admin ? "admin" : "reader";
+    const newRole = select.value;
+    if (!confirm(`Change ${user?.email || select.dataset.user} to ${newRole === "admin" ? "Admin (full dashboard access)" : "Reader"}?`)) {
+      select.value = previous;
+      return;
+    }
+    select.disabled = true;
+    try {
+      const { data, error } = await supabase.rpc("admin_set_role", { target_user: select.dataset.user, new_role: newRole });
+      if (error) throw error;
+      if (data !== newRole) throw new Error("Role change could not be confirmed. Refresh Users.");
+      if (user) user.is_admin = data === "admin";
+    } catch (error) {
+      select.value = previous;
+      console.error(error);
+      alert(`Could not change role: ${error.message}`);
+    } finally {
+      select.disabled = false;
+    }
+  }));
   const range = document.getElementById("range");
   if (range) range.addEventListener("change", () => { view.days = Number(range.value); view.stats = null; show(); });
   root.querySelectorAll(".tier-select").forEach((select) => select.addEventListener("change", async () => {
@@ -270,9 +396,12 @@ async function showPage() {
 async function init() {
   view.stats = null;
   view.users = null;
+  view.userId = null;
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return loginForm();
-  const { data: ok } = await supabase.rpc("is_admin");
+  view.userId = session.user.id;
+  const { data: ok, error } = await supabase.rpc("is_admin");
+  if (error) throw new Error(`Could not verify admin access: ${error.message}`);
   if (ok !== true) return notFound();
   show();
 }

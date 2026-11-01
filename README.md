@@ -52,6 +52,16 @@ Currently reading shows every in-progress book in the same compact, cover-first 
 ## Admin dashboard
 `/admin.html` is an unlinked, noindex report page (users, activity, books, shelves). Access is enforced in Supabase: run [the admin migration](supabase/migrations/20261021190000_admin_dashboard.sql) and [the v2 reports migration](supabase/migrations/20261021200000_admin_dashboard_v2.sql), then grant yourself access in SQL Editor with `insert into public.admins (user_id) select id from auth.users where email = 'you@example.com';`. Non-admins only see "Not found" and the `admin_stats` RPC rejects them. "Active" users are those with a recent `last_sign_in_at`.
 
+### Managing roles and test accounts
+
+Apply [the roles and test-account migration](supabase/migrations/20261101210000_admin_roles_and_test_accounts.sql) after the existing migrations, before deploying. In **Users**, the **Role** selector grants or revokes Admin access independently of membership plans. Changes require confirmation and are enforced by the `admin_set_role` RPC; admins cannot remove their own access. The initial admin still needs the SQL bootstrap above.
+
+**Create test account** creates a real, immediately confirmed password-login account with a unique `support+test-<plan>-<uuid>@librito.casa` alias. No separate mailbox is needed. Create one for each **Free**, **Book Lover**, and **Bookshop Pro** plan; paid-plan features are complimentary grants, not Stripe subscriptions or charges. Accounts start as Readers; the existing admin-only marketplace preview gate still applies even to Bookshop Pro. Names use 1-24 lowercase letters, numbers, or hyphens, and passwords use 12-128 characters plus any additional Supabase project password requirements. Save the generated email and your chosen password; delivery of password-reset emails to `support@librito.casa` depends on your email provider supporting plus-addressing.
+
+The creation confirmation and each marked test-account row offer **Sign in**. Enter the account's password to open the main app as that account, replacing the browser's admin session. Sign out and use your admin credentials to return, or use a separate browser profile for simultaneous sessions. These accounts use ordinary persistent data and billing rules, not a special sandbox; avoid initiating real payments. Remove them through the existing billing-aware **My account → Delete account** flow after testing.
+
+The authenticated, same-origin `POST /api/admin` endpoint requires server-only `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `APP_URL` (the deployment origin), but no Stripe credentials. It verifies the caller's current admin grant, generates the alias itself, and sets the protected Auth `app_metadata.is_test_account` flag; user-editable metadata cannot mark ordinary accounts as test accounts. Profile setup verifies the requested tier and attempts to remove the newly created account if setup fails, reporting incomplete cleanup explicitly. The service-role key and passwords must never be included in public configuration, committed, or logged. The static Python preview cannot execute this endpoint; test creation using a Vercel deployment or a local Vercel function runtime.
+
 ## Support, account deletion, and legal readiness
 
 ### My account
