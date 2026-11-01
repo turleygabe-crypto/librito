@@ -2946,6 +2946,11 @@ function createGenreCard(genre) {
 
 function showHomePage() {
   pendingSpotlight = null;
+  const page = document.getElementById("pageView");
+  if (page.billingRefreshTimer) {
+    clearInterval(page.billingRefreshTimer);
+    page.billingRefreshTimer = null;
+  }
   state.view = "home";
   state.currentShelf = "";
   state.currentBook = null;
@@ -2959,6 +2964,10 @@ function showPage(view) {
   state.view = view;
   document.getElementById("homeRows").classList.add("hidden");
   const page = document.getElementById("pageView");
+  if (page.billingRefreshTimer) {
+    clearInterval(page.billingRefreshTimer);
+    page.billingRefreshTimer = null;
+  }
   page.classList.remove("hidden");
   page.replaceChildren();
   return page;
@@ -7573,7 +7582,7 @@ async function refreshAfterBillingChange(onSuccess) {
     await onSuccess();
   } catch (error) {
     console.error("Billing change saved, but status refresh failed", error);
-    showToast("Your change was saved. Refresh billing status to see the latest details.");
+    showToast("Your change was saved. Billing details will update automatically.");
   }
 }
 
@@ -7934,29 +7943,44 @@ function showUpgradePage() {
   premiumComingSoon.textContent = "Coming soon";
   const premiumCopy = document.createElement("p");
   premiumCopy.textContent = "A personal library and collection-management subscription. When the marketplace opens, buying and selling will not require Book Lover.";
-  const premiumPrice = document.createElement("p");
-  premiumPrice.className = "upgrade-price";
-  premiumPrice.textContent = `${formatCurrency(MEMBERSHIP_PRICING.book_lover.monthlyCents / 100)}/month · ${formatCurrency(MEMBERSHIP_PRICING.book_lover.annualCents / 100)}/year`;
+  const setPaidCtaLabel = (button, status, cents, interval, savings) => {
+    const statusLabel = document.createElement("span");
+    statusLabel.className = "upgrade-cta-status";
+    statusLabel.textContent = status;
+    const priceLabel = document.createElement("strong");
+    priceLabel.className = "upgrade-cta-price";
+    priceLabel.textContent = `${formatCurrency(cents / 100)}/${interval}`;
+    button.append(statusLabel, priceLabel);
+    if (savings) {
+      const savingsLabel = document.createElement("span");
+      savingsLabel.className = "upgrade-cta-savings";
+      savingsLabel.textContent = savings;
+      button.append(savingsLabel);
+    }
+    return statusLabel;
+  };
+  const bookLoverMonthly = MEMBERSHIP_PRICING.book_lover.monthlyCents;
+  const bookLoverAnnual = MEMBERSHIP_PRICING.book_lover.annualCents;
   const cta = document.createElement("button");
   cta.type = "button";
   cta.className = "upgrade-cta";
-  cta.textContent = currentPlan === "book_lover" ? "Your current plan" : "Coming soon";
+  const ctaStatus = setPaidCtaLabel(cta, currentPlan === "book_lover" ? "Your current plan" : "Coming soon", bookLoverMonthly, "month");
   cta.disabled = currentPlan === "book_lover" || !paidPlansAvailable;
   cta.addEventListener("click", () => choosePlan(cta, "book_lover", "monthly"));
   const annualCta = document.createElement("button");
   annualCta.type = "button";
   annualCta.className = "upgrade-cta upgrade-annual-cta";
-  annualCta.textContent = currentPlan === "book_lover" ? "Your current plan" : "Coming soon";
+  const annualCtaStatus = setPaidCtaLabel(annualCta, currentPlan === "book_lover" ? "Your current plan" : "Coming soon", bookLoverAnnual, "year");
   annualCta.disabled = currentPlan === "book_lover" || !paidPlansAvailable;
   annualCta.addEventListener("click", () => choosePlan(annualCta, "book_lover", "annual"));
   if (currentPlan === "book_lover") {
-    cta.textContent = state.profile?.complimentary_book_lover ? "Your complimentary plan" : "Your current plan";
-    annualCta.textContent = cta.textContent;
+    ctaStatus.textContent = state.profile?.complimentary_book_lover ? "Your complimentary plan" : "Your current plan";
+    annualCtaStatus.textContent = ctaStatus.textContent;
     cta.classList.add("is-current");
     annualCta.classList.add("is-current");
   }
   premium.append(
-    popular, premiumName, premiumComingSoon, premiumCopy, premiumPrice,
+    popular, premiumName, premiumComingSoon, premiumCopy,
     createUpgradeFeatureList(BOOK_LOVER_FEATURES), cta, annualCta,
   );
 
@@ -7968,23 +7992,39 @@ function showUpgradePage() {
   professionalComingSoon.className = "upgrade-coming-soon";
   professionalComingSoon.textContent = "Coming soon";
   const professionalCopy = document.createElement("p");
-  professionalCopy.textContent = `Professional tools for independent bookstores. Proposed starting price: ${formatCurrency(MEMBERSHIP_PRICING.bookshop_pro.proposedMonthlyCents / 100)}/month; the configured Stripe Price determines the amount charged.`;
-  const professionalPrice = document.createElement("p");
-  professionalPrice.className = "upgrade-price";
-  professionalPrice.textContent = "Monthly · configured price";
+  professionalCopy.textContent = "Professional tools for independent bookstores.";
+  const bookshopProMonthly = MEMBERSHIP_PRICING.bookshop_pro.monthlyCents;
+  const bookshopProAnnual = MEMBERSHIP_PRICING.bookshop_pro.annualCents;
+  const annualSavings = bookshopProMonthly * 12 - bookshopProAnnual;
   const professionalCta = document.createElement("button");
   professionalCta.type = "button";
   professionalCta.className = "upgrade-cta";
-  professionalCta.textContent = currentPlan === "bookshop_pro" ? "Your current plan" : "Coming soon";
+  const professionalCtaStatus = setPaidCtaLabel(professionalCta, currentPlan === "bookshop_pro" ? "Your current plan" : "Coming soon", bookshopProMonthly, "month");
   professionalCta.disabled = currentPlan === "bookshop_pro" || !paidPlansAvailable;
   professionalCta.addEventListener("click", () => choosePlan(professionalCta, "bookshop_pro", "monthly"));
+  const professionalAnnualCta = document.createElement("button");
+  professionalAnnualCta.type = "button";
+  professionalAnnualCta.className = "upgrade-cta upgrade-annual-cta";
+  const professionalAnnualCtaStatus = setPaidCtaLabel(
+    professionalAnnualCta,
+    currentPlan === "bookshop_pro" ? "Your current plan" : "Coming soon",
+    bookshopProAnnual,
+    "year",
+    `Save ${formatCurrency(annualSavings / 100)} vs monthly`,
+  );
+  professionalAnnualCta.disabled = currentPlan === "bookshop_pro" || !paidPlansAvailable;
+  professionalAnnualCta.addEventListener("click", () => choosePlan(professionalAnnualCta, "bookshop_pro", "annual"));
   if (currentPlan === "bookshop_pro") {
     professionalCta.classList.add("is-current");
-    if (state.profile?.complimentary_bookshop_pro) professionalCta.textContent = "Your complimentary plan";
+    professionalAnnualCta.classList.add("is-current");
+    if (state.profile?.complimentary_bookshop_pro) {
+      professionalCtaStatus.textContent = "Your complimentary plan";
+      professionalAnnualCtaStatus.textContent = "Your complimentary plan";
+    }
   }
   professional.append(
-    professionalName, professionalComingSoon, professionalPrice, professionalCopy,
-    createUpgradeFeatureList(BOOKSHOP_PRO_FEATURES), professionalCta,
+    professionalName, professionalComingSoon, professionalCopy,
+    createUpgradeFeatureList(BOOKSHOP_PRO_FEATURES), professionalCta, professionalAnnualCta,
   );
 
   plans.append(lite, premium, professional);
@@ -8044,19 +8084,17 @@ function showUpgradePage() {
       await loadBillingStatus();
       await refreshSubscriptionReminder(true);
     }));
-  const refresh = document.createElement("button");
-  refresh.type = "button";
-  refresh.className = "text-btn";
-  refresh.textContent = "Refresh billing status";
-  refresh.hidden = true;
+  let billingStatusLoading = false;
   async function loadBillingStatus() {
-    refresh.disabled = true;
+    if (billingStatusLoading) return;
+    billingStatusLoading = true;
     try {
       const userId = state.session?.user.id;
       const status = await billingRequest();
       const { data: profile, error } = await state.supabase.from("profiles").select("*").eq("id", userId).single();
       if (error) throw error;
-      if (state.session?.user.id !== userId || !page.isConnected || !page.contains(manage)) return;
+      if (state.session?.user.id !== userId || state.view !== "upgrade"
+        || !page.isConnected || !page.contains(manage)) return;
       state.profile = profile;
       currentBillingStatus = status;
       paidPlansAvailable = status.membershipPlansAvailable === true;
@@ -8069,25 +8107,22 @@ function showUpgradePage() {
       cancel.hidden = !subscriptionTiming(status) || status.cancelAtPeriodEnd;
       billingPanel.hidden = !status.canManage && !profile.complimentary_book_lover
         && !profile.complimentary_bookshop_pro && !checkout;
-      refresh.hidden = billingPanel.hidden;
         const activePlan = normalizePlan(status.plan || profile.tier);
         const hasPaidSubscription = status.hasSubscription;
         liteStatus.textContent = activePlan === "free" ? "Your current plan" : "Free plan";
         for (const [plan, controls] of [
-          ["book_lover", [cta, annualCta]],
-          ["bookshop_pro", [professionalCta]],
+          ["book_lover", [[cta, ctaStatus], [annualCta, annualCtaStatus]]],
+          ["bookshop_pro", [[professionalCta, professionalCtaStatus], [professionalAnnualCta, professionalAnnualCtaStatus]]],
         ]) {
           const isCurrent = activePlan === plan;
-          for (const control of controls) {
+          for (const [control, statusLabel] of controls) {
             control.disabled = isCurrent || !paidPlansAvailable;
             control.classList.toggle("is-current", isCurrent);
-            if (isCurrent) control.textContent = profile[`complimentary_${plan}`]
+            if (isCurrent) statusLabel.textContent = profile[`complimentary_${plan}`]
               ? "Your complimentary plan" : "Your current plan";
-            else if (!paidPlansAvailable) control.textContent = "Coming soon";
-            else if (hasPaidSubscription) control.textContent = `${plan === "book_lover" ? "Book Lover" : "Bookshop Pro"} · switch in Manage billing`;
-            else control.textContent = plan === "book_lover"
-              ? `Book Lover · ${formatCurrency(MEMBERSHIP_PRICING.book_lover[control === cta ? "monthlyCents" : "annualCents"] / 100)}${control === cta ? "/month" : "/year"}`
-              : "Bookshop Pro · monthly";
+            else if (!paidPlansAvailable) statusLabel.textContent = "Coming soon";
+            else if (hasPaidSubscription) statusLabel.textContent = "Switch in Manage billing";
+            else statusLabel.textContent = "Choose plan";
           }
         }
       billingStatus.textContent = status.cancelAtPeriodEnd && subscriptionTiming(status)
@@ -8111,29 +8146,35 @@ function showUpgradePage() {
       resume.hidden = true;
       cancel.hidden = true;
       billingPanel.hidden = false;
-      refresh.hidden = false;
-      billingStatus.textContent = "We couldn't load your subscription details. Please try again.";
+      billingStatus.textContent = "We couldn't load your subscription details. We'll retry automatically.";
     } finally {
-      refresh.disabled = false;
+      billingStatusLoading = false;
     }
   }
-  refresh.addEventListener("click", loadBillingStatus);
-  billingPanel.append(billingHeading, billingStatus, resume, manage, cancel, refresh, billingHelp);
+  billingPanel.append(billingHeading, billingStatus, resume, manage, cancel, billingHelp);
   page.append(hero, planVisibility, planOptions, billingPanel);
   const checkout = new URLSearchParams(window.location.hash.split("?")[1] || "").get("checkout");
   if (checkout === "success") {
     const notice = document.createElement("p");
     notice.className = "upgrade-billing-status";
-    notice.textContent = "Thanks! Payment may still be processing. Access is enabled after Stripe confirms your subscription. Refresh billing status shortly.";
+    notice.textContent = "Thanks! Payment may still be processing. Access is enabled after Stripe confirms your subscription. Your status updates automatically.";
     billingPanel.prepend(notice);
     billingPanel.hidden = false;
-    refresh.hidden = !state.session;
   } else if (checkout === "canceled") {
     if (state.session) sessionStorage.removeItem(`librito-book-lover-welcome:${state.session.user.id}`);
     billingPanel.hidden = false;
     billingStatus.textContent = "Checkout canceled. No plan change was made.";
   }
-  if (state.session) return loadBillingStatus();
+  if (state.session) {
+    const initialRequest = loadBillingStatus();
+    page.billingRefreshTimer = setInterval(() => {
+      if (state.session && state.view === "upgrade" && document.visibilityState === "visible") {
+        return loadBillingStatus();
+      }
+      return undefined;
+    }, 10_000);
+    return initialRequest;
+  }
 }
 
 function showPurchasePage(params = new URLSearchParams(window.location.hash.split("?")[1] || "")) {

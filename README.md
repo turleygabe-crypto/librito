@@ -105,7 +105,7 @@ Existing Book Lover Stripe subscriptions and customer records are retained and m
 
 ### Integration design
 
-Librito sells digital memberships through Stripe Billing with hosted Checkout, reusing the existing Customer, subscription, webhook, and billing-account records. Configure Book Lover recurring USD Prices at **$2.99/month** and **$24.99/year**. Bookshop Pro has an optional monthly Price ID and a proposed $19.99/month starting point; the configured Stripe Price is authoritative. Free requires no Stripe subscription. No Stripe.js or publishable API key is needed for this hosted flow.
+Librito sells digital memberships through Stripe Billing with hosted Checkout, reusing the existing Customer, subscription, webhook, and billing-account records. Configure Book Lover recurring USD Prices at **$2.99/month** and **$24.99/year**, and Bookshop Pro recurring USD Prices at **$19.99/month** or **$199.99/year** (save $39.89 compared with monthly billing). Checkout validates each configured Price against its plan amount and interval. Free requires no Stripe subscription. No Stripe.js or publishable API key is needed for this hosted flow.
 
 The plan page calls authenticated Vercel functions. The server validates the Supabase access token and chooses an allowlisted Price, enforcing mode, USD currency, recurrence interval and the exact Book Lover prices. Bookshop Pro's amount is controlled by its configured Stripe Price. Server-only billing tables map each Supabase user to one Stripe Customer per mode. Per-account leases and mode-specific Stripe idempotency keys prevent concurrent duplicate checkouts; an open Checkout Session is reused or expired when changing plan or interval.
 
@@ -129,14 +129,14 @@ In-app banners remind signed-in readers when canceled access ends or automatic r
 
 1. In Stripe Dashboard, create a separate **sandbox** for development. Keep production and CI credentials/data separate. No live Stripe resources have been created by this setup.
 2. Apply all Supabase migrations in timestamp order, preferably in a development project first. Confirm the Stripe billing migration (`20261024250000_stripe_billing.sql`), billing-mode migration (`20261024260000_stripe_billing_modes.sql`), account-deletion migration (`20261025010000_account_deletion.sql`), membership and marketplace migration (`20261101180000_membership_marketplace.sql`), marketplace pagination migration (`20261101190000_marketplace_search_pagination.sql`), and marketplace admin launch-gate migration (`20261101200000_marketplace_admin_launch_gate.sql`) are applied. The database initially accepts sandbox billing only.
-3. In the sandbox, create the Book Lover Product and its monthly and annual Prices at $2.99 and $24.99 (quantity one, interval count one). Create an optional Bookshop Pro monthly Price; $19.99/month is the proposed starting point, but Stripe Price configuration is authoritative. Copy their `price_...` IDs. Treat these Price IDs as stable; adding replacement Prices requires planning how existing subscriptions will remain entitled.
+3. In the sandbox, create a Book Lover Product with monthly and annual Prices at $2.99 and $24.99, and a separate Bookshop Pro Product with monthly and annual Prices at $19.99 and $199.99 (quantity one, interval count one). Copy their `price_...` IDs. Treat these Price IDs as stable; adding replacement Prices requires planning how existing subscriptions will remain entitled.
 4. Set server environment variables using [.env.example](.env.example) as a list of names:
    - `APP_URL`: the exact application origin, such as `https://librito.casa` or `http://localhost:3000`. HTTPS is required except on localhost.
    - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`: match the project used by the browser's `config.js`. The service-role key must never enter browser configuration.
    - `STRIPE_SECRET_KEY`: prefer a sandbox **restricted API key** with only the permissions needed to read/write Customers, Checkout Sessions and Subscriptions, read Prices and Charges, and create Customer Portal sessions. Subscriptions write access is required to resume renewal. Adjust permissions if Stripe reports an authorization error.
    - `STRIPE_MODE`: `test` for a sandbox, `live` for real payments. Required; must match the API key prefix and the database billing environment.
    - `STRIPE_PRICE_BOOK_LOVER_MONTHLY` and `STRIPE_PRICE_BOOK_LOVER_ANNUAL`: Book Lover sandbox Price IDs. The legacy `STRIPE_PRICE_MONTHLY` and `STRIPE_PRICE_ANNUAL` names remain supported.
-   - `STRIPE_PRICE_BOOKSHOP_PRO_MONTHLY`: optional Bookshop Pro sandbox Price ID. Do not configure this until its Stripe price and customer-portal switching behavior are reviewed.
+   - `STRIPE_PRICE_BOOKSHOP_PRO_MONTHLY` and `STRIPE_PRICE_BOOKSHOP_PRO_ANNUAL`: Bookshop Pro sandbox Price IDs. Do not configure them until its customer-portal switching behavior is reviewed.
    - `MEMBERSHIP_PLANS_AVAILABLE`: defaults to `false`; leave false while new paid-plan signups are coming soon. Existing subscribers can still manage, renew, and cancel their subscriptions. Keep Stripe Customer Portal plan switching disabled while this is false. Set true only when paid-plan enrollment is ready.
    - `STRIPE_WEBHOOK_SECRET`: the endpoint's signing secret, not an API key. For local forwarding, use the signing secret printed by `stripe listen`.
    Store secrets in Vercel's **sensitive environment variables**. For local development only, use an ignored `.env.local`; never paste keys into chat, commit them, or log them. The deployment only publishes explicitly selected browser assets.
@@ -154,7 +154,7 @@ In-app banners remind signed-in readers when canceled access ends or automatic r
    - `charge.refunded`
    - `radar.early_fraud_warning.created`
 7. For full local development, install dependencies with `npm install`, then use `npx vercel dev --listen 3000` (requires Vercel project setup). In another terminal, with Stripe CLI authenticated to the sandbox, run `stripe listen --forward-to localhost:3000/api/stripe-webhook` and set its printed signing secret locally. The Python/static preview still works for browsing, but cannot execute billing endpoints.
-8. Open the plans page while signed in. Checkout returns to that page without granting access; use **Refresh billing status** after webhook confirmation. **Manage billing** remains available for existing Stripe Customers, even after paid access ends.
+8. Open the plans page while signed in. Checkout returns to that page without granting access; billing status refreshes automatically every 10 seconds while the page is visible. **Manage billing** remains available for existing Stripe Customers, even after paid access ends.
 
 ### Marketplace payment safety
 

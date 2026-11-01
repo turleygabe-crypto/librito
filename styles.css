@@ -6609,6 +6609,13 @@ body {
   font-weight: 700;
 }
 .upgrade-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  width: 100%;
+  min-height: 3.5rem;
   padding: 0.85rem 1rem;
   border: 0;
   border-radius: 0.6rem;
@@ -6616,6 +6623,8 @@ body {
   color: #fff;
   font-weight: 700;
 }
+.upgrade-cta-price { font-size: 1rem; }
+.upgrade-cta-savings { font-size: 0.75rem; font-weight: 500; }
 
 .marketplace-content {
   display: grid;

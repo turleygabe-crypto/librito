@@ -153,6 +153,11 @@ test("billing config validates origin and requires both configured prices", () =
   assert.equal(billingConfig(env).origin, "http://localhost:3000");
   assert.equal(billingConfig(env).membershipPlansAvailable, false);
   assert.equal(billingConfig({ ...env, MEMBERSHIP_PLANS_AVAILABLE: "true" }).membershipPlansAvailable, true);
+  assert.deepEqual(billingConfig({
+    ...env,
+    STRIPE_PRICE_BOOKSHOP_PRO_MONTHLY: "pro-month",
+    STRIPE_PRICE_BOOKSHOP_PRO_ANNUAL: "pro-year",
+  }).planPrices.bookshop_pro, { monthly: "pro-month", annual: "pro-year" });
 });
 
 test("billing requires an explicit mode matching a server-side test or live key", () => {
@@ -712,6 +717,7 @@ test("authenticated checkout starts Book Lover and Bookshop Pro subscriptions us
     { plan: "book_lover", billing: "monthly", price: config.prices.monthly },
     { plan: "book_lover", billing: "annual", price: config.prices.annual },
     { plan: "bookshop_pro", billing: "monthly", price: "price_pro_month" },
+    { plan: "bookshop_pro", billing: "annual", price: "price_pro_year" },
   ];
   for (const [index, item] of cases.entries()) {
     const id = `77777777-7777-4777-8777-77777777777${index}`;
@@ -720,13 +726,15 @@ test("authenticated checkout starts Book Lover and Bookshop Pro subscriptions us
       ...config,
       planPrices: {
         book_lover: { monthly: config.prices.monthly, annual: config.prices.annual },
-        bookshop_pro: { monthly: "price_pro_month" },
+        bookshop_pro: { monthly: "price_pro_month", annual: "price_pro_year" },
       },
     };
     fixture.stripe.prices.retrieve = async (priceId) => ({
       id: priceId, livemode: false, active: true, currency: "usd",
-      unit_amount: priceId === "price_pro_month" ? 1999 : priceId === "price_month" ? 299 : 2499,
-      recurring: { interval: priceId === "price_year" ? "year" : "month", interval_count: 1 },
+      unit_amount: ({
+        price_month: 299, price_year: 2499, price_pro_month: 1999, price_pro_year: 19999,
+      })[priceId],
+      recurring: { interval: priceId.endsWith("_year") ? "year" : "month", interval_count: 1 },
     });
     fixture.stripe.checkout.sessions.create = async (params) => {
       assert.equal(params.line_items[0].price, item.price);

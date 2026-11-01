@@ -48,18 +48,27 @@ test("membership page renders all tiers and directs active subscribers to the ex
     };
     let resumeClicked = false;
     let cancelClicked = false;
+    let billingRequests = 0;
+    let refreshCallback;
+    let refreshInterval;
     const billingActions = [];
     const context = {
       state, URLSearchParams, console: { error() {} }, subscriptionTiming, subscriptionTimingMessage,
       normalizePlan, MEMBERSHIP_PRICING,
+      setInterval(callback, interval) { refreshCallback = callback; refreshInterval = interval; return 123; },
+      clearInterval() {},
       window: { location: { hash: "#/upgrade" } },
-      document: { createElement() { const element = new Element(); elements.push(element); return element; } },
+      document: {
+        visibilityState: "visible",
+        createElement() { const element = new Element(); elements.push(element); return element; },
+      },
       LITE_READER_FEATURES: [], BOOK_LOVER_FEATURES: [], BOOKSHOP_PRO_FEATURES: [],
       getAccountTier: () => ({ premium: normalizePlan(state.profile.tier) !== "free" }),
       updateActiveNavigation() {}, updateAuthButton() {}, navigateTo() {}, showToast() {}, openAuthModal() {},
-      showPage: () => page, createUpgradeFeatureList: () => new Element(),
+      showPage: (view) => { state.view = view; return page; }, createUpgradeFeatureList: () => new Element(),
       formatCurrency: (value) => `$${value}`, formatDate: (value) => value,
       billingRequest: async () => {
+        billingRequests += 1;
         if (mode === "billing-error") throw new Error("Billing is not configured yet.");
         return status;
       },
@@ -69,19 +78,28 @@ test("membership page renders all tiers and directs active subscribers to the ex
       cancelBilling: (button, current) => { cancelClicked = current === status; },
     };
     await runInNewContext(`${upgradeFunction}\n(async () => showUpgradePage())()`, context);
-    const paidCtas = elements.filter((element) => element.className === "upgrade-cta"
+    const paidCtas = elements.filter((element) => (element.className || "").startsWith("upgrade-cta")
       && typeof element.events.click === "function");
-    const cta = paidCtas[0];
-    const proCta = paidCtas[1];
+    const [cta, annualCta, proCta, proAnnualCta] = paidCtas;
+    const buttonText = (button) => button.children.map((child) => child.textContent).join(" ");
     assert.ok(cta);
     assert.ok(proCta);
+    assert.ok(annualCta);
+    assert.ok(proAnnualCta);
+    assert.match(buttonText(cta), /\$2\.99\/month/);
+    assert.match(buttonText(annualCta), /\$24\.99\/year/);
+    assert.match(buttonText(proCta), /\$19\.99\/month/);
+    assert.match(buttonText(proAnnualCta), /\$199\.99\/year Save \$39\.89 vs monthly/);
     assert.equal(elements.some((element) => element.textContent === "Free"), true);
     assert.equal(elements.some((element) => element.textContent === "Bookshop Pro"), true);
     assert.equal(elements.some((element) => element.textContent === "Coming soon" && !element.hidden), mode !== "plans-open");
     const resume = elements.find((element) => element.textContent === "Renew subscription");
     const panel = elements.find((element) => element.className === "upgrade-billing-panel");
     const message = elements.find((element) => element.className === "upgrade-billing-status");
+    assert.equal(elements.some((element) => element.textContent === "Refresh billing status"), false);
+    assert.equal(refreshInterval, mode === "signed-out" ? undefined : 10_000);
     assert.equal(cta.disabled, mode !== "plans-open");
+    assert.equal(proAnnualCta.disabled, mode !== "plans-open");
     assert.equal(panel.hidden, ["lite", "signed-out", "plans-open"].includes(mode));
     const visibility = elements.find((element) => element.className === "secondary-btn upgrade-plan-visibility");
     const options = elements.find((element) => element.id === "membershipPlanOptions");
@@ -95,6 +113,13 @@ test("membership page renders all tiers and directs active subscribers to the ex
     assert.equal(options.hidden, false);
     assert.equal(visibility.textContent, "Hide plans");
     assert.equal(visibility.attributes["aria-expanded"], "true");
+    if (mode !== "signed-out") {
+      await refreshCallback();
+      assert.equal(billingRequests, 2);
+      context.document.visibilityState = "hidden";
+      await refreshCallback();
+      assert.equal(billingRequests, 2);
+    }
     assert.equal(resume.hidden, mode !== "canceled");
     const cancel = elements.find((element) => element.textContent === "Cancel subscription");
     assert.equal(cancel.hidden, mode !== "active");
@@ -108,16 +133,20 @@ test("membership page renders all tiers and directs active subscribers to the ex
       assert.equal(cancelClicked, true);
     } else if (complimentary) {
       assert.match(message.textContent, /complimentary/);
-      assert.equal(cta.textContent, "Your complimentary plan");
+      assert.match(buttonText(cta), /Your complimentary plan/);
     } else if (mode === "billing-error") {
       assert.match(message.textContent, /couldn't load/);
     }
     cta.events.click();
+    annualCta.events.click();
     proCta.events.click();
+    proAnnualCta.events.click();
     if (mode === "plans-open") {
       assert.equal(JSON.stringify(billingActions), JSON.stringify([
         { action: "checkout", plan: "book_lover", billing: "monthly" },
+        { action: "checkout", plan: "book_lover", billing: "annual" },
         { action: "checkout", plan: "bookshop_pro", billing: "monthly" },
+        { action: "checkout", plan: "bookshop_pro", billing: "annual" },
       ]));
     } else assert.deepEqual(billingActions, []);
     const manage = elements.find((element) => element.textContent === "Manage billing");
