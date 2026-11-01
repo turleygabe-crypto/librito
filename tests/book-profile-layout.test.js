@@ -6,7 +6,7 @@ import { translate } from "../translations.js";
 
 const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
 const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
-const renderSource = source.slice(source.indexOf("function renderBookPage("), source.indexOf("\nfunction createBookEditionPicker("));
+const renderSource = source.slice(source.indexOf("function renderBookPage("), source.indexOf("\nfunction createPrivateBookPhotoGallery("));
 
 class Element {
   children = [];
@@ -20,11 +20,11 @@ class Element {
   get childElementCount() { return this.children.length; }
 }
 
-function renderProfile(ownedBook) {
+function renderProfile(ownedBook, signedIn = false) {
   const page = new Element();
   const calls = [];
   const context = {
-    state: {},
+    state: signedIn ? { session: { user: { id: "reader" } }, supabase: {} } : {},
     document: { createElement: () => new Element() },
     t: translate,
     showPage: () => page,
@@ -43,6 +43,7 @@ function renderProfile(ownedBook) {
     toggleBookFavorite: (book) => calls.push(["favorite", book]),
     navigateTo() {},
     createBookEditionPicker: () => new Element("edition-picker"),
+    createPrivateBookPhotoGallery: () => new Element("private-book-photos"),
     createBookAudiobookPanel: () => new Element("book-audiobook-panel"),
     createProfileRecommendationSection: () => ({ section: new Element("book-profile-recommendation") }),
     loadBookProfileCatalog() {},
@@ -73,6 +74,16 @@ test("profile places actions above metadata and statuses without the duplicate s
   assert.deepEqual(calls, [["favorite", book]]);
   assert.deepEqual(page.children[2].children.map((child) => child.className),
     ["edition-picker", "book-audiobook-panel", "book-profile-recommendations"]);
+});
+
+test("private gallery appears only for signed-in readers with the book in their own library", () => {
+  const owned = { id: "book", title: "Free will" };
+  for (const [book, signedIn, visible] of [
+    [owned, true, true], [owned, false, false], [null, true, false], [null, false, false],
+  ]) {
+    const { page } = renderProfile(book, signedIn);
+    assert.equal(page.children.some((child) => child.className === "private-book-photos"), visible);
+  }
 });
 
 test("profile keeps bookmark progress and editing available for currently reading books", () => {

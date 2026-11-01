@@ -1,6 +1,7 @@
 import {
   authenticate, billingDependencies, BillingError, checked, respondError, withAccount,
 } from "../lib/server/billing.js";
+import { removeAccountBookPhotos } from "../lib/book-photos.js";
 
 async function stopAccountBilling(stripe, account, save) {
   if (!account.customer_id) return;
@@ -51,6 +52,7 @@ export function createAccountHandler(dependencies = billingDependencies) {
         }
         await save({ deletion_pending: true });
         await stopAccountBilling(stripe, account, save);
+        await removeAccountBookPhotos(db, user.id);
         // Recheck the lease after external calls before the irreversible Auth deletion.
         await save({ deletion_pending: true });
         const removed = checked(await db.auth.admin.deleteUser(user.id, false));

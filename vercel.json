@@ -19,7 +19,7 @@
       "use": "@vercel/static"
     },
     {
-      "src": "lib/{supabase-client,billing-status}.js",
+      "src": "lib/{supabase-client,billing-status,book-photos}.js",
       "use": "@vercel/static"
     }
   ],

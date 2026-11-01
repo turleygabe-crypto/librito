@@ -838,6 +838,12 @@ async function deletionFixture({ paid = false } = {}) {
   await sql.query("insert into book_shelves(user_id, book_id, shelf_id) select $1, b.id, s.id from books b, shelves s where b.user_id = $1 and s.user_id = $1", [id]);
   await sql.query("insert into shelf_items(user_id, shelf_id) select $1, id from shelves where user_id = $1", [id]);
   const db = fixture.db;
+  db.storage = {
+    from(bucket) {
+      assert.equal(bucket, "private-book-photos");
+      return { list: async () => ({ data: [] }) };
+    },
+  };
   db.auth = {
     getUser: async (token) => {
       const exists = (await sql.query("select id from auth.users where id = $1", [id])).rows.length > 0;
@@ -928,6 +934,36 @@ test("account deletion requires same origin, verified identity, POST, and explic
   assert.equal((await fixture.request()).code, 200);
   assert.deepEqual(fixture.calls, [["deleteAuth", fixture.id]]);
   assert.equal((await sql.query("select count(*) as n from profiles where id = $1", [userId])).rows[0].n, 1);
+});
+
+test("account deletion removes private photos before Auth and stops on storage failures", async () => {
+  const fixture = await deletionFixture();
+  let failStorage = true;
+  let photosRemoved = false;
+  fixture.db.storage = {
+    from(bucket) {
+      assert.equal(bucket, "private-book-photos");
+      return {
+        async list(prefix) {
+          assert.ok(prefix.startsWith(fixture.id));
+          return { data: [{ name: prefix === fixture.id ? "book-id" : "photo.jpg" }] };
+        },
+        async remove(paths) {
+          assert.deepEqual(paths, [`${fixture.id}/book-id/photo.jpg`]);
+          assert.equal(fixture.calls.some(([name]) => name === "deleteAuth"), false);
+          if (failStorage) return { error: new Error("Storage unavailable") };
+          photosRemoved = true;
+          return { data: [] };
+        },
+      };
+    },
+  };
+  assert.equal((await fixture.request()).code, 500);
+  assert.equal(photosRemoved, false);
+  assert.equal(fixture.calls.some(([name]) => name === "deleteAuth"), false);
+  failStorage = false;
+  assert.equal((await fixture.request()).code, 200);
+  assert.equal(photosRemoved, true);
 });
 
 test("account deletion expires Checkout, cancels all subscription states and old Prices without refunds, and cascades all owned data", async () => {

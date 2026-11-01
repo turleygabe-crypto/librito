@@ -1842,6 +1842,47 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
   color: #fff8ef;
 }
 
+.private-book-photos {
+  margin-bottom: 0.9rem;
+  padding: 1rem;
+  border: 1px solid #e8ddd2;
+  border-radius: 0.8rem;
+  background: #fffaf3;
+}
+
+.private-book-photos h2 {
+  margin-top: 0;
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.private-book-photo-upload {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.private-book-photo-upload input {
+  max-width: 100%;
+}
+
+.private-book-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+  gap: 1rem;
+}
+
+.private-book-photo-grid figure {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.private-book-photo-grid img {
+  width: 100%;
+  height: 16rem;
+  object-fit: contain;
+  border-radius: 0.5rem;
+}
+
 .edition-picker {
   display: grid;
   gap: 0.75rem;

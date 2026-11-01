@@ -6,6 +6,7 @@ Librito is a cozy, mobile-first library platform concept for scanning books, org
 - Responsive library dashboard with a cozy banner, warm paper tones, and bookish styling
 - Book cards use a single top-right three-dot button to open a menu with the cover, title, author, favorite toggle, reading and ownership statuses, shelf management, sharing, and applicable purchase and removal actions. On mobile it opens as a bottom sheet; on desktop it opens at the click location, stays within the viewport as it expands or the window resizes, and scrolls if needed. **Book Page** opens the book's profile at the top. Status choices expand within the menu; Escape, the close button, or clicking outside dismisses it.
 - Book profiles place the cover and description beside a details column, with favorite/shelf actions above metadata and reading/ownership controls below it. Bookmark progress remains available for currently reading books. Editions use horizontal cover-and-details cards, followed by author recommendations, similar books, and the audiobook panel; the layout stacks on smaller screens.
+- Signed-in readers can upload JPEG, PNG, or WebP photos (up to 5 MB each) to a separate **My private book photos** gallery on books in their library. Photos never replace catalog covers or appear to other readers; database-enforced storage policies require ownership of the library book. Downloads use authenticated requests and temporary browser object URLs, not public or shareable signed URLs, and bypass the service worker image cache. Removing a book deletes its photos first; permanent account deletion also removes uploaded photos. If cleanup fails, deletion stops with an error and can be retried.
 - Local demo library with mock data
 - Books are added to the library by default and can optionally be assigned to user-created shelves
 - Open a custom shelf to use **Rename shelf** or **Delete shelf**, both in local/demo mode and when signed in. Renaming keeps its books and saved items; deleting requires confirmation, keeps library books and their other shelf memberships, and removes items saved only to the deleted shelf. Built-in collections, including Wishlist, cannot be renamed or deleted.
@@ -18,6 +19,8 @@ Librito is a cozy, mobile-first library platform concept for scanning books, org
 - Vercel-friendly static deployment structure
 
 ## Local preview
+Before deploying private photo uploads, run [the private book photos migration](supabase/migrations/20261101160000_private_book_photos.sql) in Supabase SQL Editor. It configures the private bucket, allowed formats, 5 MB file limit, and owner/library-only access policies; it is safe to rerun. This storage setup is separate from the public schema script and requires Supabase Storage. Local/demo mode does not upload photos; sign in and add the book to your library first.
+
 For signed-in shelf management, apply [the shelf-management migration](supabase/migrations/20261025040000_shelf_management.sql) before deploying the updated app. It synchronizes legacy book shelf names atomically when a shelf is renamed or deleted; shelf memberships and saved items continue to use the existing foreign-key cascades.
 
 Run the site locally:
@@ -70,9 +73,10 @@ Signed-in users can choose **Account -> Delete account**. The Librito dialog exp
 3. Expires all open Checkout Sessions for the account's dedicated Stripe Customer.
 4. Immediately cancels all nonterminal subscriptions on that Customer, including paused/incomplete subscriptions and old Price IDs, with `invoice_now=false` and `prorate=false`. It never calls a refund API.
 5. Deletes the dedicated Stripe Customer to prevent old portal sessions from opening new subscriptions. Stripe may retain invoices and legally required financial records. Already-processing payments are not guaranteed to be reversed.
-6. Rechecks lease ownership and permanently deletes the Supabase Auth user. The database cascades the profile, books, shelves, memberships, likes, shelf items, admin grant, and local billing mappings/event ledger.
+6. Removes private book photos through the Supabase Storage API, including any files left by books removed outside the app. A storage error stops deletion and allows retry; photos already removed are not restored.
+7. Rechecks lease ownership and permanently deletes the Supabase Auth user. The database cascades the profile, books, shelves, memberships, likes, shelf items, admin grant, and local billing mappings/event ledger.
 
-Stripe and Auth deletion are not one transaction. If Stripe fails, the account/library is not removed. If Stripe succeeds but Auth fails, the account remains marked for deletion and billing may already have stopped. The dialog preserves the error and allows retry; retries recognize an already-deleted Stripe Customer and continue. Do not blindly clear `deletion_pending` or promise that a partially completed deletion restores paid access. Diagnose and finish deletion, or contact the owner about a deliberate recovery plan.
+Stripe, Storage, and Auth deletion are not one transaction. If Stripe fails, the account/library is not removed. If Stripe succeeds but Storage or Auth fails, the account remains marked for deletion and billing may already have stopped. The dialog preserves the error and allows retry; retries recognize an already-deleted Stripe Customer and continue. Do not blindly clear `deletion_pending` or promise that a partially completed deletion restores paid access. Diagnose and finish deletion, or contact the owner about a deliberate recovery plan.
 
 The client only clears the local session, Librito-prefixed browser storage/caches, and redirects to a lasting completion notice after a verified success response. If local cleanup fails, it explicitly asks the user to clear site data. Deletion cannot remotely erase another device's local caches, exports, emails, support correspondence, logs or provider backups.
 

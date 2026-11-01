@@ -1,6 +1,7 @@
 import { createSupabaseClient } from "./lib/supabase-client.js";
 import { subscriptionTiming, subscriptionTimingMessage } from "./lib/billing-status.js";
 import { translate as t } from "./translations.js";
+import { listBookPhotos, uploadBookPhoto, downloadBookPhoto, removeBookPhotos } from "./lib/book-photos.js";
 
 const storageKey = "librito-library-v1";
 const shelvesStorageKey = "librito-shelves-v1";
@@ -989,17 +990,30 @@ async function removeBookFromShelf(book, shelfName) {
 }
 
 async function removeBookFromLibrary(book) {
-  const confirmed = await showAppConfirm(`Remove “${book.title}” from your library?`, {
+  const confirmed = await showAppConfirm(`Remove “${book.title}” from your library?${state.session ? ` ${t("photos.library_remove_warning")}` : ""}`, {
     title: "Remove book",
     confirmLabel: "Remove book",
     danger: true,
   });
   if (!confirmed) return;
   if (state.supabase && state.session) {
+    const userId = state.session.user.id;
+    try {
+      const photos = await listBookPhotos(state.supabase, userId, book.id);
+      await removeBookPhotos(state.supabase, photos.map((photo) => photo.path));
+    } catch (error) {
+      console.error("Could not remove private book photos", error);
+      showToast("Could not remove this book's photos. The book was not removed; try again.");
+      return;
+    }
+    if (state.session?.user.id !== userId) {
+      showToast("Your account changed. The book was not removed; try again.");
+      return;
+    }
     const { error } = await state.supabase.from("books")
       .delete()
       .eq("id", book.id)
-      .eq("user_id", state.session.user.id);
+      .eq("user_id", userId);
     if (error) {
       console.error(error);
       showToast("Could not remove this book from your library.");
@@ -4254,10 +4268,152 @@ function renderBookPage(book) {
   );
   recommendations.append(moreByAuthor.section, readersEnjoyed.section);
   below.append(editions, audiobook, recommendations);
+  if (ownedBook && state.session && state.supabase) {
+    page.append(createPrivateBookPhotoGallery(ownedBook));
+  }
   page.append(below);
   loadBookProfileCatalog(book, { page, rating, description, readMore, editions });
   loadBookProfileAudiobook(book, audiobook);
   loadBookProfileRecommendations(book, moreByAuthor, readersEnjoyed);
+}
+
+function createPrivateBookPhotoGallery(book) {
+  const section = document.createElement("section");
+  section.className = "private-book-photos";
+  const userId = state.session.user.id;
+  const client = state.supabase;
+  const heading = document.createElement("h2");
+  heading.textContent = t("photos.title");
+  const copy = document.createElement("p");
+  copy.textContent = t("photos.privacy");
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/jpeg,image/png,image/webp";
+  const label = document.createElement("label");
+  label.className = "private-book-photo-upload";
+  label.append(document.createTextNode(t("photos.upload")), input);
+  const status = document.createElement("p");
+  status.setAttribute("role", "status");
+  const grid = document.createElement("div");
+  grid.className = "private-book-photo-grid";
+  const retry = document.createElement("button");
+  retry.type = "button";
+  retry.className = "secondary-btn";
+  retry.textContent = t("photos.retry");
+  retry.hidden = true;
+  section.append(heading, copy, label, status, retry, grid);
+  const urls = new Set();
+  let generation = 0;
+  let mounted = false;
+  const active = () => state.session?.user.id === userId
+    && state.books.some((item) => item.id === book.id)
+    && state.view === "book"
+    && section.isConnected;
+  const clear = () => {
+    urls.forEach((url) => URL.revokeObjectURL(url));
+    urls.clear();
+    grid.replaceChildren();
+  };
+  const observer = new MutationObserver(() => {
+    if (section.isConnected) mounted = true;
+    if (mounted && !active()) {
+      generation++;
+      clear();
+      section.replaceChildren();
+      observer.disconnect();
+    }
+  });
+  observer.observe(document.getElementById("pageView"), {
+    childList: true, subtree: true, attributes: true, attributeFilter: ["class"],
+  });
+  const fail = (error, key) => {
+    console.error("Private book photos", error);
+    if (active()) {
+      status.textContent = t(key);
+      showToast(t(key));
+    }
+  };
+  const load = async () => {
+    const current = ++generation;
+    clear();
+    input.disabled = true;
+    retry.hidden = true;
+    status.textContent = t("photos.loading");
+    try {
+      const photos = await listBookPhotos(client, userId, book.id);
+      for (const [index, photo] of photos.entries()) {
+        const blob = await downloadBookPhoto(client, photo.path);
+        if (!active() || current !== generation) return;
+        const url = URL.createObjectURL(blob);
+        urls.add(url);
+        const figure = document.createElement("figure");
+        const image = document.createElement("img");
+        image.src = url;
+        image.alt = t("photos.alt", { title: book.title, number: index + 1 });
+        image.addEventListener("error", () => fail(new Error("Photo could not be displayed"), "photos.load_error"));
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "secondary-btn";
+        remove.textContent = t("photos.delete");
+        remove.setAttribute("aria-label", t("photos.delete_label", { number: index + 1 }));
+        remove.addEventListener("click", async () => {
+          if (!active()) return;
+          const confirmed = await showAppConfirm(t("photos.delete_confirm"), {
+            title: t("photos.delete"), confirmLabel: t("photos.delete"), danger: true,
+          });
+          if (!confirmed || !active()) return;
+          remove.disabled = true;
+          try {
+            await removeBookPhotos(client, [photo.path]);
+            if (active()) await load();
+          } catch (error) {
+            fail(error, "photos.delete_error");
+            remove.disabled = false;
+          }
+        });
+        figure.append(image, remove);
+        grid.append(figure);
+      }
+      if (active() && current === generation) status.textContent = t(photos.length ? "photos.loaded" : "photos.empty");
+    } catch (error) {
+      if (current === generation) {
+        clear();
+        fail(error, "photos.load_error");
+        retry.hidden = false;
+      }
+    } finally {
+      if (active() && current === generation) input.disabled = false;
+    }
+  };
+  retry.addEventListener("click", load);
+  input.addEventListener("change", async () => {
+    const file = input.files?.[0];
+    if (!file || !active()) return;
+    input.disabled = true;
+    status.textContent = t("photos.uploading");
+    try {
+      await uploadBookPhoto(client, userId, book.id, file);
+      if (active()) {
+        showToast(t("photos.uploaded"));
+        await load();
+      }
+    } catch (error) {
+      console.error("Private book photo upload", error);
+      if (active()) {
+        status.textContent = error.message || t("photos.upload_error");
+        showToast(status.textContent);
+      }
+    } finally {
+      input.value = "";
+      if (active()) input.disabled = false;
+    }
+  });
+  queueMicrotask(() => {
+    mounted = section.isConnected;
+    if (active()) return load();
+    else observer.disconnect();
+  });
+  return section;
 }
 
 function createBookEditionPicker(book) {
@@ -6895,7 +7051,7 @@ async function deleteAccount(button) {
   try {
     const result = await showAppDialog({
       title: "Permanently delete your account?",
-      message: "This permanently removes your account, books, shelves, notes and reading history. Any subscription is canceled immediately, and remaining paid access is lost. No automatic refund is issued; this does not waive refunds required by law. Financial records and backups may be retained where needed. Save any information you want to keep first. Type DELETE to continue.",
+      message: "This permanently removes your account, books, private book photos, shelves, notes and reading history. Any subscription is canceled immediately, and remaining paid access is lost. No automatic refund is issued; this does not waive refunds required by law. Financial records and backups may be retained where needed. Save any information you want to keep first. Type DELETE to continue.",
       confirmLabel: "Permanently delete account",
       cancelLabel: "Keep my account",
       danger: true,
