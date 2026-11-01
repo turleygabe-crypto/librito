@@ -2047,7 +2047,142 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 0.1rem;
+  gap: 0.75rem;
+}
+
+.book-photo-upload-dialog {
+  width: min(42rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  box-sizing: border-box;
+  overflow: auto;
+  padding: clamp(1rem, 3vw, 1.75rem);
+  border: 1px solid #e8d2be;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, #fffaf3, #fcf3e8);
+  color: #492a1d;
+  box-shadow: 0 16px 48px rgba(50, 31, 20, 0.2);
+}
+
+.book-photo-upload-dialog::backdrop {
+  background: rgba(36, 22, 17, 0.65);
+}
+
+.book-photo-upload-header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e8d2be;
+}
+
+.book-photo-upload-header > .book-photo-icon {
+  width: 2rem;
+  height: 2rem;
+  padding: 0.8rem;
+  border-radius: 50%;
+  background: #f4e2cf;
+  color: #ad4c26;
+}
+
+.book-photo-upload-header > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.book-photo-upload-header h2 {
+  margin: 0;
+  font: bold 1.7rem Georgia, "Times New Roman", serif;
+}
+
+.book-photo-upload-header p {
+  margin: 0.35rem 0 0;
+  color: #73513c;
+}
+
+.book-photo-drop-zone {
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+  margin: 1.25rem 0;
+  padding: 1.75rem 1rem;
+  border: 2px dashed #d8ac8a;
+  border-radius: 0.85rem;
+  background: #fffaf380;
+}
+
+.book-photo-drop-zone.is-dragging {
+  border-color: #a94729;
+  background: #f4e2cf;
+}
+
+.book-photo-drop-zone > .book-photo-icon {
+  width: 3rem;
+  height: 3rem;
+  color: #ad4c26;
+}
+
+.book-photo-drop-zone p {
+  margin: 0;
+  text-align: center;
+  color: #73513c;
+}
+
+.book-photo-upload-dialog .private-book-photo-upload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0.45rem 1.25rem;
+  border-radius: 999px;
+  background: #ad4c26;
+  color: #fffaf3;
+  font: 1rem Georgia, "Times New Roman", serif;
+}
+
+.book-photo-upload-dialog .book-photo-camera {
+  display: none;
+}
+
+.book-photo-upload-dialog .private-book-photo-upload:focus-within,
+.book-photo-upload-dialog button:focus-visible {
+  outline: 2px solid #a94729;
+  outline-offset: 3px;
+}
+
+.book-photo-upload-help {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #73513c;
+}
+
+.book-photo-upload-previews {
+  display: flex;
+  gap: 0.65rem;
+  overflow-x: auto;
+  padding: 0.25rem;
+  margin-top: 1rem;
+}
+
+.book-photo-upload-previews .book-photo-thumbnail {
+  flex-basis: 4.5rem;
+  width: 4.5rem;
+  height: 6rem;
+  border-color: #e8d2be;
+}
+
+@media (max-width: 480px) {
+  .book-photo-upload-header {
+    flex-wrap: wrap;
+  }
+
+  .book-photo-upload-header > .book-photo-icon {
+    display: none;
+  }
+
+  .book-photo-upload-header h2 {
+    font-size: 1.4rem;
+  }
 }
 
 .book-photo-camera {
@@ -2056,6 +2191,10 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
 
 @media (any-pointer: coarse), (max-width: 899px) {
   .book-photo-camera {
+    display: inline-flex;
+  }
+
+  .book-photo-upload-dialog .book-photo-camera {
     display: inline-flex;
   }
 

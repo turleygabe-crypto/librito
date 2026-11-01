@@ -151,6 +151,11 @@ class Element {
   events = {};
   attributes = {};
   isConnected = true;
+  classes = new Set();
+  classList = {
+    add: (name) => this.classes.add(name),
+    remove: (name) => this.classes.delete(name),
+  };
   constructor(tagName = "div") { this.tagName = tagName.toUpperCase(); }
   append(...children) {
     children.forEach((child) => { if (child instanceof Element) child.parent = this; });
@@ -169,6 +174,7 @@ class Element {
   close() { this.open = false; this.events.close?.(); }
   remove() { this.removed = true; }
   focus() { this.focused = true; }
+  contains(element) { return this === element || this.children.some((child) => child instanceof Element && child.contains(element)); }
   querySelectorAll(selector) {
     return this.children.flatMap((child) => child instanceof Element
       ? [...(selector === "button" && child.tagName === "BUTTON" ? [child] : []), ...child.querySelectorAll(selector)]
@@ -230,14 +236,21 @@ async function galleryHarness({ loadError = false, empty = false } = {}) {
   const create = runInNewContext(`${gallerySource}\ncreatePrivateBookPhotoGallery`, context);
   const section = create({ id: book, title: "My book" });
   await start();
-  const [stage, grid, addPhotos, uploadOptions, remove, status, retry] = section.children;
+  const [stage, grid, addPhotos, remove, status, retry] = section.children;
+  addPhotos.events.click();
+  const uploadDialog = context.document.body.children.at(-1);
+  const [uploadHeader, dropZone, , uploadStatus, uploadPreviews] = uploadDialog.children;
+  const uploadOptions = dropZone.children[1];
+  const closeUpload = uploadHeader.children[2];
+  closeUpload.events.click();
   const [label, cameraLabel] = uploadOptions.children;
   const [primary, uploaded, badge, navigation, expand] = stage.children;
   return {
     section, state, writes, revoked, observe: () => observe(), context,
-    stage, primary, uploaded, badge, navigation, input: label.children[1], label,
+    stage, primary, uploaded, badge, navigation, input: label.children[2], label,
     cameraLabel, cameraInput: cameraLabel.children[1], grid, remove, status, retry,
     addPhotos, uploadOptions, expand,
+    uploadDialog, dropZone, uploadStatus, uploadPreviews, closeUpload,
   };
 }
 
@@ -362,7 +375,7 @@ test("deleting the last upload restores the primary cover and hides the empty th
 
 test("books without private photos show only the primary cover and compact upload option", async () => {
   const harness = await galleryHarness({ empty: true });
-  assert.equal(harness.label.children[0], "+ Upload");
+  assert.equal(harness.label.children[1], "Upload Photos");
   assert.equal(harness.primary.hidden, false);
   assert.equal(harness.uploaded.hidden, true);
   assert.equal(harness.navigation.hidden, true);
@@ -468,25 +481,130 @@ test("mobile profiles keep decoration behind the compact cover and remove deskto
   assert.match(css, /\.book-cover-gallery-stage > \.book-detail-cover\s*\{[^}]*position: absolute;[^}]*inset: 0\.35rem/);
 });
 
-test("Add Photos toggles camera and file options and is disabled while uploading", async () => {
+test("Add Photos opens a modal with camera and file options, not inline controls, and disables while uploading", async () => {
   const harness = await galleryHarness({ empty: true });
   assert.equal(harness.addPhotos.children[1], "Add Photos");
-  assert.equal(harness.uploadOptions.hidden, true);
+  assert.equal(harness.uploadDialog.open, false);
+  assert.equal(harness.section.children.includes(harness.uploadOptions), false);
   harness.addPhotos.events.click();
-  assert.equal(harness.uploadOptions.hidden, false);
-  assert.equal(harness.addPhotos.attributes["aria-expanded"], "true");
-  harness.addPhotos.events.click();
-  assert.equal(harness.uploadOptions.hidden, true);
+  assert.equal(harness.uploadDialog.open, true);
+  assert.equal(harness.addPhotos.attributes["aria-haspopup"], "dialog");
+  harness.closeUpload.events.click();
+  assert.equal(harness.uploadDialog.open, false);
   let finish;
   harness.context.uploadBookPhoto = () => new Promise((resolve) => { finish = resolve; });
   harness.input.files = [{}];
   const pending = harness.input.events.change();
   assert.equal(harness.addPhotos.disabled, true);
   harness.addPhotos.events.click();
-  assert.equal(harness.uploadOptions.hidden, true);
+  assert.equal(harness.uploadDialog.open, false);
   finish("photo-path");
   await pending;
   assert.equal(harness.addPhotos.disabled, false);
+});
+
+test("popup supports multiple dropped photos and shows uploaded previews without changing the primary cover", async () => {
+  const harness = await galleryHarness({ empty: true });
+  harness.addPhotos.events.click();
+  assert.equal(harness.input.multiple, true);
+  const event = {
+    prevented: false,
+    preventDefault() { this.prevented = true; },
+    dataTransfer: { files: [{ type: "image/jpeg" }, { type: "image/png" }] },
+  };
+  harness.dropZone.events.dragover(event);
+  assert.equal(event.dataTransfer.dropEffect, "copy");
+  assert.equal(harness.dropZone.classes.has("is-dragging"), true);
+  await harness.dropZone.events.drop(event);
+  assert.equal(event.prevented, true);
+  assert.equal(harness.writes.length, 2);
+  assert.equal(harness.uploadPreviews.children.length, 2);
+  assert.match(harness.uploadStatus.textContent, /2 private/);
+  assert.equal(harness.dropZone.classes.has("is-dragging"), false);
+  assert.equal(harness.uploadDialog.open, true);
+  assert.equal(harness.grid.children[0].children[0].book.title, "My book");
+});
+
+test("popup reports rejected drops and upload errors, and restores picker controls", async () => {
+  const harness = await galleryHarness({ empty: true });
+  harness.addPhotos.events.click();
+  await harness.dropZone.events.drop({ preventDefault() {}, dataTransfer: { files: [] } });
+  assert.match(harness.uploadStatus.textContent, /Drop photo files/);
+  harness.context.uploadBookPhoto = async () => { throw new Error("Unsupported photo"); };
+  await harness.dropZone.events.drop({ preventDefault() {}, dataTransfer: { files: [{}] } });
+  assert.equal(harness.uploadStatus.textContent, "Unsupported photo");
+  assert.equal(harness.input.disabled, false);
+  assert.equal(harness.cameraInput.disabled, false);
+  assert.equal(harness.addPhotos.disabled, false);
+});
+
+test("multi-photo upload reports partial completion and preserves successfully uploaded files", async () => {
+  const harness = await galleryHarness({ empty: true });
+  harness.addPhotos.events.click();
+  const upload = harness.context.uploadBookPhoto;
+  let count = 0;
+  harness.context.uploadBookPhoto = async (...args) => {
+    if (count++) throw new Error("Choose a supported photo");
+    return upload(...args);
+  };
+  await harness.dropZone.events.drop({
+    preventDefault() {}, dataTransfer: { files: [{ type: "image/jpeg" }, { type: "image/svg+xml" }, {}] },
+  });
+  assert.equal(count, 2);
+  assert.equal(harness.writes.length, 1);
+  assert.equal(harness.uploadPreviews.children.length, 1);
+  assert.match(harness.uploadStatus.textContent, /1 photo\(s\) were uploaded/);
+  assert.match(harness.uploadStatus.textContent, /Choose a supported/);
+  assert.equal(harness.input.disabled, false);
+});
+
+test("popup prevents duplicate drops while uploading and never accepts uploads after library removal", async () => {
+  const harness = await galleryHarness({ empty: true });
+  harness.addPhotos.events.click();
+  let finish;
+  let count = 0;
+  harness.context.uploadBookPhoto = () => {
+    count++;
+    return new Promise((resolve) => { finish = resolve; });
+  };
+  const event = { preventDefault() {}, dataTransfer: { files: [{}] } };
+  const pending = harness.dropZone.events.drop(event);
+  await harness.dropZone.events.drop(event);
+  assert.equal(count, 1);
+  harness.state.books = [];
+  harness.observe();
+  finish("photo-path");
+  await pending;
+  await harness.dropZone.events.drop(event);
+  assert.equal(count, 1);
+  assert.equal(harness.uploadDialog.open, false);
+});
+
+test("popup closes on Escape and backdrop, restores focus, and clears private previews on sign-out", async () => {
+  const harness = await galleryHarness();
+  harness.addPhotos.events.click();
+  assert.equal(harness.uploadPreviews.children.length, 1);
+  let prevented = false;
+  harness.uploadDialog.events.cancel({ preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(harness.uploadDialog.open, false);
+  assert.equal(harness.addPhotos.focused, true);
+  harness.addPhotos.events.click();
+  harness.uploadDialog.events.click({ target: harness.uploadDialog });
+  assert.equal(harness.uploadDialog.open, false);
+  harness.addPhotos.events.click();
+  harness.state.session = null;
+  harness.observe();
+  assert.equal(harness.uploadDialog.open, false);
+  assert.equal(harness.uploadPreviews.children.length, 0);
+  assert.equal(harness.section.children.length, 0);
+});
+
+test("popup drop area is dashed, responsive and uses modal backdrop styling", async () => {
+  const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  assert.match(css, /\.book-photo-upload-dialog\s*\{[^}]*width: min\(42rem, calc\(100vw - 2rem\)\);[^}]*max-height: calc\(100dvh - 2rem\)/);
+  assert.match(css, /\.book-photo-drop-zone\s*\{[^}]*border: 2px dashed/);
+  assert.match(css, /\.book-photo-upload-dialog::backdrop/);
 });
 
 test("expanded images show the selected upload privately and are cleaned up when signing out", async () => {

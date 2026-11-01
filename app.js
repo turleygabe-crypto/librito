@@ -4329,17 +4329,18 @@ function createPrivateBookPhotoGallery(book, displayBook = book) {
   const addPhotos = document.createElement("button");
   addPhotos.type = "button";
   addPhotos.className = "book-photo-add";
-  addPhotos.setAttribute("aria-expanded", "false");
+  addPhotos.setAttribute("aria-haspopup", "dialog");
   addPhotos.append(icon("camera"), document.createTextNode(t("photos.add")));
   const input = document.createElement("input");
   input.type = "file";
   input.accept = "image/jpeg,image/png,image/webp";
+  input.multiple = true;
   input.className = "book-photo-file-input";
   input.setAttribute("aria-label", t("photos.upload"));
   const label = document.createElement("label");
   label.className = "private-book-photo-upload";
   label.title = t("photos.upload");
-  label.append(document.createTextNode(t("photos.upload_short")), input);
+  label.append(icon("camera"), document.createTextNode(t("photos.upload_button")), input);
   const cameraInput = document.createElement("input");
   cameraInput.type = "file";
   cameraInput.accept = "image/jpeg,image/png,image/webp";
@@ -4352,12 +4353,49 @@ function createPrivateBookPhotoGallery(book, displayBook = book) {
   cameraLabel.append(document.createTextNode(t("photos.camera")), cameraInput);
   const uploadOptions = document.createElement("div");
   uploadOptions.className = "book-photo-upload-options";
-  uploadOptions.hidden = true;
   uploadOptions.append(label, cameraLabel);
+  const uploadDialog = document.createElement("dialog");
+  uploadDialog.className = "book-photo-upload-dialog";
+  uploadDialog.setAttribute("aria-label", t("photos.add"));
+  const uploadHeader = document.createElement("div");
+  uploadHeader.className = "book-photo-upload-header";
+  const headerIcon = icon("camera");
+  const headerCopy = document.createElement("div");
+  const uploadHeading = document.createElement("h2");
+  uploadHeading.textContent = t("photos.add");
+  const uploadDescription = document.createElement("p");
+  uploadDescription.textContent = t("photos.upload_description");
+  headerCopy.append(uploadHeading, uploadDescription);
+  const closeUpload = document.createElement("button");
+  closeUpload.type = "button";
+  closeUpload.className = "book-photo-lightbox-close";
+  closeUpload.textContent = t("photos.close_upload");
+  uploadHeader.append(headerIcon, headerCopy, closeUpload);
+  const dropZone = document.createElement("div");
+  dropZone.className = "book-photo-drop-zone";
+  const dropIcon = icon("camera");
+  const dropHint = document.createElement("p");
+  dropHint.textContent = t("photos.drop_hint");
+  dropZone.append(dropIcon, uploadOptions, dropHint);
+  const uploadHelp = document.createElement("p");
+  uploadHelp.className = "book-photo-upload-help";
+  uploadHelp.textContent = t("photos.upload_help");
+  const uploadStatus = document.createElement("p");
+  uploadStatus.className = "book-photo-status";
+  uploadStatus.setAttribute("role", "status");
+  const uploadRetry = document.createElement("button");
+  uploadRetry.type = "button";
+  uploadRetry.className = "secondary-btn";
+  uploadRetry.textContent = t("photos.retry");
+  uploadRetry.hidden = true;
+  const uploadPreviews = document.createElement("div");
+  uploadPreviews.className = "book-photo-upload-previews";
+  uploadDialog.append(uploadHeader, dropZone, uploadHelp, uploadStatus, uploadPreviews, uploadRetry);
   const setPickerDisabled = (disabled) => {
     input.disabled = disabled;
     cameraInput.disabled = disabled;
     addPhotos.disabled = disabled;
+    uploadRetry.disabled = disabled;
   };
   const status = document.createElement("p");
   status.className = "book-photo-status";
@@ -4381,7 +4419,8 @@ function createPrivateBookPhotoGallery(book, displayBook = book) {
   retry.className = "secondary-btn";
   retry.textContent = t("photos.retry");
   retry.hidden = true;
-  section.append(stage, grid, addPhotos, uploadOptions, remove, status, retry);
+  uploadRetry.hidden = true;
+  section.append(stage, grid, addPhotos, remove, status, retry);
   const urls = new Set();
   let photos = [];
   let selected = 0;
@@ -4389,6 +4428,43 @@ function createPrivateBookPhotoGallery(book, displayBook = book) {
   let generation = 0;
   let mounted = false;
   let expandedDialog = null;
+  const closeUploadDialog = () => {
+    uploadDialog.close();
+    uploadDialog.remove();
+    dropZone.classList.remove("is-dragging");
+    if (active()) addPhotos.focus();
+  };
+  const refreshUploadPreviews = () => {
+    uploadPreviews.replaceChildren();
+    photos.forEach((photo, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "book-photo-thumbnail";
+      button.setAttribute("aria-label", t("photos.alt", { title: book.title, number: index + 1 }));
+      const image = document.createElement("img");
+      image.src = photo.url;
+      image.alt = t("photos.alt", { title: book.title, number: index + 1 });
+      button.append(image);
+      button.addEventListener("click", () => {
+        if (!active()) return;
+        select(index + 1);
+        closeUploadDialog();
+      });
+      uploadPreviews.append(button);
+    });
+  };
+  closeUpload.addEventListener("click", closeUploadDialog);
+  uploadDialog.addEventListener("click", (event) => {
+    if (event.target === uploadDialog) closeUploadDialog();
+  });
+  uploadDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeUploadDialog();
+  });
+  uploadDialog.addEventListener("close", () => {
+    uploadDialog.remove();
+    if (active()) addPhotos.focus();
+  });
   const closeExpanded = () => {
     if (!expandedDialog) return;
     const dialog = expandedDialog;
@@ -4398,9 +4474,11 @@ function createPrivateBookPhotoGallery(book, displayBook = book) {
     if (active()) expand.focus();
   };
   addPhotos.addEventListener("click", () => {
-    if (!active() || busy) return;
-    uploadOptions.hidden = !uploadOptions.hidden;
-    addPhotos.setAttribute("aria-expanded", String(!uploadOptions.hidden));
+    if (!active() || busy || uploadDialog.open) return;
+    uploadStatus.textContent = "";
+    refreshUploadPreviews();
+    document.body.append(uploadDialog);
+    uploadDialog.showModal();
   });
   expand.addEventListener("click", () => {
     if (!active() || expandedDialog) return;
@@ -4473,6 +4551,7 @@ function createPrivateBookPhotoGallery(book, displayBook = book) {
   };
   const clear = () => {
     closeExpanded();
+    uploadPreviews.replaceChildren();
     photos = [];
     grid.replaceChildren(primaryThumb);
     select(0);
@@ -4503,6 +4582,7 @@ function createPrivateBookPhotoGallery(book, displayBook = book) {
     if (section.isConnected) mounted = true;
     if (mounted && !active()) {
       generation++;
+      if (uploadDialog.open) closeUploadDialog();
       clear();
       section.replaceChildren();
       observer.disconnect();
@@ -4515,6 +4595,7 @@ function createPrivateBookPhotoGallery(book, displayBook = book) {
     console.error("Private book photos", error);
     if (active()) {
       status.textContent = t(key);
+      uploadStatus.textContent = t(key);
       showToast(t(key));
     }
   };
@@ -4550,13 +4631,17 @@ function createPrivateBookPhotoGallery(book, displayBook = book) {
         const preferredIndex = photos.findIndex((photo) => photo.path === preferredPath);
         select(preferredIndex < 0 ? 0 : preferredIndex + 1);
         status.textContent = "";
+        refreshUploadPreviews();
+        return true;
       }
     } catch (error) {
       if (current === generation) {
         clear();
         fail(error, "photos.load_error");
         retry.hidden = false;
+        uploadRetry.hidden = false;
       }
+      return false;
     } finally {
       if (active() && current === generation) {
         setPickerDisabled(busy);
@@ -4565,6 +4650,9 @@ function createPrivateBookPhotoGallery(book, displayBook = book) {
     }
   };
   retry.addEventListener("click", () => load());
+  uploadRetry.addEventListener("click", async () => {
+    if (active() && !busy && await load()) uploadStatus.textContent = "";
+  });
   remove.addEventListener("click", async () => {
     const photo = photos[selected - 1];
     if (!photo || !active() || busy) return;
@@ -4573,8 +4661,6 @@ function createPrivateBookPhotoGallery(book, displayBook = book) {
     });
     if (!confirmed || !active() || busy || !photos.some((item) => item.path === photo.path)) return;
     busy = true;
-    uploadOptions.hidden = true;
-    addPhotos.setAttribute("aria-expanded", "false");
     remove.disabled = true;
     setPickerDisabled(true);
     retry.disabled = true;
@@ -4592,31 +4678,43 @@ function createPrivateBookPhotoGallery(book, displayBook = book) {
       }
     }
   });
-  const uploadSelectedPhoto = async (picker) => {
-    const file = picker.files?.[0];
-    if (!file || !active() || busy) return;
+  const uploadSelectedPhotos = async (files) => {
+    if (!files.length || !active() || busy) return;
     busy = true;
-    uploadOptions.hidden = true;
-    addPhotos.setAttribute("aria-expanded", "false");
     remove.disabled = true;
     setPickerDisabled(true);
     retry.disabled = true;
     status.textContent = t("photos.uploading");
+    uploadStatus.textContent = t("photos.uploading");
+    let path;
+    let uploadedCount = 0;
     try {
-      const path = await uploadBookPhoto(client, userId, book.id, file);
+      for (const file of files) {
+        if (!active()) break;
+        path = await uploadBookPhoto(client, userId, book.id, file);
+        uploadedCount++;
+      }
       if (active()) {
         showToast(t("photos.uploaded"));
-        await load(path);
+        if (await load(path)) uploadStatus.textContent = t("photos.upload_count", { count: uploadedCount });
       }
     } catch (error) {
       console.error("Private book photo upload", error);
       if (active()) {
         status.textContent = error.message || t("photos.upload_error");
+        uploadStatus.textContent = status.textContent;
+        if (uploadedCount) {
+          const message = `${t("photos.partial", { count: uploadedCount })} ${status.textContent}`;
+          await load(path);
+          status.textContent = message;
+          uploadStatus.textContent = message;
+        }
         showToast(status.textContent);
       }
     } finally {
       busy = false;
-      picker.value = "";
+      input.value = "";
+      cameraInput.value = "";
       if (active()) {
         setPickerDisabled(false);
         remove.disabled = false;
@@ -4624,8 +4722,32 @@ function createPrivateBookPhotoGallery(book, displayBook = book) {
       }
     }
   };
-  input.addEventListener("change", () => uploadSelectedPhoto(input));
-  cameraInput.addEventListener("change", () => uploadSelectedPhoto(cameraInput));
+  input.addEventListener("change", () => uploadSelectedPhotos(Array.from(input.files || [])));
+  cameraInput.addEventListener("change", () => uploadSelectedPhotos(Array.from(cameraInput.files || [])));
+  dropZone.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    if (active() && !busy) {
+      event.dataTransfer.dropEffect = "copy";
+      dropZone.classList.add("is-dragging");
+    }
+  });
+  dropZone.addEventListener("dragleave", (event) => {
+    if (!dropZone.contains(event.relatedTarget)) dropZone.classList.remove("is-dragging");
+  });
+  uploadDialog.addEventListener("dragover", (event) => event.preventDefault());
+  uploadDialog.addEventListener("drop", (event) => event.preventDefault());
+  dropZone.addEventListener("drop", async (event) => {
+    event.preventDefault();
+    dropZone.classList.remove("is-dragging");
+    const files = Array.from(event.dataTransfer?.files || []);
+    if (!active() || busy) return;
+    if (!files.length) {
+      uploadStatus.textContent = t("photos.drop_error");
+      showToast(uploadStatus.textContent);
+      return;
+    }
+    await uploadSelectedPhotos(files);
+  });
   queueMicrotask(() => {
     mounted = section.isConnected;
     if (active()) return load();
