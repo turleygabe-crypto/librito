@@ -36,7 +36,7 @@ Your library content remains yours. You authorize us to store, process, display 
 
 ## 4. Plans and recurring payments
 
-Lite Reader is free and includes unlimited books and shelves, with a limit of 5 books in Currently Reading. Book Lover includes access to the Marketplace when it launches and has no Currently Reading limit. Book Lover is offered at $2.99 USD per month or $24.99 USD per year. The checkout summary states the selected price, billing interval and any applicable tax before payment.
+Lite Reader is free and includes unlimited books and shelves, with a limit of 5 books in Currently Reading. When the Marketplace launches, shopping will not require a paid plan; listing books will require Book Lover. Book Lover has no Currently Reading limit. Book Lover is offered at $2.99 USD per month or $24.99 USD per year. The checkout summary states the selected price, billing interval and any applicable tax before payment.
 
 A paid subscription renews automatically at the selected interval until canceled. By purchasing, you authorize recurring charges under the terms disclosed at checkout. A parent or legal guardian must authorize purchases for users under 18.
 

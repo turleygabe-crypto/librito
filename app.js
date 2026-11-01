@@ -7320,6 +7320,7 @@ function createLibraryExportCard(books) {
 const LITE_READER_FEATURES = [
   "Unlimited books in your library",
   "Unlimited custom shelves",
+  "Shop in the Marketplace when it launches - no paid plan required",
   t("status.reading_limit_feature", { max: 5, status: getReadingStatusLabel("reading") }),
   t("features.library_and_shelves"),
   "Track your reading progress",
@@ -7328,7 +7329,7 @@ const LITE_READER_FEATURES = [
 const BOOK_LOVER_FEATURES = [
   "Everything in Lite Reader",
   t("status.unlimited_reading_feature", { status: getReadingStatusLabel("reading") }),
-  "Access to the Marketplace when it launches",
+  "List books in the Marketplace when it launches",
   "Export insurance-ready library reports (CSV & printable PDF)",
   "Early access to new features",
   "Support the future of Librito",
@@ -7835,7 +7836,7 @@ function showUpgradePage() {
   const premiumName = document.createElement("h2");
   premiumName.textContent = "Book Lover";
   const premiumCopy = document.createElement("p");
-  premiumCopy.textContent = "For readers who want early access to upcoming features, including the Marketplace.";
+  premiumCopy.textContent = "Everyone can shop in the upcoming Marketplace without a paid plan. Book Lover will be required to list books.";
   const cta = document.createElement("button");
   cta.type = "button";
   cta.className = "upgrade-cta";

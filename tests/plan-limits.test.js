@@ -6,7 +6,7 @@ import { PGlite } from "@electric-sql/pglite";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-test("plan UI permits unlimited free books and shelves and advertises Marketplace for Book Lover", async () => {
+test("plan UI permits unlimited free books and shelves, free Marketplace shopping, and Book Lover listings", async () => {
   const source = await read("../app.js");
   const tierSource = source.slice(source.indexOf("const ACCOUNT_TIERS ="), source.indexOf("\nconst state = {"));
   const state = {
@@ -41,7 +41,9 @@ test("plan UI permits unlimited free books and shelves and advertises Marketplac
   runInNewContext(`${featureSource}\nthis.lite = LITE_READER_FEATURES; this.bookLover = BOOK_LOVER_FEATURES;`, features);
   assert.ok(features.lite.includes("Unlimited books in your library"));
   assert.ok(features.lite.includes("Unlimited custom shelves"));
-  assert.ok(features.bookLover.includes("Access to the Marketplace when it launches"));
+  assert.ok(features.lite.includes("Shop in the Marketplace when it launches - no paid plan required"));
+  assert.ok(features.bookLover.includes("List books in the Marketplace when it launches"));
+  assert.equal(features.lite.some((feature) => feature.includes("List books in the Marketplace")), false);
 });
 
 test("free library books and shelves are unlimited while Currently Reading stays capped at five", async () => {
