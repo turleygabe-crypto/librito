@@ -1069,8 +1069,9 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
   right: 0.7rem;
   z-index: 2;
   display: grid;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
   place-items: center;
   border: 0;
   border-radius: 50%;
@@ -6520,6 +6521,7 @@ body.book-actions-open {
 
 .book-actions-header p {
   margin: 0.35rem 0 0;
+  overflow-wrap: anywhere;
   color: #8e7867;
   font-size: 0.9rem;
 }
@@ -6590,7 +6592,29 @@ body.book-actions-open {
   outline-offset: 2px;
 }
 
-@media (prefers-reduced-motion: no-preference) {
+@media (min-width: 900px) {
+  .book-actions-sheet {
+    inset: 0 auto auto 0;
+    width: min(24rem, calc(100vw - 1rem));
+    max-width: calc(100vw - 1rem);
+    max-height: calc(100vh - 1rem);
+    max-height: calc(100dvh - 1rem);
+    margin: 0;
+    border: 1px solid #e6d6c5;
+    border-radius: 0.85rem;
+    box-shadow: 0 8px 32px rgba(24, 14, 10, 0.25);
+  }
+
+  .book-actions-sheet::backdrop {
+    background: transparent;
+  }
+
+  .book-actions-handle {
+    display: none;
+  }
+}
+
+@media (max-width: 899px) and (prefers-reduced-motion: no-preference) {
   .book-actions-sheet[open] {
     animation: book-actions-enter 180ms ease-out;
   }

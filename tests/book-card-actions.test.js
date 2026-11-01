@@ -8,6 +8,8 @@ class Element {
   children = [];
   attributes = {};
   events = {};
+  style = { removeProperty(name) { delete this[name]; } };
+  rect = { right: 80, bottom: 60, width: 384, height: 520 };
   classes = new Set();
   classList = {
     add: (name) => this.classes.add(name),
@@ -23,6 +25,7 @@ class Element {
   setAttribute(name, value) { this.attributes[name] = value; }
   addEventListener(name, callback) { this.events[name] = callback; }
   focus() { this.focused = true; }
+  getBoundingClientRect() { return this.rect; }
   showModal() { this.open = true; }
   close() {
     this.open = false;
@@ -38,7 +41,10 @@ const cardFunction = source.slice(source.indexOf("function createBookCard("), so
 const menuFunction = source.slice(source.indexOf("function createBookCardMenu("), source.indexOf("\nfunction removeOrphanPopovers("));
 const statusFunctions = source.slice(source.indexOf("function createReadingStatusMenu("), source.indexOf("\nfunction createBookMoreMenu("));
 
-function createCard(book, { ownedBooks = [], shelfNames = [], currentShelf = "", view = "browse" } = {}) {
+function createCard(book, {
+  ownedBooks = [], shelfNames = [], currentShelf = "", view = "browse",
+  width = 390, height = 844,
+} = {}) {
   const state = {
     books: ownedBooks,
     shelves: [
@@ -50,7 +56,24 @@ function createCard(book, { ownedBooks = [], shelfNames = [], currentShelf = "",
   };
   const calls = [];
   const body = new Element();
+  const observers = [];
+  const window = {
+    innerWidth: width,
+    innerHeight: height,
+    events: {},
+    matchMedia: () => ({ matches: window.innerWidth >= 900 }),
+    addEventListener(name, callback) { this.events[name] = callback; },
+    removeEventListener(name, callback) {
+      if (this.events[name] === callback) delete this.events[name];
+    },
+  };
   const context = {
+    window,
+    ResizeObserver: class {
+      constructor(callback) { this.callback = callback; observers.push(this); }
+      observe(element) { this.element = element; }
+      disconnect() { this.disconnected = true; }
+    },
     document: { body, createElement: (tagName) => new Element(tagName) },
     state,
     t: translate,
@@ -80,12 +103,12 @@ function createCard(book, { ownedBooks = [], shelfNames = [], currentShelf = "",
   );
   const card = createBookCard(book);
   const trigger = card.children.find((child) => child.className === "card-menu");
-  const open = () => {
-    trigger.events.click();
+  const open = (event) => {
+    trigger.events.click(event);
     const sheet = body.children[0];
     return { sheet, content: sheet.children[0], actions: sheet.children[0].children[2].children };
   };
-  return { card, trigger, open, body, calls, state };
+  return { card, trigger, open, body, calls, state, window, observers };
 }
 
 const actionLabel = (action) => action.children[1]?.textContent;
@@ -107,7 +130,7 @@ test("book cards have only one top-right action trigger, opening a sheet with bo
   assert.equal(header.children[1].children[1].textContent, book.author);
   assert.equal(sheet.attributes["aria-labelledby"], header.children[1].children[0].id);
   assert.deepEqual(actions.filter((action) => action.tagName === "button").map(actionLabel),
-    ["Add Favorite", "Add to a shelf", "Share", "Open book", "Purchase"]);
+    ["Add Favorite", "Add to a shelf", "Share", "Book Page", "Purchase"]);
   assert.equal(actions.filter((action) => action.tagName === "details").length, 2);
   const favorite = findAction(actions, "Add Favorite");
   assert.equal(favorite.attributes["aria-pressed"], "false");
@@ -123,7 +146,7 @@ test("saved book cards show current favorite/status values and dispatch all exis
   const harness = createCard(book, { ownedBooks: [book] });
   const { sheet, actions } = harness.open();
   assert.deepEqual(actions.filter((action) => action.tagName === "button").map(actionLabel),
-    ["Remove Favorite", "Add to a shelf", "Share", "Open book", "Remove from library"]);
+    ["Remove Favorite", "Add to a shelf", "Share", "Book Page", "Remove from library"]);
   assert.equal(findAction(actions, "Remove Favorite").attributes["aria-pressed"], "true");
   const statuses = actions.filter((action) => action.tagName === "details");
   assert.equal(statuses[0].children[0].textContent, "Currently Reading");
@@ -133,7 +156,7 @@ test("saved book cards show current favorite/status values and dispatch all exis
     ["Remove Favorite", "toggleBookFavorite"],
     ["Add to a shelf", "promptAddToShelf"],
     ["Share", "shareBook"],
-    ["Open book", "openBookProfile"],
+    ["Book Page", "openBookProfile"],
     ["Remove from library", "removeBookFromLibrary"],
   ]) {
     findAction(harness.open().actions, label).events.click();
@@ -213,4 +236,68 @@ test("a delayed native close event does not unlock a newly opened sheet", () => 
   assert.equal(reopened.open, true);
   assert.equal(harness.body.classes.has("book-actions-open"), true);
   assert.deepEqual(harness.body.children, [reopened]);
+});
+
+test("desktop menus open at the click and remain fully inside every viewport edge", () => {
+  for (const [x, y] of [[0, 0], [1200, 0], [0, 800], [1200, 800], [400, 200], [-100, -100], [2000, 2000]]) {
+    const harness = createCard({ key: "position" }, { width: 1200, height: 800 });
+    const { sheet } = harness.open({ detail: 1, clientX: x, clientY: y });
+    const left = parseFloat(sheet.style.left);
+    const top = parseFloat(sheet.style.top);
+    assert.ok(left >= 8);
+    assert.ok(top >= 8);
+    assert.ok(left + sheet.rect.width <= 1192);
+    assert.ok(top + sheet.rect.height <= 792);
+    if (x === 400 && y === 200) {
+      assert.equal(left, x);
+      assert.equal(top, y);
+    }
+  }
+});
+
+test("desktop menus reclamp after expansion and window resize, and remove positioning on mobile", () => {
+  const harness = createCard({ key: "resize" }, { width: 1200, height: 800 });
+  const { sheet } = harness.open({ detail: 1, clientX: 1190, clientY: 790 });
+  sheet.rect.height = 700;
+  harness.observers[0].callback();
+  assert.equal(parseFloat(sheet.style.top), 92);
+  harness.window.innerWidth = 950;
+  harness.window.innerHeight = 720;
+  harness.window.events.resize();
+  assert.equal(parseFloat(sheet.style.left), 558);
+  assert.equal(parseFloat(sheet.style.top), 12);
+  harness.window.innerWidth = 390;
+  harness.window.events.resize();
+  assert.equal(sheet.style.left, undefined);
+  assert.equal(sheet.style.top, undefined);
+  sheet.close();
+  assert.equal(harness.observers[0].disconnected, true);
+  assert.equal(harness.window.events.resize, undefined);
+});
+
+test("keyboard activation anchors the desktop menu to the trigger and mobile ignores click coordinates", () => {
+  const desktop = createCard({ key: "keyboard" }, { width: 1200, height: 800 });
+  const sheet = desktop.open({ detail: 0, clientX: 0, clientY: 0 }).sheet;
+  assert.equal(parseFloat(sheet.style.left), desktop.trigger.rect.right);
+  assert.equal(parseFloat(sheet.style.top), desktop.trigger.rect.bottom);
+  const mobile = createCard({ key: "mobile" });
+  const mobileSheet = mobile.open({ detail: 1, clientX: 200, clientY: 500 }).sheet;
+  assert.equal(mobileSheet.style.left, undefined);
+  assert.equal(mobileSheet.style.top, undefined);
+});
+
+test("opening Book Page navigates to the profile and resets scroll immediately after rendering", () => {
+  const profileSource = source.slice(source.indexOf("function openBookProfile("), source.indexOf("\nfunction closeBookProfile("));
+  const calls = [];
+  const context = {
+    document: { activeElement: {} },
+    navigateTo: (...args) => calls.push(["navigate", ...args]),
+    window: { scrollTo: (options) => calls.push(["scroll", options]) },
+  };
+  const openProfile = runInNewContext(`${profileSource}\nopenBookProfile`, context);
+  openProfile({ id: "profile", title: "A Book", author: "An Author" });
+  assert.equal(calls[0][0], "navigate");
+  assert.equal(calls[0][1], "book");
+  assert.equal(calls[0][2].id, "profile");
+  assert.deepEqual({ ...calls[1][1] }, { top: 0, left: 0, behavior: "instant" });
 });

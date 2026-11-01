@@ -61,6 +61,7 @@ test("status controls retain warm icon pills and book-card actions use an inline
   assert.match(css, /\.book-actions-sheet\s*\{[^}]*max-height: 85dvh/);
   assert.match(css, /\.book-actions-sheet::backdrop\s*\{[^}]*background: rgba/);
   assert.match(css, /\.book-actions-list \.book-status-menu-panel\s*\{[^}]*position: static/);
-  assert.match(css, /\.card-menu\s*\{[^}]*top: 0\.7rem;[^}]*right: 0\.7rem;[^}]*width: 2\.75rem;[^}]*height: 2\.75rem/);
-  assert.match(css, /@media \(prefers-reduced-motion: no-preference\)/);
+  assert.match(css, /\.card-menu\s*\{[^}]*top: 0\.7rem;[^}]*right: 0\.7rem;[^}]*width: 2rem;[^}]*height: 2rem/);
+  assert.match(css, /@media \(max-width: 899px\) and \(prefers-reduced-motion: no-preference\)/);
+  assert.match(css, /@media \(min-width: 900px\)\s*\{\s*\.book-actions-sheet\s*\{[^}]*max-width: calc\(100vw - 1rem\);[^}]*max-height: calc\(100dvh - 1rem\);[^}]*margin: 0/);
 });

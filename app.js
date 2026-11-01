@@ -1546,6 +1546,7 @@ function openBookProfile(book) {
     cover_i: book.cover_i || "",
     page_count: book.page_count || book.pages || "",
   });
+  window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 }
 
 function closeBookProfile() {
@@ -2364,19 +2365,37 @@ function createBookCardMenu(book) {
   menu.textContent = "⋯";
   menu.setAttribute("aria-label", `More actions for ${book.title}`);
   menu.setAttribute("aria-haspopup", "dialog");
-  menu.addEventListener("click", () => openBookCardActions(book, menu));
+  menu.addEventListener("click", (event) => openBookCardActions(book, menu, event));
   return menu;
 }
 
-function openBookCardActions(book, trigger) {
+function openBookCardActions(book, trigger, event) {
   const ownedBook = getLibraryBooks().find((owned) => getBookKey(owned) === getBookKey(book));
   const sheet = document.createElement("dialog");
   sheet.className = "book-actions-sheet";
   sheet.setAttribute("aria-labelledby", "bookActionsTitle");
+  const triggerRect = trigger.getBoundingClientRect();
+  const anchor = event?.detail
+    ? { x: event.clientX, y: event.clientY }
+    : { x: triggerRect.right, y: triggerRect.bottom };
+  const position = () => {
+    if (!window.matchMedia("(min-width: 900px)").matches) {
+      sheet.style.removeProperty("left");
+      sheet.style.removeProperty("top");
+      return;
+    }
+    const rect = sheet.getBoundingClientRect();
+    const margin = 8;
+    sheet.style.left = `${Math.max(margin, Math.min(anchor.x, window.innerWidth - rect.width - margin))}px`;
+    sheet.style.top = `${Math.max(margin, Math.min(anchor.y, window.innerHeight - rect.height - margin))}px`;
+  };
+  const resizeObserver = new ResizeObserver(position);
   let cleanedUp = false;
   const cleanup = () => {
     if (cleanedUp) return;
     cleanedUp = true;
+    resizeObserver.disconnect();
+    window.removeEventListener("resize", position);
     sheet.remove();
     document.body.classList.remove("book-actions-open");
   };
@@ -2445,7 +2464,7 @@ function openBookCardActions(book, trigger) {
     promptAddToShelf(book);
   });
   addAction("Share", "↗", () => shareBook(ownedBook || book));
-  addAction("Open book", "▤", () => openBookProfile(ownedBook || book));
+  addAction("Book Page", "▤", () => openBookProfile(ownedBook || book));
   if (!ownedBook) {
     addAction("Purchase", "$", () => {
       navigateTo("purchase", {
@@ -2473,6 +2492,9 @@ function openBookCardActions(book, trigger) {
   trigger.focus();
   sheet.showModal();
   document.body.classList.add("book-actions-open");
+  position();
+  resizeObserver.observe(sheet);
+  window.addEventListener("resize", position);
 }
 
 function removeOrphanPopovers() {
