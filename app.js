@@ -181,7 +181,7 @@ const defaultBookMetadata = Object.fromEntries(defaultBooks.map((book) => [book.
 }]));
 
 const ACCOUNT_TIERS = {
-  lite_reader: { name: "Lite Reader", premium: false, maxBooks: 100, maxShelves: 5, maxReading: 5 },
+  lite_reader: { name: "Lite Reader", premium: false, maxBooks: Infinity, maxShelves: Infinity, maxReading: 5 },
   book_lover: { name: "Book Lover", premium: true, maxBooks: Infinity, maxShelves: Infinity, maxReading: Infinity },
 };
 
@@ -7324,8 +7324,8 @@ function createLibraryExportCard(books) {
 }
 
 const LITE_READER_FEATURES = [
-  "Up to 100 books in your library",
-  "Up to 5 custom shelves",
+  "Unlimited books in your library",
+  "Unlimited custom shelves",
   t("status.reading_limit_feature", { max: 5, status: getReadingStatusLabel("reading") }),
   t("features.library_and_shelves"),
   "Track your reading progress",
@@ -7333,9 +7333,8 @@ const LITE_READER_FEATURES = [
 ];
 const BOOK_LOVER_FEATURES = [
   "Everything in Lite Reader",
-  "Unlimited books",
-  "Unlimited shelves",
   t("status.unlimited_reading_feature", { status: getReadingStatusLabel("reading") }),
+  "Access to the Marketplace when it launches",
   "Export insurance-ready library reports (CSV & printable PDF)",
   "Early access to new features",
   "Support the future of Librito",
@@ -7842,7 +7841,7 @@ function showUpgradePage() {
   const premiumName = document.createElement("h2");
   premiumName.textContent = "Book Lover";
   const premiumCopy = document.createElement("p");
-  premiumCopy.textContent = "For readers who want more. No limits on your collection, and reports you can use when it matters.";
+  premiumCopy.textContent = "For readers who want early access to upcoming features, including the Marketplace.";
   const cta = document.createElement("button");
   cta.type = "button";
   cta.className = "upgrade-cta";

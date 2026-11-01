@@ -36,7 +36,7 @@ Your library content remains yours. You authorize us to store, process, display 
 
 ## 4. Plans and recurring payments
 
-Lite Reader is free and has the limits displayed in the app. Book Lover is offered at $2.99 USD per month or $24.99 USD per year. The checkout summary states the selected price, billing interval and any applicable tax before payment.
+Lite Reader is free and includes unlimited books and shelves, with a limit of 5 books in Currently Reading. Book Lover includes access to the Marketplace when it launches and has no Currently Reading limit. Book Lover is offered at $2.99 USD per month or $24.99 USD per year. The checkout summary states the selected price, billing interval and any applicable tax before payment.
 
 A paid subscription renews automatically at the selected interval until canceled. By purchasing, you authorize recurring charges under the terms disclosed at checkout. A parent or legal guardian must authorize purchases for users under 18.
 
@@ -46,7 +46,7 @@ We will disclose material price or subscription changes in advance as required b
 
 ## 5. Cancellation, refunds and failed payments
 
-You can cancel through the plan page in Librito or through Manage billing. Normal cancellation stops future renewals and preserves paid access until the end of the paid period. After cancellation, your library remains saved; free-tier limits apply to adding new items when paid access ends.
+You can cancel through the plan page in Librito or through Manage billing. Normal cancellation stops future renewals and preserves paid access until the end of the paid period. After cancellation, your library remains saved; the Lite Reader Currently Reading limit applies when paid access ends.
 
 We do not routinely refund unused portions of billing periods or renewal charges. Cancellation does not automatically issue a refund or forgive an outstanding balance. Contact support@librito.casa to report billing errors, duplicate or unauthorized charges, or exceptional circumstances for review.
 

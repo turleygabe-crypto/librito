@@ -250,7 +250,8 @@ alter table public.profiles enable row level security;
 -- See migrations/20261024180000_shelf_items.sql.
 -- Built-in Wishlist shelf: see migrations/20261024240000_builtin_wishlist_shelf.sql.
 -- Atomic shelf rename/delete book updates: see migrations/20261025040000_shelf_management.sql.
--- Lite Reader book/shelf limits: see migrations/20261024200000_lite_reader_limits.sql.
+-- Book/shelf limits were initially added in migrations/20261024200000_lite_reader_limits.sql
+-- and removed by migrations/20261101170000_unlimited_free_library.sql.
 -- Lite Reader Currently Reading limit: see migrations/20261024210000_lite_reader_reading_limit.sql.
 -- Reading/ownership status dimensions, favorites, and retirement of the built-in
 -- Wishlist shelf and shelf_items: see migrations/20261029150000_status_dimensions.sql
