@@ -2567,7 +2567,7 @@ body {
   gap: 0.85rem;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-color: var(--weathered) transparent;
+  scrollbar-color: #91643d transparent;
   scrollbar-width: thin;
 }
 
@@ -3004,10 +3004,11 @@ body {
   }
 
   .sidebar {
+    --sidebar-height: calc(100dvh + 1.25rem);
     align-self: start;
-    top: 1rem;
-    height: calc(100dvh - 2rem);
-    margin: 1rem 0 1rem 1rem;
+    top: -0.75rem;
+    height: var(--sidebar-height);
+    margin: -0.75rem 0 0;
     gap: 0.85rem;
     padding: 1rem;
     border: 0;
@@ -3191,13 +3192,12 @@ body {
   position: sticky;
   isolation: isolate;
   overflow: hidden;
-  padding: 1rem;
-  border: 1px solid var(--weathered);
-  border-radius: 0.85rem;
-  background: var(--clockwork);
-  color: var(--linen);
+  padding: calc(var(--sidebar-height, calc(100dvh - 2rem)) * 0.085) 1.75rem calc(var(--sidebar-height, calc(100dvh - 2rem)) * 0.28);
+  border: 0;
+  border-radius: 0;
+  background: transparent url("/assets/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel.png") center / 250% 100% no-repeat;
   clip-path: none;
-  box-shadow: inset 0 0 0 4px var(--clockwork), inset 0 0 0 5px var(--weathered), 0 4px 16px rgba(68, 50, 35, 0.12);
+  box-shadow: none;
 }
 
 .sidebar-content {
@@ -3211,7 +3211,7 @@ body {
 
 .sidebar .sidebar-brand {
   padding: 0.5rem 0 0.9rem;
-  border-bottom-color: var(--weathered);
+  border-bottom-color: rgba(224, 172, 103, 0.42);
   text-align: center;
 }
 
@@ -3224,7 +3224,7 @@ body {
 
 .sidebar .sidebar-nav,
 .sidebar .sidebar-library-nav {
-  border-bottom-color: var(--weathered);
+  border-bottom-color: rgba(224, 172, 103, 0.36);
 }
 
 .sidebar .nav-pill,
@@ -3257,19 +3257,19 @@ body {
 }
 
 .sidebar .nav-pill.active {
-  background: var(--cafe-noir);
-  box-shadow: inset 3px 0 var(--latte);
+  background: linear-gradient(90deg, rgba(199, 111, 65, 0.38), rgba(170, 116, 69, 0.18));
+  box-shadow: inset 3px 0 #df8052, inset 0 0 0 1px rgba(224, 172, 103, 0.16);
 }
 
 .sidebar .nav-pill:hover,
 .sidebar .shelf-item:hover,
 .sidebar .shelf-item:focus-visible,
 .sidebar .sidebar-create-shelf:hover {
-  background-color: var(--cafe-noir);
+  background-color: rgba(224, 172, 103, 0.14);
 }
 
 .sidebar .sidebar-shelf-heading h2 {
-  color: var(--linen) !important;
+  color: #d3a66d !important;
   font-family: inherit;
   font-size: 0.72rem !important;
   letter-spacing: 0.1em;
@@ -3287,12 +3287,12 @@ body {
 }
 
 .sidebar .shelf-item.active {
-  background: var(--cafe-noir);
-  box-shadow: inset 3px 0 var(--latte);
+  background: rgba(224, 172, 103, 0.2);
+  box-shadow: inset 2px 0 #df8052;
 }
 
 .sidebar .shelf-thumbnail {
-  border: 1px solid var(--weathered);
+  border: 1px solid rgba(224, 172, 103, 0.55);
   box-shadow: 0 2px 6px rgba(9, 5, 3, 0.35);
 }
 
@@ -3306,7 +3306,7 @@ body {
 }
 
 .sidebar .shelf-item-count {
-  color: var(--linen);
+  color: #e4bd8b;
   flex-shrink: 0;
   font-size: 0.8rem;
 }
@@ -3314,15 +3314,22 @@ body {
 .sidebar .mobile-sidebar-close {
   z-index: 2;
   place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 3rem;
+  height: 3rem;
   padding: 0;
   border: 0;
-  border-radius: 0.5rem;
-  background: var(--cafe-noir);
-  color: var(--linen);
-  opacity: 1;
+  border-radius: 50%;
+  background: transparent;
+  opacity: 0.82;
   transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.sidebar .mobile-sidebar-close-medallion {
+  display: block;
+  width: 3rem;
+  height: 3rem;
+  filter: drop-shadow(0 1px 2px rgba(16, 8, 4, 0.45));
+  pointer-events: none;
 }
 
 .sidebar .mobile-sidebar-close:hover {
@@ -3335,25 +3342,25 @@ body {
 
 .sidebar .mobile-sidebar-close:focus-visible {
   opacity: 1;
-  outline: 2px solid var(--linen);
-  outline-offset: 3px;
+  outline: 2px solid #ffe4b2;
+  outline-offset: 0;
 }
 
 @media (max-width: 899px) {
   .sidebar {
+    --sidebar-height: calc((100dvh + 0.75rem) / 0.84);
     position: fixed;
-    top: 0.75rem;
-    bottom: 0.75rem;
-    left: 0.75rem;
-    width: min(18rem, calc(100vw - 1.5rem));
-    height: calc(100dvh - 1.5rem);
-    padding-top: max(4.25rem, calc(3.25rem + env(safe-area-inset-top)));
-    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    top: -0.75rem;
+    bottom: auto;
+    width: min(15rem, 86vw);
+    height: var(--sidebar-height);
+    padding-top: max(calc(5.5rem + env(safe-area-inset-top)), calc(var(--sidebar-height) * 0.085));
+    padding-bottom: calc(var(--sidebar-height) * 0.26);
   }
 
   .sidebar .mobile-sidebar-close {
-    top: max(0.75rem, env(safe-area-inset-top));
-    right: 0.75rem;
+    top: max(2.625rem, calc(env(safe-area-inset-top) + 2rem));
+    right: 1.25rem;
   }
 }
 
@@ -7330,25 +7337,6 @@ body.book-actions-open {
 }
 
 /* Shared palette for navigation, popovers, and reading controls. */
-.sidebar .nav-pill,
-.sidebar .nav-pill::before,
-.sidebar .shelf-item,
-.sidebar .shelf-item-copy strong,
-.sidebar .shelf-item-copy > span,
-.sidebar .shelf-item::after,
-.sidebar .sidebar-empty,
-.sidebar .sidebar-create-shelf,
-.sidebar .library-filter-count {
-  color: var(--linen);
-}
-
-.sidebar .sidebar-shelf-heading h2 {
-  font-family: Georgia, "Times New Roman", serif;
-  letter-spacing: 0.04em;
-  text-transform: none;
-  font-size: 1rem !important;
-}
-
 .page-description,
 .row-empty-state,
 .card-open-button .book-cover-author,
@@ -7359,12 +7347,6 @@ body.book-actions-open {
 .search-loading-copy,
 .book-breadcrumb [aria-current="page"] {
   color: var(--ink);
-}
-
-.sidebar button:focus-visible,
-.sidebar .shelf-item:focus-visible {
-  outline: 2px solid var(--linen);
-  outline-offset: -2px;
 }
 
 .home-hero {
@@ -7588,10 +7570,6 @@ body.book-actions-open {
   border-color: var(--cedar);
   background: var(--deep-olive);
   color: var(--linen);
-}
-
-.status-shelf-thumbnail {
-  background: var(--cedar);
 }
 
 :is(button, a, summary, input, select, textarea):focus-visible {
