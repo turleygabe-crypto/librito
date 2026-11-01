@@ -4535,7 +4535,7 @@ function createBookEditionPicker(book) {
   const copy = document.createElement("div");
   copy.className = "edition-picker-copy";
   const heading = document.createElement("h2");
-  heading.textContent = "Choose your edition";
+  heading.textContent = "Edition Finder";
   const description = document.createElement("p");
   description.className = "page-description";
   description.textContent = "Compare available editions and choose the cover you prefer.";
