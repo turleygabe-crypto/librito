@@ -9235,8 +9235,11 @@ document.addEventListener("click", (event) => {
   const activeMenu = target instanceof Element
     ? target.closest(".card-like-menu, .card-menu, .book-shelf-menu, .book-status-menu, .account-menu")
     : null;
+  const selectedAccountItem = target instanceof Element
+    ? target.closest(".account-menu-link, #authButton")
+    : null;
   document.querySelectorAll(".card-like-menu[open], .card-menu[open], .book-shelf-menu[open], .book-status-menu[open], .account-menu[open]").forEach((menu) => {
-    if (menu !== activeMenu) menu.open = false;
+    if (menu !== activeMenu || selectedAccountItem) menu.open = false;
   });
 });
 

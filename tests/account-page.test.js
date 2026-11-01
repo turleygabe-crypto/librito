@@ -27,9 +27,11 @@ test("account dropdown closes on outside clicks without closing on clicks inside
   }));
   let click;
   class Target {
-    constructor(menu) { this.menu = menu; }
+    constructor(menu, selectedItem = null) { this.menu = menu; this.selectedItem = selectedItem; }
     closest(selector) {
-      return this.menu && selector.split(", ").includes(this.menu.selector) ? this.menu : null;
+      const selectors = selector.split(", ");
+      if (this.selectedItem && selectors.includes(this.selectedItem)) return { selector: this.selectedItem };
+      return this.menu && selectors.includes(this.menu.selector) ? this.menu : null;
     }
   }
   runInNewContext(handler, {
@@ -47,6 +49,11 @@ test("account dropdown closes on outside clicks without closing on clicks inside
   menus[0].open = true;
   click({ target: {} });
   assert.equal(menus[0].open, false);
+  for (const selection of [".account-menu-link", "#authButton"]) {
+    menus.forEach((menu) => { menu.open = true; });
+    click({ target: new Target(menus[0], selection) });
+    menus.forEach((menu) => assert.equal(menu.open, false));
+  }
 });
 
 test("admin shortcuts are hidden unless the current signed-in user has verified admin access", async () => {
