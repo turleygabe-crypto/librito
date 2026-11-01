@@ -4187,7 +4187,6 @@ function renderBookPage(book) {
     field.append(icon, strong, valueNode);
     metadata.append(field);
   });
-  content.append(metadata);
 
   const ownedBook = findOwnedBook(book);
   const isLibraryBook = Boolean(ownedBook);
@@ -4219,7 +4218,7 @@ function renderBookPage(book) {
   like.addEventListener("click", () => toggleBookFavorite(book));
   actions.append(like);
   actions.append(createBookShelfMenu(book), moreMenu);
-  content.append(createShelfStatus(book, ownedBook), statusControls, actions);
+  content.append(actions, metadata, statusControls);
   if (isLibraryBook) {
     const readingActions = document.createElement("div");
     readingActions.className = "reading-actions";
