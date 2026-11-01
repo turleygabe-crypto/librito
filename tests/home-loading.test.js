@@ -107,17 +107,21 @@ test("mobile close button is an understated, keyboard-accessible golden medallio
   assert.match(sw, /"\/assets\/Ornate%20Golden%20X%20Medallion\.png"/);
 });
 
-test("sidebar artwork replaces CSS ornaments and reserves room for the eyelet and tassel", async () => {
+test("sage bookmark layer preserves artwork, eyelet and tassel without filtering navigation", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const sidebarRules = [...css.matchAll(/\.sidebar\s*\{([^}]+)\}/g)];
-  const bookmark = sidebarRules.find((rule) => rule[1].includes("Elegant%20Brown"));
-  assert.match(bookmark[1], /transparent url/);
-  assert.match(bookmark[1], /250% 100% no-repeat/);
+  const bookmark = sidebarRules.find((rule) => rule[1].includes("isolation: isolate"));
+  const artwork = css.match(/\.sidebar::before\s*\{([^}]+)\}/)[1];
+  assert.match(artwork, /Elegant%20Brown/);
+  assert.match(artwork, /250% 100% no-repeat/);
+  assert.match(artwork, /filter: sepia\(1\).*hue-rotate/);
+  assert.match(artwork, /pointer-events: none/);
+  assert.match(artwork, /z-index: -1/);
   assert.match(bookmark[1], /padding: calc\(var\(--sidebar-height, calc\(100dvh - 2rem\)\) \* 0\.085\) 1\.75rem calc\(var\(--sidebar-height, calc\(100dvh - 2rem\)\) \* 0\.28\)/);
   assert.match(bookmark[1], /clip-path: none/);
-  assert.doesNotMatch(css, /\.sidebar::(?:before|after)/);
+  assert.doesNotMatch(bookmark[1], /filter:/);
   assert.match(sidebarRules.at(-1)[1], /position: fixed/);
-  assert.match(css, /\.sidebar \.nav-pill\.active\s*\{[^}]*#df8052/);
+  assert.match(css, /\.sidebar \.nav-pill\.active\s*\{[^}]*background: var\(--sage-ink\)/);
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   assert.doesNotMatch(html, /sidebar-ornament/);
   assert.match(css, /\.sidebar-content\s*\{[^}]*overflow-y: auto/);
@@ -293,11 +297,13 @@ test("Currently reading still offers ordinary library cards when no book has bee
   assert.deepEqual(calls, [["profile", books[0]]]);
 });
 
-test("reading cards stack full-width covers above details in a slim, scrollable row", async () => {
+test("reading cards put covers beside details in a responsive, scrollable row", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
-  assert.match(css, /\.reading-feature-card\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\)[^}]*align-content: start/);
+  assert.match(css, /\.reading-feature-card\s*\{[^}]*grid-template-columns: 5\.5rem minmax\(0, 1fr\)[^}]*align-content: start/);
   assert.match(css, /\.reading-feature-cover\s*\{[^}]*width: 100%/);
-  assert.match(css, /\.card-row\.reading-home-row\s*\{[^}]*grid-auto-columns: minmax\(8\.7rem, 10\.5rem\)/);
+  assert.match(css, /\.reading-feature-title\s*\{[^}]*-webkit-line-clamp: 2/);
+  assert.match(css, /\.card-row\.reading-home-row\s*\{[^}]*grid-auto-columns: minmax\(16rem, 18rem\)/);
+  assert.match(css, /@media \(max-width: 480px\)\s*\{\s*\.card-row\.reading-home-row\s*\{[^}]*grid-auto-columns: minmax\(15rem, 85vw\)/);
   assert.doesNotMatch(css, /\.reading-home-layout/);
 });
 

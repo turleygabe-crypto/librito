@@ -1,17 +1,17 @@
-:root { color-scheme: light; --bg: #e8d1a7; --card: #fff8eb; --line: #84592b; --ink: #442d1c; --muted: #743014; --brown: #442d1c; --tan: #9d9167; --side: #442d1c; }
+:root { color-scheme: light; --bg: #f3e6d8; --card: #fffaf2; --line: #e8c3ae; --ink: #302d24; --muted: #45523a; --brown: #5e6f4f; --tan: #7f9270; --side: #5e6f4f; }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); }
 .center { max-width: 360px; margin: 12vh auto; padding: 0 16px; }
 .center input { width: 100%; margin-bottom: 8px; }
 .shell { display: grid; grid-template-columns: 230px 1fr; min-height: 100vh; }
-.side { background: var(--side); color: #fff8eb; padding: 20px 14px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; }
+.side { background: var(--side); color: #fffaf2; padding: 20px 14px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; }
 .side .brand { display: flex; gap: 10px; align-items: center; margin-bottom: 18px; }
 .side .mark { width: 36px; height: 36px; border-radius: 10px; background: var(--bg); color: var(--side); display: grid; place-items: center; font-weight: 700; }
-.side small { display: block; letter-spacing: .08em; font-size: .65rem; color: #fff8eb; }
-.side .label { font-size: .7rem; letter-spacing: .1em; color: #fff8eb; margin: 8px 8px 4px; }
-.side button, .side a { all: unset; cursor: pointer; padding: 10px 12px; border-radius: 10px; color: #fff8eb; display: block; }
+.side small { display: block; letter-spacing: .08em; font-size: .65rem; color: #fffaf2; }
+.side .label { font-size: .7rem; letter-spacing: .1em; color: #fffaf2; margin: 8px 8px 4px; }
+.side button, .side a { all: unset; cursor: pointer; padding: 10px 12px; border-radius: 10px; color: #fffaf2; display: block; }
 .side button:hover, .side a:hover { background: rgba(255,255,255,.07); }
-.side button.active { background: #743014; color: #fff8eb; }
+.side button.active { background: #45523a; color: #fffaf2; }
 .side .spacer { flex: 1; }
 main { padding: 26px 28px 40px; min-width: 0; }
 .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }

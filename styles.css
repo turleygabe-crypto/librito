@@ -1,17 +1,22 @@
 :root {
   color-scheme: light;
-  --golden-batter: #e8d1a7;
-  --cowhide-cocoa: #442d1c;
-  --olive-harvest: #9d9167;
-  --toasted-caramel: #84592b;
-  --cream: #fff8eb;
-  --spiced-wine: #743014;
-  --black: var(--golden-batter);
+  --warm-sand: #f3e6d8;
+  --deep-sage: #5e6f4f;
+  --sage: #7f9270;
+  --soft-sage: #9caf88;
+  --blush-adobe: #e8c3ae;
+  --terracotta: #c26a4a;
+  --warm-peach-clay: #d98b6b;
+  --cream: #fffaf2;
+  --deep-clay: #a9553a;
+  --text: #302d24;
+  --sage-ink: #45523a;
+  --black: var(--warm-sand);
   --panel: var(--cream);
-  --muted: var(--cowhide-cocoa);
-  --accent: var(--cowhide-cocoa);
+  --muted: var(--sage-ink);
+  --accent: var(--deep-sage);
   --paper: var(--cream);
-  --ink: var(--cowhide-cocoa);
+  --ink: var(--text);
 }
 
 * { box-sizing: border-box; }
@@ -59,17 +64,17 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
 .support-email { font-size: 1.15rem; font-weight: bold; }
 .support-notice { padding: 1rem; border: 1px solid #c97b4d; border-radius: 0.75rem; background: var(--panel); }
 .account-layout { display: grid; grid-template-columns: minmax(180px, 220px) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
-.account-navigation { display: grid; gap: 0.35rem; padding: 0.75rem; border-radius: 0.8rem; background: var(--cowhide-cocoa); }
+.account-navigation { display: grid; gap: 0.35rem; padding: 0.75rem; border-radius: 0.8rem; background: var(--deep-sage); }
 .account-navigation a { padding: 0.8rem; border-radius: 0.5rem; text-decoration: none; color: var(--cream); font-weight: 600; line-height: 1.5; }
-.account-navigation a:hover, .account-navigation .text-btn:hover { background: var(--cowhide-cocoa); color: var(--cream); }
-.account-navigation a[aria-current="page"] { background: var(--cowhide-cocoa); color: var(--cream); font-weight: bold; }
+.account-navigation a:hover, .account-navigation .text-btn:hover { background: var(--deep-sage); color: var(--cream); }
+.account-navigation a[aria-current="page"] { background: var(--deep-sage); color: var(--cream); font-weight: bold; }
 .account-navigation a:focus-visible, .account-navigation .text-btn:focus-visible { outline: 3px solid var(--cream); outline-offset: 3px; }
 .account-navigation .text-btn { padding: 0.8rem; text-align: left; color: var(--cream); line-height: 1.5; border-radius: 0.5rem; }
 .account-content { display: grid; gap: 1.25rem; min-width: 0; }
 .account-card { padding: 1.5rem; border: 1px solid #65493a; border-radius: 0.8rem; background: var(--panel); overflow-wrap: anywhere; }
 .account-card h2 { font-size: 1.3rem; }
 .account-card p { line-height: 1.6; }
-.account-card a { display: block; margin-top: 0.75rem; color: var(--cowhide-cocoa); text-underline-offset: 0.2em; }
+.account-card a { display: block; margin-top: 0.75rem; color: var(--deep-sage); text-underline-offset: 0.2em; }
 .account-card a[hidden] { display: none; }
 .account-card input { width: 100%; }
 .upgrade-plan-options { display: grid; gap: 1.5rem; }
@@ -1319,14 +1324,14 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
 .reading-feature-card {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: 5.5rem minmax(0, 1fr);
   align-content: start;
-  gap: 0.55rem;
+  gap: 0.9rem;
   padding: 0.65rem;
-  border: 1px solid #ebe3da;
+  border: 1px solid var(--blush-adobe);
   border-radius: 0.65rem;
-  background: #fffdf9;
-  box-shadow: 0 2px 10px rgba(67, 46, 30, 0.04);
+  background: var(--cream);
+  box-shadow: 0 3px 9px rgba(69, 82, 58, 0.12);
 }
 
 .reading-feature-cover {
@@ -1348,6 +1353,7 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
   display: grid;
   min-width: 0;
   gap: 0.35rem;
+  align-content: center;
 }
 
 .reading-feature-title {
@@ -1361,7 +1367,9 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
   font-weight: 600;
   text-align: left;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .reading-feature-author {
@@ -1409,7 +1417,7 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
 
 .card-row.reading-home-row {
   min-width: 0;
-  grid-auto-columns: minmax(8.7rem, 10.5rem);
+  grid-auto-columns: minmax(16rem, 18rem);
   align-items: start;
 }
 
@@ -2539,7 +2547,7 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
 
 body {
   color: var(--ink);
-  background: var(--golden-batter);
+  background: var(--warm-sand);
   font-family: "Trebuchet MS", "Segoe UI", sans-serif;
 }
 
@@ -2777,7 +2785,7 @@ body {
   margin: 0;
   padding: 0 clamp(0.75rem, 1.5vw, 1.25rem);
   color: var(--ink);
-  background: var(--golden-batter);
+  background: var(--warm-sand);
 }
 
 .spotify-topbar {
@@ -3194,9 +3202,19 @@ body {
   padding: calc(var(--sidebar-height, calc(100dvh - 2rem)) * 0.085) 1.75rem calc(var(--sidebar-height, calc(100dvh - 2rem)) * 0.28);
   border: 0;
   border-radius: 0;
-  background: transparent url("/assets/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel.png") center / 250% 100% no-repeat;
+  background: transparent;
   clip-path: none;
   box-shadow: none;
+}
+
+.sidebar::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: url("/assets/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel.png") center / 250% 100% no-repeat;
+  filter: sepia(1) saturate(1.1) hue-rotate(35deg) brightness(1.7) contrast(0.8);
+  pointer-events: none;
 }
 
 .sidebar-content {
@@ -3210,7 +3228,7 @@ body {
 
 .sidebar .sidebar-brand {
   padding: 0.5rem 0 0.9rem;
-  border-bottom-color: rgba(224, 172, 103, 0.42);
+  border-bottom-color: var(--sage);
   text-align: center;
 }
 
@@ -3223,7 +3241,7 @@ body {
 
 .sidebar .sidebar-nav,
 .sidebar .sidebar-library-nav {
-  border-bottom-color: rgba(224, 172, 103, 0.36);
+  border-bottom-color: var(--sage);
 }
 
 .sidebar .nav-pill,
@@ -3256,19 +3274,19 @@ body {
 }
 
 .sidebar .nav-pill.active {
-  background: linear-gradient(90deg, rgba(199, 111, 65, 0.38), rgba(170, 116, 69, 0.18));
-  box-shadow: inset 3px 0 #df8052, inset 0 0 0 1px rgba(224, 172, 103, 0.16);
+  background: var(--sage-ink);
+  box-shadow: inset 3px 0 var(--blush-adobe), inset 0 0 0 1px var(--sage);
 }
 
 .sidebar .nav-pill:hover,
 .sidebar .shelf-item:hover,
 .sidebar .shelf-item:focus-visible,
 .sidebar .sidebar-create-shelf:hover {
-  background-color: rgba(224, 172, 103, 0.14);
+  background-color: var(--sage-ink);
 }
 
 .sidebar .sidebar-shelf-heading h2 {
-  color: #d3a66d !important;
+  color: var(--cream) !important;
   font-family: inherit;
   font-size: 0.72rem !important;
   letter-spacing: 0.1em;
@@ -3286,12 +3304,12 @@ body {
 }
 
 .sidebar .shelf-item.active {
-  background: rgba(224, 172, 103, 0.2);
-  box-shadow: inset 2px 0 #df8052;
+  background: var(--sage-ink);
+  box-shadow: inset 2px 0 var(--blush-adobe);
 }
 
 .sidebar .shelf-thumbnail {
-  border: 1px solid rgba(224, 172, 103, 0.55);
+  border: 1px solid var(--soft-sage);
   box-shadow: 0 2px 6px rgba(9, 5, 3, 0.35);
 }
 
@@ -3305,7 +3323,7 @@ body {
 }
 
 .sidebar .shelf-item-count {
-  color: #e4bd8b;
+  color: var(--cream);
   flex-shrink: 0;
   font-size: 0.8rem;
 }
@@ -7336,6 +7354,27 @@ body.book-actions-open {
 }
 
 /* Shared palette for navigation, popovers, and reading controls. */
+.sidebar .nav-pill,
+.sidebar .nav-pill::before,
+.sidebar .shelf-item,
+.sidebar .shelf-item-copy strong,
+.sidebar .shelf-item-copy > span,
+.sidebar .shelf-item::after,
+.sidebar .sidebar-empty,
+.sidebar .sidebar-create-shelf,
+.sidebar .library-filter-count,
+.sidebar .status-shelf-remove {
+  color: var(--cream);
+}
+
+.sidebar-content {
+  scrollbar-color: var(--soft-sage) transparent;
+}
+
+.status-shelf-thumbnail {
+  background: var(--deep-sage);
+}
+
 .page-description,
 .row-empty-state,
 .card-open-button .book-cover-author,
@@ -7349,9 +7388,9 @@ body.book-actions-open {
 }
 
 .home-hero {
-  background-color: var(--cowhide-cocoa);
+  background-color: var(--deep-sage);
   background-image:
-    linear-gradient(90deg, #442d1c 0%, #442d1c 29%, rgba(68, 45, 28, 0.96) 39%, rgba(68, 45, 28, 0.68) 51%, rgba(68, 45, 28, 0) 66%),
+    linear-gradient(90deg, #45523a 0%, #45523a 25%, rgba(69, 82, 58, 0.94) 38%, rgba(69, 82, 58, 0.55) 54%, rgba(69, 82, 58, 0) 72%),
     url("/cozy%20banner%20librito.png");
   color: var(--cream);
 }
@@ -7362,14 +7401,14 @@ body.book-actions-open {
 .book-form select,
 .book-form textarea,
 .global-search-language {
-  border-color: var(--toasted-caramel);
+  border-color: var(--blush-adobe);
   background-color: var(--cream);
   color: var(--ink);
 }
 
 .global-search:focus-within {
-  border-color: var(--toasted-caramel);
-  box-shadow: 0 0 0 3px rgba(132, 89, 43, 0.3);
+  border-color: var(--deep-sage);
+  box-shadow: 0 0 0 3px rgba(127, 146, 112, 0.3);
 }
 
 .global-search > button,
@@ -7380,7 +7419,7 @@ body.book-actions-open {
 .support-page a,
 .account-card a,
 .browse-sort select {
-  color: var(--spiced-wine);
+  color: var(--sage-ink);
 }
 
 .card-row-section,
@@ -7391,30 +7430,30 @@ body.book-actions-open {
 .book-table-wrap,
 .book-table th,
 .book-table td {
-  border-color: var(--toasted-caramel);
+  border-color: var(--blush-adobe);
 }
 
 .shelf-hero {
-  border-color: var(--toasted-caramel);
-  background: linear-gradient(135deg, var(--golden-batter), var(--cream));
+  border-color: var(--blush-adobe);
+  background: linear-gradient(135deg, var(--warm-sand), var(--cream));
 }
 
 .book-shelf-status.is-on-shelf {
-  border-color: var(--olive-harvest);
+  border-color: var(--sage);
   background: var(--cream);
-  color: var(--spiced-wine);
+  color: var(--sage-ink);
 }
 
 .book-detail-content .book-reading-progress-track > span,
 .book-reading-progress-track > span,
 .reading-feature-progress-bar > span,
 .book-actions-handle {
-  background: var(--olive-harvest);
+  background: var(--sage);
 }
 
 .card-shelf-tag.is-on-shelf,
 .shelf-picker-option .shelf-check {
-  color: var(--spiced-wine);
+  color: var(--sage-ink);
 }
 
 .account-menu-panel,
@@ -7426,8 +7465,8 @@ body.book-actions-open {
 .edition-language-list,
 .browse-popover .browse-panel,
 .disposition-options {
-  border-color: var(--toasted-caramel);
-  background: var(--cowhide-cocoa);
+  border-color: var(--blush-adobe);
+  background: var(--deep-sage);
   color: var(--cream);
 }
 
@@ -7469,7 +7508,7 @@ body.book-actions-open {
 .edition-language-option[aria-selected="true"],
 .global-search .edition-language-option:hover,
 .global-search .edition-language-option[aria-selected="true"] {
-  background: var(--spiced-wine);
+  background: var(--sage-ink);
   color: var(--cream);
 }
 
@@ -7477,14 +7516,14 @@ body.book-actions-open {
 .book-more-menu-panel .danger-action {
   color: var(--cream);
   text-decoration: underline;
-  text-decoration-color: var(--golden-batter);
+  text-decoration-color: var(--warm-sand);
   text-underline-offset: 0.2em;
 }
 
 .book-actions-header,
 .book-status-menu-panel > .status-remove-option,
 .card-add-actions .shelf-create-option {
-  border-color: var(--toasted-caramel);
+  border-color: var(--blush-adobe);
 }
 
 .action-btn,
@@ -7522,8 +7561,8 @@ body.book-actions-open {
 .genre-pager-btn.active,
 .genre-sort-tab.active,
 .browse-chip.active {
-  border-color: var(--cowhide-cocoa);
-  background: var(--cowhide-cocoa);
+  border-color: var(--deep-sage);
+  background: var(--deep-sage);
   color: var(--cream);
 }
 
@@ -7541,14 +7580,14 @@ body.book-actions-open {
 .edition-language-trigger:hover,
 .audiobook-sample-button:hover,
 .book-audiobook-find:hover {
-  border-color: var(--spiced-wine);
-  background: var(--spiced-wine);
+  border-color: var(--sage-ink);
+  background: var(--sage-ink);
   color: var(--cream);
 }
 
 .book-detail-content .page-actions > .secondary-btn[aria-pressed="true"],
 .book-detail-content .book-profile-actions > .secondary-btn[aria-pressed="true"] {
-  background: var(--spiced-wine);
+  background: var(--sage-ink);
   color: var(--cream);
 }
 
@@ -7558,21 +7597,21 @@ body.book-actions-open {
 }
 
 .book-status-menu > summary::after {
-  border-color: var(--golden-batter);
+  border-color: var(--warm-sand);
 }
 
 .edition-language-trigger::after {
-  border-color: var(--golden-batter);
+  border-color: var(--warm-sand);
 }
 
 .library-view-shelf-toggle[aria-pressed="true"] {
-  border-color: var(--olive-harvest);
-  background: var(--spiced-wine);
+  border-color: var(--sage);
+  background: var(--sage-ink);
   color: var(--cream);
 }
 
 :is(button, a, summary, input, select, textarea):focus-visible {
-  outline: 2px solid var(--spiced-wine);
+  outline: 2px solid var(--sage-ink);
   outline-offset: 3px;
 }
 
@@ -7584,7 +7623,73 @@ body.book-actions-open {
 @media (max-width: 600px) {
   .home-hero {
     background-image:
-      linear-gradient(180deg, rgba(68, 45, 28, 0) 0%, rgba(68, 45, 28, 0) 22%, #442d1c 58%),
+      linear-gradient(180deg, rgba(69, 82, 58, 0) 0%, rgba(69, 82, 58, 0) 22%, #45523a 58%),
       url("/cozy%20banner%20librito.png");
+  }
+}
+
+.home-hero .action-btn {
+  border: 1px solid var(--warm-sand);
+  background: transparent;
+}
+
+.home-hero .action-btn:hover {
+  border-color: var(--cream);
+  background: var(--sage-ink);
+}
+
+.reading-feature-title,
+.reading-feature-author,
+.reading-feature-progress {
+  color: var(--ink);
+}
+
+.reading-feature-progress {
+  margin-top: 0.5rem;
+}
+
+.reading-feature-progress-bar,
+.book-reading-progress-track {
+  background: var(--warm-sand);
+}
+
+.reading-feature-progress-bar > span {
+  background: var(--terracotta);
+}
+
+.upgrade-save-tag,
+.upgrade-badge,
+.marketplace-test-notice {
+  background: linear-gradient(135deg, var(--blush-adobe), var(--warm-peach-clay));
+  color: var(--ink);
+}
+
+.account-card a {
+  color: var(--deep-clay);
+}
+
+.show-all-btn:hover {
+  color: var(--sage-ink);
+}
+
+.upgrade-plan.is-featured {
+  border-color: var(--terracotta);
+}
+
+.card-row-section .section-heading-row h2 {
+  color: var(--ink);
+}
+
+@media (max-width: 480px) {
+  .card-row.reading-home-row {
+    grid-auto-columns: minmax(15rem, 85vw);
+  }
+
+  .row-arrow-prev {
+    left: 0;
+  }
+
+  .row-arrow-next {
+    right: 0;
   }
 }
