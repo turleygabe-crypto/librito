@@ -4728,7 +4728,7 @@ body {
 .book-audiobook-panel {
   display: grid;
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 3;
   width: 100%;
   justify-self: stretch;
   align-content: start;
@@ -4818,7 +4818,7 @@ body {
 .book-profile-recommendations {
   display: grid;
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 3;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.9rem;
 }
@@ -4845,6 +4845,95 @@ body {
   color: #302720;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 1.2rem;
+}
+
+.book-purchase-section {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  gap: 0.65rem;
+}
+
+.book-purchase-section[data-status="loading"] .book-recommendation-status {
+  flex: none;
+  min-height: 0;
+  justify-content: flex-start;
+}
+
+.book-purchase-intro,
+.book-purchase-disclosure {
+  margin: 0;
+  color: #756b62;
+  font-size: 0.84rem;
+}
+
+.book-purchase-disclosure {
+  font-size: 0.75rem;
+}
+
+.book-purchase-row {
+  display: flex;
+  gap: 0.7rem;
+  overflow-x: auto;
+  padding: 0.2rem 0.2rem 0.6rem;
+  scroll-snap-type: x proximity;
+}
+
+.book-purchase-marketplace {
+  display: contents;
+}
+
+.book-purchase-card {
+  display: flex;
+  flex: 0 0 min(15rem, 85%);
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.85rem;
+  border: 1px solid #e8ddd2;
+  border-radius: 0.6rem;
+  background: #fffcf8;
+  scroll-snap-align: start;
+}
+
+.book-purchase-card.is-librito {
+  border-color: #bc8054;
+  background: #f9ecde;
+}
+
+.book-purchase-card .book-purchase-cover {
+  width: 3.5rem;
+  height: 5rem;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+.book-purchase-card h3 {
+  margin: 0;
+  color: #302720;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1rem;
+}
+
+.book-purchase-card p {
+  margin: 0;
+  color: #756b62;
+  font-size: 0.8rem;
+}
+
+.book-purchase-card .book-purchase-price {
+  color: #a94729;
+  font-weight: 700;
+}
+
+.book-purchase-card > :last-child {
+  margin-top: auto;
+  text-align: center;
+}
+
+.book-purchase-row:focus-visible,
+.book-purchase-card button:focus-visible,
+.book-purchase-card a:focus-visible {
+  outline: 2px solid #a94729;
+  outline-offset: 2px;
 }
 
 .book-profile-recommendation .home-section {

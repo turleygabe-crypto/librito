@@ -46,6 +46,8 @@ function renderProfile(ownedBook, signedIn = false) {
     createPrivateBookPhotoGallery: () => new Element("book-cover-gallery"),
     createBookAudiobookPanel: () => new Element("book-audiobook-panel"),
     createProfileRecommendationSection: () => ({ section: new Element("book-profile-recommendation") }),
+    createBookPurchaseSection: () => ({ section: new Element("book-profile-recommendation book-purchase-section") }),
+    loadBookPurchaseOptions() {},
     loadBookProfileCatalog() {},
     loadBookProfileAudiobook() {},
     loadBookProfileRecommendations() {},
@@ -73,7 +75,7 @@ test("profile places actions above metadata and statuses without the duplicate s
   actions.children[0].events.click();
   assert.deepEqual(calls, [["favorite", book]]);
   assert.deepEqual(page.children[2].children.map((child) => child.className),
-    ["edition-picker", "book-audiobook-panel", "book-profile-recommendations"]);
+    ["edition-picker", "book-profile-recommendation book-purchase-section", "book-audiobook-panel", "book-profile-recommendations"]);
 });
 
 test("private gallery appears only for signed-in readers with the book in their own library", () => {

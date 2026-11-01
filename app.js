@@ -6,6 +6,7 @@ import { normalizePlan, PLAN_LIMITS } from "./lib/entitlements.js";
 import { MEMBERSHIP_PRICING } from "./lib/membership-pricing.js?v=2";
 import { renderMarketplacePage } from "./lib/marketplace-ui.js";
 import { escapeCsvCell } from "./lib/csv.js";
+import { getBookRetailers, loadMarketplaceBookListings } from "./lib/book-purchases.js";
 
 const storageKey = "librito-library-v1";
 const shelvesStorageKey = "librito-shelves-v1";
@@ -4337,8 +4338,10 @@ function renderBookPage(book) {
     "Finding similar books…"
   );
   recommendations.append(moreByAuthor.section, readersEnjoyed.section);
-  below.append(editions, audiobook, recommendations);
+  const purchases = createBookPurchaseSection(book);
+  below.append(editions, purchases.section, audiobook, recommendations);
   page.append(below);
+  loadBookPurchaseOptions(book, purchases);
   loadBookProfileCatalog(book, { page, rating, description, readMore, editions });
   loadBookProfileAudiobook(book, audiobook);
   loadBookProfileRecommendations(book, moreByAuthor, readersEnjoyed);
@@ -4990,6 +4993,142 @@ function createProfileRecommendationSection(title, message) {
   return { section: wrapper, status };
 }
 
+function createBookPurchaseSection(book) {
+  const { section, status } = createProfileRecommendationSection("Buy this book", "Checking Librito listings...");
+  section.classList.add("book-purchase-section");
+  const intro = document.createElement("p");
+  intro.className = "book-purchase-intro";
+  intro.textContent = "Shop copies from Librito readers first, then explore other bookstores.";
+  const row = document.createElement("div");
+  row.className = "book-purchase-row";
+  row.setAttribute("aria-label", "Places to buy this book");
+  row.tabIndex = 0;
+  const marketplace = document.createElement("div");
+  marketplace.className = "book-purchase-marketplace";
+  const pending = createBookPurchaseCard(book, {
+    source: "Librito Marketplace", note: "Reader-owned copies get first place here.",
+    price: "Checking listings...", detail: "Looking for an available copy from Librito readers.",
+  });
+  pending.classList.add("is-librito");
+  marketplace.append(pending);
+  row.append(marketplace);
+  const isbn = normalizeBookIsbn(book.isbn);
+  const searchTerm = isbn || [book.title, book.author].filter(Boolean).join(" ");
+  for (const retailer of getBookRetailers(searchTerm)) {
+    const card = createBookPurchaseCard(book, {
+      source: retailer.name,
+      note: retailer.description,
+      price: "Check retailer for price",
+      detail: isbn ? `ISBN ${isbn}` : "Confirm the edition on the retailer's site",
+    });
+    card.append(createBookExternalLink("Check retailer", retailer.url, "secondary-btn"));
+    row.append(card);
+  }
+  const disclosure = document.createElement("p");
+  disclosure.className = "book-purchase-disclosure";
+  disclosure.textContent = "Librito prices are set by sellers; shipping is shown separately. Outside links are retailer searches, not affiliate links yet. Live retailer prices are not connected. Confirm the edition, availability, and final total before buying.";
+  section.append(intro, row, disclosure);
+  return { section, status, marketplace };
+}
+
+function createBookPurchaseCard(book, { source, note, price, detail, photoUrl = null }) {
+  const card = document.createElement("article");
+  card.className = "book-purchase-card";
+  const cover = createBookCover({
+    ...book, cover_i: photoUrl ? null : book.cover_i, cover_url: photoUrl || book.cover_url,
+  }, "book-purchase-cover");
+  const heading = document.createElement("h3");
+  heading.textContent = source;
+  const seller = document.createElement("p");
+  seller.textContent = note;
+  const amount = document.createElement("p");
+  amount.className = "book-purchase-price";
+  amount.textContent = price;
+  const details = document.createElement("p");
+  details.textContent = detail;
+  card.append(cover, heading, seller, amount, details);
+  return card;
+}
+
+async function loadBookPurchaseOptions(book, { section, status, marketplace }) {
+  const client = state.supabase;
+  const userId = state.session?.user.id;
+  const isActive = () => section.isConnected && state.view === "book" && state.currentBook === book
+    && state.supabase === client && state.session?.user.id === userId;
+  const showMarketplaceCard = (price, note) => {
+    const card = createBookPurchaseCard(book, {
+      source: "Librito Marketplace", note, price, detail: "Reader-owned copies get first place here.",
+    });
+    card.classList.add("is-librito");
+    const browse = document.createElement("button");
+    browse.type = "button";
+    browse.className = "secondary-btn";
+    browse.textContent = "Explore marketplace";
+    browse.addEventListener("click", () => navigateTo("marketplace", { q: book.isbn || book.title || "" }));
+    card.append(browse);
+    marketplace.replaceChildren(card);
+  };
+  try {
+    let canBrowse = false;
+    if (client && userId) {
+      const { data, error } = await client.rpc("is_admin");
+      if (error) throw error;
+      canBrowse = data === true;
+    }
+    if (!isActive()) return;
+    if (!canBrowse) {
+      showMarketplaceCard("Coming soon", "Librito's marketplace is not open to the public yet.");
+      status.textContent = "Librito listings will appear first when the marketplace opens.";
+      section.dataset.status = "ready";
+      return;
+    }
+    const listings = await loadMarketplaceBookListings(client, book);
+    if (!isActive()) return;
+    marketplace.replaceChildren();
+    const money = (cents) => new Intl.NumberFormat(undefined, {
+      style: "currency", currency: "USD",
+    }).format(cents / 100);
+    for (const listing of listings) {
+      const card = createBookPurchaseCard({ ...book, title: listing.title }, {
+        source: "Librito Marketplace",
+        note: `Sold by ${listing.sellerName}`,
+        price: money(listing.price_cents),
+        detail: `${listing.condition.replace(/_/g, " ")}${listing.book_format ? ` · ${listing.book_format}` : ""} · Shipping ${money(listing.shipping_cents)}`,
+        photoUrl: listing.photoUrl,
+      });
+      card.classList.add("is-librito");
+      const view = document.createElement("button");
+      view.type = "button";
+      view.className = "action-btn";
+      view.textContent = "View listing";
+      view.addEventListener("click", () => navigateTo("marketplace-listing", { id: listing.id }));
+      card.append(view);
+      marketplace.append(card);
+    }
+    if (!listings.length) showMarketplaceCard("No matching copies yet", "Check the marketplace for more books from readers.");
+    status.textContent = listings.length
+      ? `${listings.length} Librito ${listings.length === 1 ? "copy" : "copies"} shown first. Other editions may be included; confirm the listing.`
+      : "No matching Librito listings are available right now.";
+    section.dataset.status = "ready";
+  } catch (error) {
+    console.error("Could not load book purchase listings", error);
+    if (!isActive()) return;
+    showMarketplaceCard("Listings unavailable", "We could not load Librito listings. Please try again.");
+    status.textContent = "Could not load Librito listings.";
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "secondary-btn";
+    retry.textContent = "Retry listings";
+    retry.addEventListener("click", () => {
+      retry.disabled = true;
+      section.dataset.status = "loading";
+      loadBookPurchaseOptions(book, { section, status, marketplace });
+    });
+    status.append(retry);
+    section.dataset.status = "error";
+  }
+}
+
 function updateBookPageDetails(book, { clearMissingPageCount = false } = {}) {
   state.currentBook = book;
   const page = document.getElementById("pageView");
@@ -5424,19 +5563,58 @@ async function fetchGoogleCatalogBooks(query, { genre = "", language = "", max =
 function editDistance(a, b) {
   if (a === b) return 0;
   let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  let beforePrevious;
   for (let i = 1; i <= a.length; i += 1) {
     const current = [i];
     for (let j = 1; j <= b.length; j += 1) {
       current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        current[j] = Math.min(current[j], beforePrevious[j - 2] + 1);
+      }
     }
+    beforePrevious = previous;
     previous = current;
   }
   return previous[b.length];
 }
 
 function fuzzyTermMatches(term, words) {
-  const allowed = term.length <= 3 ? 0 : term.length <= 6 ? 1 : 2;
+  const allowed = term.length <= 3 ? 0 : term.length <= 4 ? 1 : 2;
   return words.some((word) => word.includes(term) || (allowed > 0 && editDistance(term, word) <= allowed));
+}
+
+function searchWords(value) {
+  return normalizeBookText((value || "").normalize("NFD").replace(/\p{M}/gu, "")).split(/\s+/).filter(Boolean);
+}
+
+function matchesBookSpelling(query, book) {
+  const terms = searchWords(query);
+  const words = searchWords([book.title, book.author, ...(book.author_name || [])].filter(Boolean).join(" "));
+  return terms.length > 0 && terms.every((term) => fuzzyTermMatches(term, words));
+}
+
+async function fetchSpellingTolerantSearch(params, query, timeout = 20000) {
+  const exact = await fetchOpenLibrarySearch(params, timeout);
+  if (exact.docs?.length || !/^[\p{L}\p{M}\s.'-]+$/u.test(query)) return exact;
+  const terms = [...new Set(searchWords(query))];
+  if (!terms.length || terms.length > 8 || !terms.some((term) => term.length >= 4)) return exact;
+  const language = params.get("lang");
+  const fetchCandidates = async (clauses) => {
+    const relaxed = new URLSearchParams(params);
+    relaxed.set("q", `(${clauses.join(" OR ")})${language ? ` AND language:${language}` : ""}`);
+    relaxed.set("offset", "0");
+    relaxed.set("limit", "100");
+    const payload = await fetchOpenLibrarySearch(relaxed, timeout);
+    return (payload.docs || []).filter((work) => matchesBookSpelling(query, work));
+  };
+  // Retrieve candidates using intact words first; fuzzy syntax is not supported by the catalog.
+  let docs = await fetchCandidates(terms.flatMap((term) => [`title:"${term}"`, `author:"${term}"`]));
+  if (!docs.length) {
+    docs = await fetchCandidates(terms.filter((term) => term.length >= 4)
+      .flatMap((term) => [`title:${term.slice(0, 2)}*`, `author:${term.slice(0, 2)}*`]));
+  }
+  docs = docs.slice(0, Number(params.get("limit")) || 100);
+  return { ...exact, docs, numFound: docs.length, num_found: docs.length, spellingFallback: docs.length > 0 };
 }
 
 async function fetchBookProfileVolumes(book) {
@@ -6120,31 +6298,19 @@ function openEditionShopping(book, details, returnFocus) {
     details.publisher,
     details.publish_date,
   ].filter(Boolean).join(" ");
-  const encodedSearch = encodeURIComponent(searchTerm);
   const searchDescription = isbn
     ? `Search ISBN ${isbn}`
     : "Search by title and author; confirm the edition";
-  const retailers = [
-    ["Amazon", "Shop new and used editions", `https://www.amazon.com/s?k=${encodedSearch}&i=stripbooks`],
-    ["Bookshop.org", "Support independent bookstores", `https://bookshop.org/search?keywords=${encodedSearch}`],
-    ["Barnes & Noble", "Browse books and editions", `https://www.barnesandnoble.com/s/${encodedSearch}`],
-    ["ThriftBooks", "Find pre-owned copies", `https://www.thriftbooks.com/browse/?b.search=${encodedSearch}`],
-    ["Better World Books", "Shop new and used books", `https://www.betterworldbooks.com/search/results?q=${encodedSearch}`],
-  ];
+  const retailers = getBookRetailers(searchTerm);
   const list = document.createElement("div");
   list.className = "edition-retailer-list";
-  retailers.forEach(([name, description, url]) => {
+  retailers.forEach(({ name, description, url }) => {
     const link = createBookExternalLink(name, url, "edition-retailer-link");
     const note = document.createElement("span");
     note.textContent = `${description} · ${searchDescription}`;
     const price = document.createElement("span");
     price.className = "edition-retailer-price";
-    price.textContent = details.price === null
-      ? "Price unavailable · check retailer"
-      : `Google Books: ${new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: details.currency || "USD",
-      }).format(details.price)} · check retailer`;
+    price.textContent = "Check retailer for price";
     link.replaceChildren();
     const linkCopy = document.createElement("span");
     const retailer = document.createElement("strong");
@@ -7056,7 +7222,7 @@ function findLocalSearchMatches(query) {
   const parsed = parseNaturalSearch(query);
   const candidates = [...getLibraryBooks(), ...discoveryBooks].filter((book, index, all) =>
     all.findIndex((candidate) => getBookKey(candidate) === getBookKey(book)) === index);
-  const exact = candidates.filter((book) => {
+  const eligible = candidates.filter((book) => {
     const searchable = [book.title, book.author, book.genre, ...(book.subjects || [])]
       .filter(Boolean).join(" ").toLowerCase();
     if (parsed.genre && !searchable.includes(parsed.genre) && !searchable.includes(parsed.genre.replace("science fiction", "sci-fi"))) return false;
@@ -7064,15 +7230,18 @@ function findLocalSearchMatches(query) {
       && !searchable.includes(parsed.mood)
       && !book.mood?.toLowerCase().includes(parsed.mood)) return false;
     if (parsed.pageLimit && (!book.pages || Number(book.pages) > parsed.pageLimit)) return false;
-    return !parsed.cleaned || parsed.cleaned.split(/\s+/).every((term) => searchable.includes(term));
+    return true;
+  });
+  const terms = searchWords(parsed.cleaned);
+  const exact = eligible.filter((book) => {
+    const searchable = searchWords([book.title, book.author, book.genre, ...(book.subjects || [])].filter(Boolean).join(" ")).join(" ");
+    return terms.every((term) => searchable.includes(term));
   });
   if (exact.length || !parsed.cleaned) return exact;
-  const terms = parsed.cleaned.split(/\s+/).filter(Boolean);
-  return candidates.filter((book) => {
-    const words = normalizeBookText([book.title, book.author].filter(Boolean).join(" ")).split(" ");
-    return terms.every((term) => fuzzyTermMatches(term, words));
-  });
+  return eligible.filter((book) => matchesBookSpelling(parsed.cleaned, book));
 }
+
+let naturalSearchRequestId = 0;
 
 async function runNaturalSearch(query, { updateHistory = true, language = globalSearchLanguage.value } = {}) {
   const languageValue = language && language !== "default" ? language : "";
@@ -7080,6 +7249,9 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
     navigateTo("search", { q: query.trim(), lang: languageValue });
     return;
   }
+  const requestId = ++naturalSearchRequestId;
+  const isCurrentSearch = () => requestId === naturalSearchRequestId
+    && state.view === "search" && state.searchQuery === query.trim();
   globalSearchLanguage.value = languageValue || "default";
   if (globalSearchLanguage.value !== (languageValue || "default")) globalSearchLanguage.value = "default";
   syncGlobalSearchLanguageMenu();
@@ -7108,6 +7280,7 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
   state.searchLoading = true;
   showSearchPage(state.searchQuery);
   const searchTerms = [...new Set(parsed.queryTerms)];
+  let searchMessage = "";
   try {
     const catalogQuery = searchGenre
       ? `subject:${JSON.stringify(searchGenre)}`
@@ -7121,7 +7294,10 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
         offset: String(searchOffset),
       });
       if (selectedLanguage) params.set("lang", selectedLanguage);
-      const data = await fetchOpenLibrarySearch(params, 20000);
+      const data = searchGenre
+        ? await fetchOpenLibrarySearch(params, 20000)
+        : await fetchSpellingTolerantSearch(params, catalogQuery);
+      if (data.spellingFallback) searchMessage = "Showing closest spelling matches.";
       return Array.isArray(data.docs) ? data.docs : [];
     };
     let works = [];
@@ -7227,12 +7403,14 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
           language: selectedLanguage,
         });
         externalBooks = fallback.books.filter((book) => !parsed.pageLimit || (book.pages && book.pages <= parsed.pageLimit));
-        if (externalBooks.length && !searchGenre) state.searchMessage = "Showing closest matches.";
+        if (externalBooks.length && !searchGenre) searchMessage = "Showing closest matches.";
       } catch (error) {
         console.warn("Google Books fallback failed", error);
         if (catalogFailed) throw error;
       }
     }
+    if (!isCurrentSearch()) return;
+    state.searchMessage = searchMessage;
     state.searchResults = [...state.searchResults, ...externalBooks]
       .filter((book, index, all) =>
         all.findIndex((candidate) =>
@@ -7249,13 +7427,14 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
     }
   } catch (error) {
     console.warn("Natural-language search used local results because Open Library was unavailable.", error);
+    if (!isCurrentSearch()) return;
     state.searchMessage = state.searchResults.length
       ? "Showing local matches; book-catalog search is temporarily unavailable."
       : "Book-catalog search is temporarily unavailable. Try a title, author, or genre in your library.";
   } finally {
-    state.searchLoading = false;
+    if (isCurrentSearch()) state.searchLoading = false;
   }
-  if (state.view === "search" && state.searchQuery === query.trim()) showSearchPage(state.searchQuery);
+  if (isCurrentSearch()) showSearchPage(state.searchQuery);
 }
 
 function showStatsPage() {
@@ -8673,7 +8852,7 @@ async function lookupBooksByTitleOrAuthor() {
   renderSelectedBookConfirmation();
 
   try {
-    const payload = await fetchOpenLibrarySearch(params, 20000);
+    const payload = await fetchSpellingTolerantSearch(params, searchTerms);
     const works = Array.isArray(payload.docs) ? payload.docs : [];
     const editionResults = await Promise.allSettled(works.map(async (work) => {
       if (!work.key) return null;
@@ -8707,7 +8886,7 @@ async function lookupBooksByTitleOrAuthor() {
     }
 
     renderTitleSearchResults();
-    scanStatus.textContent = `${titleSearchResults.length} matching editions${editionLookupFailures ? "; some editions could not be checked" : ""}. Select a cover to review and confirm.`;
+    scanStatus.textContent = `${titleSearchResults.length} matching editions${payload.spellingFallback ? " (closest spelling matches)" : ""}${editionLookupFailures ? "; some editions could not be checked" : ""}. Select a cover to review and confirm.`;
   } catch (error) {
     console.error(error);
     scanStatus.textContent = "Book search failed. Try again or enter the details manually.";
