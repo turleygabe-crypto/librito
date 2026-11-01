@@ -1310,19 +1310,12 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
   font-size: 1rem;
 }
 
-.reading-home-layout {
-  display: grid;
-  grid-template-columns: minmax(18rem, 20rem) minmax(0, 1fr);
-  align-items: stretch;
-  gap: 1rem;
-}
-
 .reading-feature-card {
   display: grid;
   min-width: 0;
-  grid-template-columns: 5rem minmax(0, 1fr);
-  align-items: center;
-  gap: 0.85rem;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 0.55rem;
   padding: 0.65rem;
   border: 1px solid #ebe3da;
   border-radius: 0.65rem;
@@ -1331,7 +1324,7 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
 }
 
 .reading-feature-cover {
-  width: 5rem;
+  width: 100%;
   padding: 0;
   overflow: hidden;
   border: 0;
@@ -1408,9 +1401,10 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
   font-size: 0.7rem;
 }
 
-.reading-home-row {
+.card-row.reading-home-row {
   min-width: 0;
-  grid-auto-columns: minmax(7.4rem, 8.6rem);
+  grid-auto-columns: minmax(8.7rem, 10.5rem);
+  align-items: start;
 }
 
 .page-view {
@@ -3148,10 +3142,6 @@ body {
     padding: 1rem;
   }
 
-  .reading-home-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .home-hero h1 {
     font-size: clamp(1.65rem, 7vw, 2rem);
   }
@@ -3190,9 +3180,6 @@ body {
     grid-auto-columns: minmax(8.7rem, 50vw);
   }
 
-  .reading-feature-card {
-    width: min(100%, 21rem);
-  }
 }
 
 .page-view {

@@ -9,6 +9,7 @@ class Element {
   children = [];
   attributes = {};
   events = {};
+  style = {};
   isConnected = true;
   append(...children) { this.children.push(...children); }
   replaceChildren(...children) { this.children = children; }
@@ -212,6 +213,92 @@ test("Currently reading shows the book loader while pending, then an honest empt
   const failed = context.createSection([], []);
   assert.equal(failed.children[1].textContent, context.state.loadError);
   assert.equal(failed.children.length, 2);
+});
+
+function createReadingSection(books, libraryBooks = books) {
+  const calls = [];
+  const context = {
+    document: { createElement: () => new Element() },
+    state: { loading: false, loadError: "" },
+    getReadingStatusLabel: () => "Currently Reading",
+    createBookCover: (book) => ({ book }),
+    openBookProfile: (book) => calls.push(["profile", book]),
+    setBookBookmark: (book) => calls.push(["bookmark", book]),
+  };
+  const functions = source.slice(source.indexOf("function createCurrentlyReadingHomeSection("),
+    source.indexOf("\nfunction ", source.indexOf("function createReadingBookCard(") + 1));
+  const createSection = runInNewContext(`${functions}\ncreateCurrentlyReadingHomeSection`, context);
+  return { section: createSection(books, libraryBooks), calls };
+}
+
+test("every currently reading book has a cover-first card with progress and its own bookmark action", () => {
+  const books = Array.from({ length: 8 }, (_, index) => ({
+    title: `Book ${index}`, author: `Author ${index}`, reading_status: "reading",
+    page_count: 100, current_page: index * 10,
+  }));
+  const { section, calls } = createReadingSection(books);
+  const row = section.children[1];
+  assert.equal(row.className, "card-row reading-home-row");
+  assert.equal(row.children.length, books.length);
+  assert.equal(row.attributes["aria-label"], "Currently reading books");
+  assert.equal(row.tabIndex, 0);
+  row.children.forEach((card, index) => {
+    assert.equal(card.className, "reading-feature-card");
+    const [cover, details] = card.children;
+    assert.equal(cover.children[0].book, books[index]);
+    const [title, author, progress, bookmark] = details.children;
+    assert.equal(title.textContent, books[index].title);
+    assert.equal(author.textContent, books[index].author);
+    assert.equal(progress.children[0].textContent, `Page ${index * 10} of 100`);
+    assert.equal(progress.children[1].textContent, `${index * 10}%`);
+    assert.equal(progress.children[2].attributes["aria-valuenow"], String(index * 10));
+    assert.equal(progress.children[2].children[0].style.width, `${index * 10}%`);
+    assert.equal(bookmark.textContent, index ? "Move bookmark" : "Set bookmark");
+    cover.events.click();
+    title.events.click();
+    bookmark.events.click();
+    assert.deepEqual(calls.slice(-3),
+      [["profile", books[index]], ["profile", books[index]], ["bookmark", books[index]]]);
+  });
+  const scrolls = [];
+  row.scrollBy = (options) => scrolls.push({ ...options });
+  let prevented = 0;
+  for (const key of ["ArrowRight", "ArrowLeft", "Enter"]) {
+    row.events.keydown({ key, preventDefault() { prevented += 1; } });
+  }
+  assert.equal(prevented, 2);
+  assert.deepEqual(scrolls, [
+    { left: 240, behavior: "smooth" }, { left: -240, behavior: "smooth" },
+  ]);
+});
+
+test("a single reading book uses the same row and missing page counts remain supported", () => {
+  const book = { title: "Single book", reading_status: "reading", current_page: 12 };
+  const { section } = createReadingSection([book]);
+  const row = section.children[1];
+  assert.equal(row.className, "card-row reading-home-row");
+  assert.equal(row.children.length, 1);
+  const progress = row.children[0].children[1].children[2];
+  assert.equal(progress.children[0].textContent, "Page 12");
+  assert.equal(progress.children[1].textContent, "");
+});
+
+test("Currently reading still offers ordinary library cards when no book has been started", () => {
+  const books = [{ title: "Next book", reading_status: "next_read" }];
+  const { section, calls } = createReadingSection([], books);
+  assert.match(section.children[1].textContent, /Choose one from your library/);
+  const card = section.children[2].children[0];
+  assert.equal(card.className, "media-card book-card");
+  card.children[0].events.click();
+  assert.deepEqual(calls, [["profile", books[0]]]);
+});
+
+test("reading cards stack full-width covers above details in a slim, scrollable row", async () => {
+  const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  assert.match(css, /\.reading-feature-card\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\)[^}]*align-content: start/);
+  assert.match(css, /\.reading-feature-cover\s*\{[^}]*width: 100%/);
+  assert.match(css, /\.card-row\.reading-home-row\s*\{[^}]*grid-auto-columns: minmax\(8\.7rem, 10\.5rem\)/);
+  assert.doesNotMatch(css, /\.reading-home-layout/);
 });
 
 test("home rows wait for the library before reporting an empty author row", () => {

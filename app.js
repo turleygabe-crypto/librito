@@ -1894,25 +1894,19 @@ function createCurrentlyReadingHomeSection(books, libraryBooks) {
     return section;
   }
   if (books.length) {
-    const content = document.createElement("div");
-    content.className = "reading-home-layout";
-    content.append(createFeaturedReadingCard(books[0]));
-    if (books.length > 1) {
-      const row = document.createElement("div");
-      row.className = "card-row reading-home-row";
-      row.setAttribute("role", "region");
-      row.setAttribute("aria-label", "Currently reading books");
-      row.tabIndex = 0;
-      row.addEventListener("keydown", (event) => {
-        if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
-          event.preventDefault();
-          row.scrollBy({ left: event.key === "ArrowRight" ? 240 : -240, behavior: "smooth" });
-        }
-      });
-      books.slice(1).forEach((book) => row.append(createReadingBookCard(book)));
-      content.append(row);
-    }
-    section.append(heading, content);
+    const row = document.createElement("div");
+    row.className = "card-row reading-home-row";
+    row.setAttribute("role", "region");
+    row.setAttribute("aria-label", "Currently reading books");
+    row.tabIndex = 0;
+    row.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+        event.preventDefault();
+        row.scrollBy({ left: event.key === "ArrowRight" ? 240 : -240, behavior: "smooth" });
+      }
+    });
+    books.forEach((book) => row.append(createFeaturedReadingCard(book)));
+    section.append(heading, row);
     return section;
   }
 

@@ -45,6 +45,8 @@ The mobile close control uses the subtle Ornate Golden X Medallion artwork, sits
 
 Home rows use the bouncing-book loader while the account library or catalog requests are pending (animation respects reduced-motion preferences). Once a new account's empty library has loaded, Currently reading and Recently added show prompts to add books, and author recommendations need books in the library first. These empty states are not ongoing loading states; general recommendations remain available under Picked for your library.
 
+Currently reading shows every in-progress book in the same compact, cover-first card, with its title, author, page progress, and bookmark control underneath. The row scrolls horizontally on desktop and mobile, including with the left and right arrow keys when focused.
+
 ## Admin dashboard
 `/admin.html` is an unlinked, noindex report page (users, activity, books, shelves). Access is enforced in Supabase: run [the admin migration](supabase/migrations/20261021190000_admin_dashboard.sql) and [the v2 reports migration](supabase/migrations/20261021200000_admin_dashboard_v2.sql), then grant yourself access in SQL Editor with `insert into public.admins (user_id) select id from auth.users where email = 'you@example.com';`. Non-admins only see "Not found" and the `admin_stats` RPC rejects them. "Active" users are those with a recent `last_sign_in_at`.
 
