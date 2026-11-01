@@ -4,6 +4,7 @@ Librito is a cozy, mobile-first library platform concept for scanning books, org
 
 ## What is included
 - Responsive library dashboard with a cozy banner, warm paper tones, and bookish styling
+- Book cards use a single top-right three-dot button to open a bottom sheet with the cover, title, author, favorite toggle, reading and ownership statuses, shelf management, sharing, and applicable open, purchase, and removal actions. Status choices expand within the sheet; Escape, the close button, or tapping the backdrop dismisses it.
 - Local demo library with mock data
 - Books are added to the library by default and can optionally be assigned to user-created shelves
 - Open a custom shelf to use **Rename shelf** or **Delete shelf**, both in local/demo mode and when signed in. Renaming keeps its books and saved items; deleting requires confirmation, keeps library books and their other shelf memberships, and removes items saved only to the deleted shelf. Built-in collections, including Wishlist, cannot be renamed or deleted.

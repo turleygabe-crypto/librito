@@ -51,11 +51,16 @@ test("reading and ownership menus keep their status text free of duplicate dropd
   assert.equal(source.includes("Format (optional)"), false);
 });
 
-test("status controls use warm icon pills and stack on book cards", async () => {
+test("status controls retain warm icon pills and book-card actions use an inline bottom sheet", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   assert.match(css, /\.book-status-menu > summary\.currently-reading-button\s*\{[^}]*background: #fbf6ef/);
   assert.match(css, /\.book-status-menu > summary::before\s*\{[^}]*background: url\("data:image\/svg\+xml/);
   assert.match(css, /\.ownership-status-menu > summary::before\s*\{[^}]*background-image: url\("data:image\/svg\+xml/);
   assert.match(css, /\.book-status-menu > summary::after\s*\{[^}]*transform: rotate\(45deg\)/);
-  assert.match(css, /\.card-status-controls\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\)/);
+  assert.match(css, /\.book-actions-sheet\s*\{[^}]*inset: auto 0 0/);
+  assert.match(css, /\.book-actions-sheet\s*\{[^}]*max-height: 85dvh/);
+  assert.match(css, /\.book-actions-sheet::backdrop\s*\{[^}]*background: rgba/);
+  assert.match(css, /\.book-actions-list \.book-status-menu-panel\s*\{[^}]*position: static/);
+  assert.match(css, /\.card-menu\s*\{[^}]*top: 0\.7rem;[^}]*right: 0\.7rem;[^}]*width: 2\.75rem;[^}]*height: 2\.75rem/);
+  assert.match(css, /@media \(prefers-reduced-motion: no-preference\)/);
 });

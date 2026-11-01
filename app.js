@@ -2235,23 +2235,7 @@ function createBookCard(book, { compact = false, subtitle = "" } = {}) {
     tag.textContent = shelfNames.length ? `📚 ${shelfNames.join(", ")}` : "No shelf yet";
     open.append(tag);
   }
-  const statusControls = document.createElement("div");
-  statusControls.className = "card-status-controls";
-  statusControls.append(
-    createReadingStatusMenu(book, ownedBook, { compact: true }),
-    createOwnershipStatusMenu(book, ownedBook, { compact: true }),
-  );
-  card.append(statusControls);
-  const isFavorite = Boolean(ownedBook?.is_favorite);
-  const like = document.createElement("button");
-  like.type = "button";
-  like.className = `card-like${isFavorite ? " is-liked" : ""}`;
-  like.textContent = isFavorite ? "♥" : "♡";
-  like.setAttribute("aria-label", `${isFavorite ? "Remove" : "Add"} ${t("favorite.label")} ${book.title ? `for ${book.title}` : ""}`.trim());
-  like.setAttribute("aria-pressed", String(isFavorite));
-  like.addEventListener("click", () => toggleBookFavorite(book));
-  card.append(like);
-  card.append(createBookCardMenu(book, ownedBook));
+  card.append(createBookCardMenu(book));
   return card;
 }
 
@@ -2373,29 +2357,97 @@ function promptAddToShelf(book) {
   (list.querySelector("button:not(:disabled)") || x).focus();
 }
 
-function createBookCardMenu(book, ownedBook) {
-  const menu = document.createElement("details");
+function createBookCardMenu(book) {
+  const menu = document.createElement("button");
+  menu.type = "button";
   menu.className = "card-menu";
-  const summary = document.createElement("summary");
-  summary.textContent = "⋯";
-  summary.setAttribute("aria-label", `More actions for ${book.title}`);
+  menu.textContent = "⋯";
+  menu.setAttribute("aria-label", `More actions for ${book.title}`);
+  menu.setAttribute("aria-haspopup", "dialog");
+  menu.addEventListener("click", () => openBookCardActions(book, menu));
+  return menu;
+}
+
+function openBookCardActions(book, trigger) {
+  const ownedBook = getLibraryBooks().find((owned) => getBookKey(owned) === getBookKey(book));
+  const sheet = document.createElement("dialog");
+  sheet.className = "book-actions-sheet";
+  sheet.setAttribute("aria-labelledby", "bookActionsTitle");
+  let cleanedUp = false;
+  const cleanup = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    sheet.remove();
+    document.body.classList.remove("book-actions-open");
+  };
+  const close = () => {
+    sheet.close();
+    cleanup();
+  };
+  sheet.addEventListener("close", cleanup);
+  sheet.addEventListener("click", (event) => {
+    if (event.target === sheet) close();
+  });
+  const content = document.createElement("div");
+  content.className = "book-actions-content";
+  const handle = document.createElement("div");
+  handle.className = "book-actions-handle";
+  handle.setAttribute("aria-hidden", "true");
+  const header = document.createElement("header");
+  header.className = "book-actions-header";
+  header.append(createBookCover(book));
+  const details = document.createElement("div");
+  const title = document.createElement("h2");
+  title.id = "bookActionsTitle";
+  title.textContent = book.title || "Untitled";
+  const author = document.createElement("p");
+  author.textContent = book.author || "Unknown author";
+  details.append(title, author);
+  const dismiss = document.createElement("button");
+  dismiss.type = "button";
+  dismiss.className = "book-actions-close";
+  dismiss.textContent = "×";
+  dismiss.setAttribute("aria-label", "Close book actions");
+  dismiss.addEventListener("click", close);
+  header.append(details, dismiss);
   const actions = document.createElement("div");
-  actions.className = "card-menu-actions";
-  wireCardPopover(menu, summary, actions);
-  const addToShelf = document.createElement("button");
-  addToShelf.type = "button";
-  addToShelf.textContent = getAnyShelfNames(book).length ? "Change shelves" : "Add to a shelf";
-  addToShelf.addEventListener("click", () => {
-    menu.open = false;
+  actions.className = "book-actions-list";
+  const addAction = (label, icon, callback, { danger = false } = {}) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `book-actions-option${danger ? " danger-action" : ""}`;
+    const symbol = document.createElement("span");
+    symbol.className = "book-actions-icon";
+    symbol.textContent = icon;
+    symbol.setAttribute("aria-hidden", "true");
+    const text = document.createElement("span");
+    text.textContent = label;
+    button.append(symbol, text);
+    button.addEventListener("click", () => {
+      close();
+      callback();
+    });
+    actions.append(button);
+    return button;
+  };
+  const isFavorite = Boolean(ownedBook?.is_favorite);
+  const favorite = addAction(
+    `${isFavorite ? "Remove" : "Add"} ${t("favorite.label")}`,
+    isFavorite ? "♥" : "♡",
+    () => toggleBookFavorite(book),
+  );
+  favorite.setAttribute("aria-pressed", String(isFavorite));
+  actions.append(
+    createReadingStatusMenu(book, ownedBook, { compact: true, inline: true, onSelect: close }),
+    createOwnershipStatusMenu(book, ownedBook, { inline: true, onSelect: close }),
+  );
+  addAction(getAnyShelfNames(book).length ? "Change shelves" : "Add to a shelf", "＋", () => {
     promptAddToShelf(book);
   });
-  actions.append(addToShelf);
+  addAction("Share", "↗", () => shareBook(ownedBook || book));
+  addAction("Open book", "▤", () => openBookProfile(ownedBook || book));
   if (!ownedBook) {
-    const purchase = document.createElement("button");
-    purchase.type = "button";
-    purchase.textContent = "Purchase";
-    purchase.addEventListener("click", () => {
-      menu.open = false;
+    addAction("Purchase", "$", () => {
       navigateTo("purchase", {
         title: book.title || "",
         author: book.author || "",
@@ -2404,41 +2456,23 @@ function createBookCardMenu(book, ownedBook) {
           || (book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-L.jpg?default=false` : ""),
       });
     });
-    actions.append(purchase);
   }
   if (ownedBook) {
-    const openBook = document.createElement("button");
-    openBook.type = "button";
-    openBook.textContent = "Open book";
-    openBook.addEventListener("click", () => {
-      menu.open = false;
-      openBookProfile(ownedBook);
-    });
-    actions.append(openBook);
-    const removeFromLibrary = document.createElement("button");
-    removeFromLibrary.type = "button";
-    removeFromLibrary.textContent = "Remove from library";
-    removeFromLibrary.addEventListener("click", () => {
-      menu.open = false;
-      removeBookFromLibrary(ownedBook);
-    });
-    actions.append(removeFromLibrary);
+    addAction("Remove from library", "−", () => removeBookFromLibrary(ownedBook), { danger: true });
   }
   const isOnCurrentShelf = state.view === "shelf"
     && getCustomShelves().some((shelf) => shelf.name === state.currentShelf)
     && getAnyShelfNames(book).includes(state.currentShelf);
   if (isOnCurrentShelf) {
-    const removeFromShelf = document.createElement("button");
-    removeFromShelf.type = "button";
-    removeFromShelf.textContent = "Remove from shelf";
-    removeFromShelf.addEventListener("click", () => {
-      menu.open = false;
-      removeAnyBookFromShelf(book, state.currentShelf);
-    });
-    actions.append(removeFromShelf);
+    const shelfName = state.currentShelf;
+    addAction("Remove from shelf", "−", () => removeAnyBookFromShelf(book, shelfName), { danger: true });
   }
-  menu.append(summary, actions);
-  return menu;
+  content.append(handle, header, actions);
+  sheet.append(content);
+  document.body.append(sheet);
+  trigger.focus();
+  sheet.showModal();
+  document.body.classList.add("book-actions-open");
 }
 
 function removeOrphanPopovers() {
@@ -4602,7 +4636,7 @@ function createShelfStatus(book, ownedBook) {
   return box;
 }
 
-function createReadingStatusMenu(book, ownedBook, { compact = false } = {}) {
+function createReadingStatusMenu(book, ownedBook, { compact = false, inline = false, onSelect = () => {} } = {}) {
   const menu = document.createElement("details");
   menu.className = `book-status-menu${compact ? " card-quick-status-menu" : ""}`;
   const summary = document.createElement("summary");
@@ -4621,6 +4655,7 @@ function createReadingStatusMenu(book, ownedBook, { compact = false } = {}) {
     option.setAttribute("aria-pressed", String(currentStatus === status));
     option.addEventListener("click", () => {
       menu.open = false;
+      onSelect();
       setReadingStatus(book, status);
     });
     panel.append(option);
@@ -4632,16 +4667,17 @@ function createReadingStatusMenu(book, ownedBook, { compact = false } = {}) {
     remove.textContent = "Remove status";
     remove.addEventListener("click", () => {
       menu.open = false;
+      onSelect();
       setReadingStatus(book, null);
     });
     panel.append(remove);
   }
   menu.append(summary, panel);
-  wireCardPopover(menu, summary, panel);
+  if (!inline) wireCardPopover(menu, summary, panel);
   return menu;
 }
 
-function createOwnershipStatusMenu(book, ownedBook, { compact = false } = {}) {
+function createOwnershipStatusMenu(book, ownedBook, { compact = false, inline = false, onSelect = () => {} } = {}) {
   const menu = document.createElement("details");
   menu.className = `book-status-menu ownership-status-menu${compact ? " card-quick-status-menu" : ""}`;
   const summary = document.createElement("summary");
@@ -4658,6 +4694,7 @@ function createOwnershipStatusMenu(book, ownedBook, { compact = false } = {}) {
     option.setAttribute("aria-pressed", String(currentStatus === status));
     option.addEventListener("click", () => {
       menu.open = false;
+      onSelect();
       setOwnershipStatus(book, status);
     });
     panel.append(option);
@@ -4669,12 +4706,13 @@ function createOwnershipStatusMenu(book, ownedBook, { compact = false } = {}) {
     remove.textContent = "Remove ownership status";
     remove.addEventListener("click", () => {
       menu.open = false;
+      onSelect();
       setOwnershipStatus(book, null);
     });
     panel.append(remove);
   }
   menu.append(summary, panel);
-  wireCardPopover(menu, summary, panel);
+  if (!inline) wireCardPopover(menu, summary, panel);
   return menu;
 }
 
@@ -8503,6 +8541,7 @@ document.querySelectorAll(".nav-pill").forEach((item) => {
 });
 
 document.addEventListener("keydown", (event) => {
+  if (document.querySelector(".book-actions-sheet[open]")) return;
   if (event.key === "Escape") {
     if (appDialogOverlay && !appDialogOverlay.classList.contains("hidden")) settleAppDialog(null);
     else if (editionDialogOverlay && !editionDialogOverlay.classList.contains("hidden")) closeBookEditionDialog();
