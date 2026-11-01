@@ -37,7 +37,7 @@ Then open http://127.0.0.1:3000/.
 
 ## Branding and home loading states
 
-The site follows [the asset color palette](assets/colorpalet.jpg): Latte (`#DBC4A5`) backgrounds, Clockwork (`#72583E`) menus, Cafe Noir (`#443223`) buttons, and Cedar (`#7C7960`) / Weathered (`#A08670`) accents. Linen (`#FFF9F3`) provides readable menu text and light card surfaces.
+The site follows [the autumn color palette](assets/1000002508.jpg): Golden Batter (`#E8D1A7`) backgrounds and Cowhide Cocoa (`#442D1C`) main elements, buttons, and menus. Spiced Wine (`#743014`) adds links, selected states, and hover accents; Toasted Caramel (`#84592B`) frames borders and focus states; Olive Harvest (`#9D9167`) highlights reading progress. A lighter cream (`#FFF8EB`) provides readable menu text and card surfaces. The bookmark sidebar artwork and layout remain unchanged.
 
 The sidebar retains its original vintage leather bookmark styling, using [Elegant Brown Leather Bookmark with Tassel](assets/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel.png) and the [Librito Digital Home Library logo](assets/Librito%20Digital%20Home%20Library%20Logo.png). The slim desktop panel is 13.5–15rem wide, with navigation inset inside the stitching and scrollable content. Its top edge is cropped slightly above the viewport and the tassel nearly touches the bottom. The mobile bookmark extends below the viewport with its tassel offscreen to leave room for navigation. The Ornate Golden X Medallion close control stays within the visible safe area, with an accessible label and keyboard focus. All three images are precached for offline use. The rest of the site keeps the new palette.
 

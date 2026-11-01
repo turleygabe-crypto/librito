@@ -1,18 +1,17 @@
 :root {
   color-scheme: light;
-  --latte: #dbc4a5;
-  --clockwork: #72583e;
-  --cafe-noir: #443223;
-  --cedar: #7c7960;
-  --weathered: #a08670;
-  --linen: #fff9f3;
-  --deep-olive: #44422d;
-  --black: var(--latte);
-  --panel: var(--linen);
-  --muted: var(--cafe-noir);
-  --accent: var(--cafe-noir);
-  --paper: var(--linen);
-  --ink: var(--cafe-noir);
+  --golden-batter: #e8d1a7;
+  --cowhide-cocoa: #442d1c;
+  --olive-harvest: #9d9167;
+  --toasted-caramel: #84592b;
+  --cream: #fff8eb;
+  --spiced-wine: #743014;
+  --black: var(--golden-batter);
+  --panel: var(--cream);
+  --muted: var(--cowhide-cocoa);
+  --accent: var(--cowhide-cocoa);
+  --paper: var(--cream);
+  --ink: var(--cowhide-cocoa);
 }
 
 * { box-sizing: border-box; }
@@ -60,17 +59,17 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
 .support-email { font-size: 1.15rem; font-weight: bold; }
 .support-notice { padding: 1rem; border: 1px solid #c97b4d; border-radius: 0.75rem; background: var(--panel); }
 .account-layout { display: grid; grid-template-columns: minmax(180px, 220px) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
-.account-navigation { display: grid; gap: 0.35rem; padding: 0.75rem; border-radius: 0.8rem; background: var(--clockwork); }
-.account-navigation a { padding: 0.8rem; border-radius: 0.5rem; text-decoration: none; color: var(--linen); font-weight: 600; line-height: 1.5; }
-.account-navigation a:hover, .account-navigation .text-btn:hover { background: var(--cafe-noir); color: var(--linen); }
-.account-navigation a[aria-current="page"] { background: var(--cafe-noir); color: var(--linen); font-weight: bold; }
-.account-navigation a:focus-visible, .account-navigation .text-btn:focus-visible { outline: 3px solid var(--linen); outline-offset: 3px; }
-.account-navigation .text-btn { padding: 0.8rem; text-align: left; color: var(--linen); line-height: 1.5; border-radius: 0.5rem; }
+.account-navigation { display: grid; gap: 0.35rem; padding: 0.75rem; border-radius: 0.8rem; background: var(--cowhide-cocoa); }
+.account-navigation a { padding: 0.8rem; border-radius: 0.5rem; text-decoration: none; color: var(--cream); font-weight: 600; line-height: 1.5; }
+.account-navigation a:hover, .account-navigation .text-btn:hover { background: var(--cowhide-cocoa); color: var(--cream); }
+.account-navigation a[aria-current="page"] { background: var(--cowhide-cocoa); color: var(--cream); font-weight: bold; }
+.account-navigation a:focus-visible, .account-navigation .text-btn:focus-visible { outline: 3px solid var(--cream); outline-offset: 3px; }
+.account-navigation .text-btn { padding: 0.8rem; text-align: left; color: var(--cream); line-height: 1.5; border-radius: 0.5rem; }
 .account-content { display: grid; gap: 1.25rem; min-width: 0; }
 .account-card { padding: 1.5rem; border: 1px solid #65493a; border-radius: 0.8rem; background: var(--panel); overflow-wrap: anywhere; }
 .account-card h2 { font-size: 1.3rem; }
 .account-card p { line-height: 1.6; }
-.account-card a { display: block; margin-top: 0.75rem; color: var(--cafe-noir); text-underline-offset: 0.2em; }
+.account-card a { display: block; margin-top: 0.75rem; color: var(--cowhide-cocoa); text-underline-offset: 0.2em; }
 .account-card a[hidden] { display: none; }
 .account-card input { width: 100%; }
 .upgrade-plan-options { display: grid; gap: 1.5rem; }
@@ -2540,7 +2539,7 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
 
 body {
   color: var(--ink);
-  background: var(--latte);
+  background: var(--golden-batter);
   font-family: "Trebuchet MS", "Segoe UI", sans-serif;
 }
 
@@ -2778,7 +2777,7 @@ body {
   margin: 0;
   padding: 0 clamp(0.75rem, 1.5vw, 1.25rem);
   color: var(--ink);
-  background: var(--latte);
+  background: var(--golden-batter);
 }
 
 .spotify-topbar {
@@ -7350,11 +7349,11 @@ body.book-actions-open {
 }
 
 .home-hero {
-  background-color: var(--clockwork);
+  background-color: var(--cowhide-cocoa);
   background-image:
-    linear-gradient(90deg, #72583e 0%, #72583e 29%, rgba(114, 88, 62, 0.96) 39%, rgba(114, 88, 62, 0.68) 51%, rgba(114, 88, 62, 0) 66%),
+    linear-gradient(90deg, #442d1c 0%, #442d1c 29%, rgba(68, 45, 28, 0.96) 39%, rgba(68, 45, 28, 0.68) 51%, rgba(68, 45, 28, 0) 66%),
     url("/cozy%20banner%20librito.png");
-  color: var(--linen);
+  color: var(--cream);
 }
 
 .global-search,
@@ -7363,14 +7362,14 @@ body.book-actions-open {
 .book-form select,
 .book-form textarea,
 .global-search-language {
-  border-color: var(--weathered);
-  background-color: var(--linen);
+  border-color: var(--toasted-caramel);
+  background-color: var(--cream);
   color: var(--ink);
 }
 
 .global-search:focus-within {
-  border-color: var(--cedar);
-  box-shadow: 0 0 0 3px rgba(124, 121, 96, 0.3);
+  border-color: var(--toasted-caramel);
+  box-shadow: 0 0 0 3px rgba(132, 89, 43, 0.3);
 }
 
 .global-search > button,
@@ -7381,7 +7380,7 @@ body.book-actions-open {
 .support-page a,
 .account-card a,
 .browse-sort select {
-  color: var(--cafe-noir);
+  color: var(--spiced-wine);
 }
 
 .card-row-section,
@@ -7392,30 +7391,30 @@ body.book-actions-open {
 .book-table-wrap,
 .book-table th,
 .book-table td {
-  border-color: var(--weathered);
+  border-color: var(--toasted-caramel);
 }
 
 .shelf-hero {
-  border-color: var(--weathered);
-  background: linear-gradient(135deg, var(--latte), var(--linen));
+  border-color: var(--toasted-caramel);
+  background: linear-gradient(135deg, var(--golden-batter), var(--cream));
 }
 
 .book-shelf-status.is-on-shelf {
-  border-color: var(--cedar);
-  background: var(--linen);
-  color: var(--deep-olive);
+  border-color: var(--olive-harvest);
+  background: var(--cream);
+  color: var(--spiced-wine);
 }
 
 .book-detail-content .book-reading-progress-track > span,
 .book-reading-progress-track > span,
 .reading-feature-progress-bar > span,
 .book-actions-handle {
-  background: var(--cedar);
+  background: var(--olive-harvest);
 }
 
 .card-shelf-tag.is-on-shelf,
 .shelf-picker-option .shelf-check {
-  color: var(--deep-olive);
+  color: var(--spiced-wine);
 }
 
 .account-menu-panel,
@@ -7427,14 +7426,14 @@ body.book-actions-open {
 .edition-language-list,
 .browse-popover .browse-panel,
 .disposition-options {
-  border-color: var(--weathered);
-  background: var(--clockwork);
-  color: var(--linen);
+  border-color: var(--toasted-caramel);
+  background: var(--cowhide-cocoa);
+  color: var(--cream);
 }
 
 :is(.account-menu-panel, .account-navigation, .book-actions-sheet, .book-status-menu-panel, .book-more-menu-panel, .card-add-actions, .edition-language-list, .browse-popover .browse-panel, .disposition-options)
   :is(p, label, small, h2, h3, .book-actions-icon, .bookmarked-page-field, .currently-reading-bookmark-time, .shelf-menu-heading, .shelf-check, .edition-language-group, .text-btn, .account-menu-link, .disposition-links a, .disposition-mark) {
-  color: var(--linen);
+  color: var(--cream);
 }
 
 .account-navigation a,
@@ -7450,7 +7449,7 @@ body.book-actions-open {
 .global-search .edition-language-option,
 .disposition-option {
   background: transparent;
-  color: var(--linen);
+  color: var(--cream);
 }
 
 .account-navigation a:hover,
@@ -7470,22 +7469,22 @@ body.book-actions-open {
 .edition-language-option[aria-selected="true"],
 .global-search .edition-language-option:hover,
 .global-search .edition-language-option[aria-selected="true"] {
-  background: var(--cafe-noir);
-  color: var(--linen);
+  background: var(--spiced-wine);
+  color: var(--cream);
 }
 
 .book-actions-option.danger-action,
 .book-more-menu-panel .danger-action {
-  color: var(--linen);
+  color: var(--cream);
   text-decoration: underline;
-  text-decoration-color: var(--latte);
+  text-decoration-color: var(--golden-batter);
   text-underline-offset: 0.2em;
 }
 
 .book-actions-header,
 .book-status-menu-panel > .status-remove-option,
 .card-add-actions .shelf-create-option {
-  border-color: var(--weathered);
+  border-color: var(--toasted-caramel);
 }
 
 .action-btn,
@@ -7523,9 +7522,9 @@ body.book-actions-open {
 .genre-pager-btn.active,
 .genre-sort-tab.active,
 .browse-chip.active {
-  border-color: var(--cafe-noir);
-  background: var(--cafe-noir);
-  color: var(--linen);
+  border-color: var(--cowhide-cocoa);
+  background: var(--cowhide-cocoa);
+  color: var(--cream);
 }
 
 .action-btn:hover,
@@ -7542,15 +7541,15 @@ body.book-actions-open {
 .edition-language-trigger:hover,
 .audiobook-sample-button:hover,
 .book-audiobook-find:hover {
-  border-color: var(--clockwork);
-  background: var(--clockwork);
-  color: var(--linen);
+  border-color: var(--spiced-wine);
+  background: var(--spiced-wine);
+  color: var(--cream);
 }
 
 .book-detail-content .page-actions > .secondary-btn[aria-pressed="true"],
 .book-detail-content .book-profile-actions > .secondary-btn[aria-pressed="true"] {
-  background: var(--deep-olive);
-  color: var(--linen);
+  background: var(--spiced-wine);
+  color: var(--cream);
 }
 
 .book-status-menu > summary::before,
@@ -7559,33 +7558,33 @@ body.book-actions-open {
 }
 
 .book-status-menu > summary::after {
-  border-color: var(--latte);
+  border-color: var(--golden-batter);
 }
 
 .edition-language-trigger::after {
-  border-color: var(--latte);
+  border-color: var(--golden-batter);
 }
 
 .library-view-shelf-toggle[aria-pressed="true"] {
-  border-color: var(--cedar);
-  background: var(--deep-olive);
-  color: var(--linen);
+  border-color: var(--olive-harvest);
+  background: var(--spiced-wine);
+  color: var(--cream);
 }
 
 :is(button, a, summary, input, select, textarea):focus-visible {
-  outline: 2px solid var(--deep-olive);
+  outline: 2px solid var(--spiced-wine);
   outline-offset: 3px;
 }
 
 :is(.account-menu-panel, .account-navigation, .book-actions-sheet, .book-status-menu-panel, .book-more-menu-panel, .card-add-actions, .edition-language-list, .browse-panel)
   :is(button, a, summary, input, select):focus-visible {
-  outline-color: var(--linen);
+  outline-color: var(--cream);
 }
 
 @media (max-width: 600px) {
   .home-hero {
     background-image:
-      linear-gradient(180deg, rgba(114, 88, 62, 0) 0%, rgba(114, 88, 62, 0) 22%, #72583e 58%),
+      linear-gradient(180deg, rgba(68, 45, 28, 0) 0%, rgba(68, 45, 28, 0) 22%, #442d1c 58%),
       url("/cozy%20banner%20librito.png");
   }
 }

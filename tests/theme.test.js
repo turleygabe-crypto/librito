@@ -4,12 +4,12 @@ import { test } from "node:test";
 
 const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
 const palette = {
-  latte: "#dbc4a5",
-  clockwork: "#72583e",
-  "cafe-noir": "#443223",
-  cedar: "#7c7960",
-  weathered: "#a08670",
-  linen: "#fff9f3",
+  "golden-batter": "#e8d1a7",
+  "cowhide-cocoa": "#442d1c",
+  "spiced-wine": "#743014",
+  "toasted-caramel": "#84592b",
+  "olive-harvest": "#9d9167",
+  cream: "#fff8eb",
 };
 
 function luminance(hex) {
@@ -25,16 +25,17 @@ test("theme tokens match the asset palette and use accessible text pairs", () =>
     assert.match(css, new RegExp(`--${name}: ${value};`));
   }
   for (const [foreground, background] of [
-    ["cafe-noir", "latte"],
-    ["clockwork", "linen"],
-    ["linen", "clockwork"],
-    ["linen", "cafe-noir"],
+    ["cowhide-cocoa", "golden-batter"],
+    ["spiced-wine", "golden-batter"],
+    ["toasted-caramel", "cream"],
+    ["cream", "cowhide-cocoa"],
+    ["cream", "spiced-wine"],
   ]) {
     const values = [luminance(palette[foreground]), luminance(palette[background])].sort((a, b) => b - a);
     assert((values[0] + 0.05) / (values[1] + 0.05) >= 4.5, `${foreground} on ${background} must meet WCAG AA`);
   }
-  assert.match(css, /body\s*\{[^}]*color: var\(--ink\);[^}]*background: var\(--latte\)/);
-  assert.match(css, /\.main-stage\s*\{[^}]*background: var\(--latte\)/);
+  assert.match(css, /body\s*\{[^}]*color: var\(--ink\);[^}]*background: var\(--golden-batter\)/);
+  assert.match(css, /\.main-stage\s*\{[^}]*background: var\(--golden-batter\)/);
 });
 
 test("menus, buttons, and progress accents share the palette across app surfaces", () => {
@@ -44,25 +45,25 @@ test("menus, buttons, and progress accents share the palette across app surfaces
     ".account-navigation", ".book-actions-sheet", ".book-status-menu-panel",
     ".book-more-menu-panel", ".card-add-actions", ".edition-language-list", ".browse-popover .browse-panel",
   ]) assert(menus.includes(selector), `${selector} must share the menu surface`);
-  assert.match(menus, /background: var\(--clockwork\);[\s\S]*color: var\(--linen\)/);
+  assert.match(menus, /background: var\(--cowhide-cocoa\);[\s\S]*color: var\(--cream\)/);
   const buttons = theme.slice(theme.indexOf("\n.action-btn,"), theme.indexOf("\n.action-btn:hover"));
   for (const selector of [".reading-continue-btn", ".secondary-btn", ".edition-picker-button", ".cc-btn", ".upgrade-cta"]) {
     assert(buttons.includes(selector), `${selector} must share the button palette`);
   }
-  assert.match(buttons, /background: var\(--cafe-noir\);[\s\S]*color: var\(--linen\)/);
-  assert.match(theme, /\.reading-feature-progress-bar > span,[\s\S]*background: var\(--cedar\)/);
+  assert.match(buttons, /background: var\(--cowhide-cocoa\);[\s\S]*color: var\(--cream\)/);
+  assert.match(theme, /\.reading-feature-progress-bar > span,[\s\S]*background: var\(--olive-harvest\)/);
 });
 
 test("browser chrome, installed app, support pages, and admin use matching colors", async () => {
   const manifest = JSON.parse(await readFile(new URL("../manifest.webmanifest", import.meta.url), "utf8"));
-  assert.equal(manifest.background_color, palette.latte);
-  assert.equal(manifest.theme_color, palette.clockwork);
+  assert.equal(manifest.background_color, palette["golden-batter"]);
+  assert.equal(manifest.theme_color, palette["cowhide-cocoa"]);
   for (const path of ["index.html", "contact.html", "billing-support.html"]) {
     const html = await readFile(new URL(`../${path}`, import.meta.url), "utf8");
-    assert.match(html, /name="theme-color" content="#dbc4a5"/);
+    assert.match(html, /name="theme-color" content="#e8d1a7"/);
   }
   const admin = await readFile(new URL("../admin.css", import.meta.url), "utf8");
-  assert.match(admin, /--bg: #dbc4a5/);
-  assert.match(admin, /--side: #72583e/);
-  assert.match(admin, /--brown: #443223/);
+  assert.match(admin, /--bg: #e8d1a7/);
+  assert.match(admin, /--side: #442d1c/);
+  assert.match(admin, /--brown: #442d1c/);
 });
