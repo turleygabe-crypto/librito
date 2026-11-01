@@ -726,5 +726,5 @@ test("private storage requests bypass service-worker caches", async () => {
   assert.match(source, /"\/lib\/book-photos.js"/);
   const deployment = JSON.parse(await readFile(new URL("../vercel.json", import.meta.url), "utf8"));
   assert.ok(deployment.builds.some((build) => build.use === "@vercel/static"
-    && build.src === "lib/{supabase-client,billing-status,book-photos,entitlements,membership-pricing,marketplace-ui,marketplace-photos,image-validation,csv,marketplace-money}.js"));
+    && build.src === "lib/{supabase-client,billing-status,book-photos,book-purchases,entitlements,membership-pricing,marketplace-ui,marketplace-photos,image-validation,csv,marketplace-money}.js"));
 });

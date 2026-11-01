@@ -19,7 +19,7 @@
       "use": "@vercel/static"
     },
     {
-      "src": "lib/{supabase-client,billing-status,book-photos,entitlements,membership-pricing,marketplace-ui,marketplace-photos,image-validation,csv,marketplace-money}.js",
+      "src": "lib/{supabase-client,billing-status,book-photos,book-purchases,entitlements,membership-pricing,marketplace-ui,marketplace-photos,image-validation,csv,marketplace-money}.js",
       "use": "@vercel/static"
     }
   ],
