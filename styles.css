@@ -1842,45 +1842,147 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
   color: #fff8ef;
 }
 
-.private-book-photos {
-  margin-bottom: 0.9rem;
-  padding: 1rem;
-  border: 1px solid #e8ddd2;
-  border-radius: 0.8rem;
-  background: #fffaf3;
+.book-cover-gallery {
+  display: grid;
+  gap: 0.5rem;
+  width: min(100%, 11rem);
+  min-width: 0;
+  justify-self: center;
+  align-self: center;
 }
 
-.private-book-photos h2 {
-  margin-top: 0;
-  font-family: Georgia, "Times New Roman", serif;
+.book-cover-gallery [hidden] {
+  display: none;
+}
+
+.book-cover-gallery-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+}
+
+.book-cover-gallery-stage > .book-detail-cover {
+  width: 100%;
+  height: 100%;
+}
+
+.book-cover-gallery-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 0.18rem;
+  background: #f4e2cf;
+}
+
+.book-photo-badge {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  padding: 0.2rem 0.35rem;
+  border-radius: 0.3rem;
+  background: #302720;
+  color: #fffaf3;
+  font-size: 0.65rem;
+}
+
+.book-photo-navigation {
+  position: absolute;
+  bottom: 0.35rem;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: #302720;
+  color: #fffaf3;
+  font-size: 0.7rem;
+}
+
+.book-photo-navigation button {
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0.25rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
 }
 
 .private-book-photo-upload {
-  display: grid;
-  gap: 0.5rem;
+  position: relative;
+  justify-self: center;
+  padding: 0.35rem 0.5rem;
+  color: #9d452b;
+  font-size: 0.8rem;
+  cursor: pointer;
 }
 
-.private-book-photo-upload input {
-  max-width: 100%;
+.book-photo-file-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.private-book-photo-upload:focus-within,
+.book-cover-gallery button:focus-visible {
+  outline: 2px solid #a94729;
+  outline-offset: 2px;
 }
 
 .private-book-photo-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
-  gap: 1rem;
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding: 0.2rem;
 }
 
-.private-book-photo-grid figure {
-  display: grid;
-  gap: 0.5rem;
-  margin: 0;
+.book-photo-thumbnail {
+  flex: 0 0 2.5rem;
+  width: 2.5rem;
+  height: 3.5rem;
+  padding: 0.15rem;
+  border: 2px solid transparent;
+  border-radius: 0.25rem;
+  background: transparent;
 }
 
-.private-book-photo-grid img {
+.book-photo-thumbnail[aria-pressed="true"] {
+  border-color: #a94729;
+}
+
+.book-photo-thumbnail img,
+.book-photo-thumbnail-cover {
   width: 100%;
-  height: 16rem;
+  height: 100%;
   object-fit: contain;
-  border-radius: 0.5rem;
+  border-radius: 0.1rem;
+}
+
+.book-photo-thumbnail-cover .book-cover-placeholder {
+  font-size: 0.45rem;
+}
+
+.book-photo-delete {
+  justify-self: center;
+  padding: 0.25rem;
+  border: 0;
+  background: transparent;
+  color: #a13728;
+  font-size: 0.7rem;
+}
+
+.book-photo-status {
+  margin: 0;
+  color: #756b62;
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+
+.book-photo-status:empty {
+  display: none;
 }
 
 .edition-picker {
@@ -3579,7 +3681,8 @@ body {
   }
 }
 
-.book-detail-layout.is-disposed > .book-detail-cover {
+.book-detail-layout.is-disposed > .book-detail-cover,
+.book-detail-layout.is-disposed > .book-cover-gallery .book-detail-cover {
   opacity: 0.68;
 }
 
@@ -4507,7 +4610,8 @@ body {
     grid-template-columns: minmax(8rem, 0.7fr) minmax(0, 1.3fr);
   }
 
-  .book-detail-cover {
+  .book-detail-cover,
+  .book-cover-gallery {
     grid-row: span 2;
     width: min(100%, 12rem);
   }
@@ -4544,7 +4648,8 @@ body {
     padding: 1rem;
   }
 
-  .book-detail-cover {
+  .book-detail-cover,
+  .book-cover-gallery {
     width: min(58vw, 12rem);
     grid-row: auto;
   }

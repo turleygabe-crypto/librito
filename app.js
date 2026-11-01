@@ -4146,7 +4146,10 @@ function renderBookPage(book) {
 
   const layout = document.createElement("div");
   layout.className = "book-detail-layout";
-  const cover = createBookCover(book, "book-detail-cover");
+  const ownedBook = findOwnedBook(book);
+  const cover = ownedBook && state.session && state.supabase
+    ? createPrivateBookPhotoGallery(ownedBook, book)
+    : createBookCover(book, "book-detail-cover");
   const intro = document.createElement("div");
   intro.className = "book-profile-intro";
   const heading = document.createElement("h1");
@@ -4202,7 +4205,6 @@ function renderBookPage(book) {
     metadata.append(field);
   });
 
-  const ownedBook = findOwnedBook(book);
   const isLibraryBook = Boolean(ownedBook);
   const isDisposed = ["sold", "donated"].includes(ownedBook?.ownership_status);
   layout.classList.toggle("is-disposed", isDisposed);
@@ -4268,52 +4270,134 @@ function renderBookPage(book) {
   );
   recommendations.append(moreByAuthor.section, readersEnjoyed.section);
   below.append(editions, audiobook, recommendations);
-  if (ownedBook && state.session && state.supabase) {
-    page.append(createPrivateBookPhotoGallery(ownedBook));
-  }
   page.append(below);
   loadBookProfileCatalog(book, { page, rating, description, readMore, editions });
   loadBookProfileAudiobook(book, audiobook);
   loadBookProfileRecommendations(book, moreByAuthor, readersEnjoyed);
 }
 
-function createPrivateBookPhotoGallery(book) {
-  const section = document.createElement("section");
-  section.className = "private-book-photos";
+function createPrivateBookPhotoGallery(book, displayBook = book) {
+  const section = document.createElement("div");
+  section.className = "book-cover-gallery";
+  section.setAttribute("aria-label", t("photos.gallery"));
   const userId = state.session.user.id;
   const client = state.supabase;
-  const heading = document.createElement("h2");
-  heading.textContent = t("photos.title");
-  const copy = document.createElement("p");
-  copy.textContent = t("photos.privacy");
+  const stage = document.createElement("div");
+  stage.className = "book-cover-gallery-stage";
+  let primary = createBookCover(displayBook, "book-detail-cover");
+  const uploaded = document.createElement("img");
+  uploaded.className = "book-cover-gallery-image";
+  uploaded.hidden = true;
+  const badge = document.createElement("span");
+  badge.className = "book-photo-badge";
+  badge.textContent = t("photos.your_photo");
+  badge.title = t("photos.privacy");
+  badge.hidden = true;
+  const navigation = document.createElement("div");
+  navigation.className = "book-photo-navigation";
+  navigation.hidden = true;
+  const previous = document.createElement("button");
+  previous.type = "button";
+  previous.textContent = "<";
+  previous.setAttribute("aria-label", t("photos.previous"));
+  const position = document.createElement("span");
+  position.setAttribute("aria-live", "polite");
+  const next = document.createElement("button");
+  next.type = "button";
+  next.textContent = ">";
+  next.setAttribute("aria-label", t("photos.next"));
+  navigation.append(previous, position, next);
+  stage.append(primary, uploaded, badge, navigation);
   const input = document.createElement("input");
   input.type = "file";
   input.accept = "image/jpeg,image/png,image/webp";
+  input.className = "book-photo-file-input";
+  input.setAttribute("aria-label", t("photos.upload"));
   const label = document.createElement("label");
   label.className = "private-book-photo-upload";
-  label.append(document.createTextNode(t("photos.upload")), input);
+  label.title = t("photos.upload");
+  label.append(document.createTextNode(t("photos.upload_short")), input);
   const status = document.createElement("p");
+  status.className = "book-photo-status";
   status.setAttribute("role", "status");
   const grid = document.createElement("div");
   grid.className = "private-book-photo-grid";
+  grid.setAttribute("aria-label", t("photos.gallery"));
+  const primaryThumb = document.createElement("button");
+  primaryThumb.type = "button";
+  primaryThumb.className = "book-photo-thumbnail";
+  primaryThumb.setAttribute("aria-label", t("photos.primary"));
+  let primaryThumbCover = createBookCover(displayBook, "book-photo-thumbnail-cover");
+  primaryThumb.append(primaryThumbCover);
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "book-photo-delete";
+  remove.textContent = t("photos.delete");
+  remove.hidden = true;
   const retry = document.createElement("button");
   retry.type = "button";
   retry.className = "secondary-btn";
   retry.textContent = t("photos.retry");
   retry.hidden = true;
-  section.append(heading, copy, label, status, retry, grid);
+  section.append(stage, label, grid, remove, status, retry);
   const urls = new Set();
+  let photos = [];
+  let selected = 0;
+  let busy = false;
   let generation = 0;
   let mounted = false;
   const active = () => state.session?.user.id === userId
     && state.books.some((item) => item.id === book.id)
     && state.view === "book"
     && section.isConnected;
+  const select = (index) => {
+    selected = index;
+    const photo = photos[index - 1];
+    primary.hidden = Boolean(photo);
+    uploaded.hidden = !photo;
+    badge.hidden = !photo;
+    remove.hidden = !photo;
+    remove.disabled = busy;
+    if (photo) {
+      uploaded.src = photo.url;
+      uploaded.alt = t("photos.alt", { title: book.title, number: index });
+      remove.setAttribute("aria-label", t("photos.delete_label", { number: index }));
+    } else uploaded.removeAttribute("src");
+    navigation.hidden = photos.length === 0;
+    grid.hidden = photos.length === 0;
+    position.textContent = `${index + 1} / ${photos.length + 1}`;
+    grid.querySelectorAll("button").forEach((button, buttonIndex) => {
+      button.setAttribute("aria-pressed", String(buttonIndex === index));
+    });
+    position.setAttribute("aria-label", photo
+      ? t("photos.alt", { title: book.title, number: index })
+      : t("photos.primary"));
+  };
   const clear = () => {
+    photos = [];
+    grid.replaceChildren(primaryThumb);
+    select(0);
     urls.forEach((url) => URL.revokeObjectURL(url));
     urls.clear();
-    grid.replaceChildren();
   };
+  primaryThumb.addEventListener("click", () => select(0));
+  const cycle = (direction) => select((selected + direction + photos.length + 1) % (photos.length + 1));
+  previous.addEventListener("click", () => cycle(-1));
+  next.addEventListener("click", () => cycle(1));
+  section.addEventListener("keydown", (event) => {
+    if (event.target.tagName !== "BUTTON" || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+    event.preventDefault();
+    cycle(event.key === "ArrowLeft" ? -1 : 1);
+  });
+  section.addEventListener("book-cover-update", (event) => {
+    primary.replaceWith(primary = createBookCover(event.detail, "book-detail-cover"));
+    primaryThumbCover.replaceWith(primaryThumbCover = createBookCover(event.detail, "book-photo-thumbnail-cover"));
+    select(selected);
+  });
+  uploaded.addEventListener("error", () => {
+    select(0);
+    fail(new Error("Photo could not be displayed"), "photos.load_error");
+  });
   const observer = new MutationObserver(() => {
     if (section.isConnected) mounted = true;
     if (mounted && !active()) {
@@ -4333,48 +4417,39 @@ function createPrivateBookPhotoGallery(book) {
       showToast(t(key));
     }
   };
-  const load = async () => {
+  const load = async (preferredPath = photos[selected - 1]?.path) => {
     const current = ++generation;
     clear();
     input.disabled = true;
+    retry.disabled = true;
     retry.hidden = true;
     status.textContent = t("photos.loading");
     try {
-      const photos = await listBookPhotos(client, userId, book.id);
-      for (const [index, photo] of photos.entries()) {
+      const files = await listBookPhotos(client, userId, book.id);
+      for (const [index, photo] of files.entries()) {
         const blob = await downloadBookPhoto(client, photo.path);
         if (!active() || current !== generation) return;
         const url = URL.createObjectURL(blob);
         urls.add(url);
-        const figure = document.createElement("figure");
+        photos.push({ ...photo, url });
+        const thumbnail = document.createElement("button");
+        thumbnail.type = "button";
+        thumbnail.className = "book-photo-thumbnail";
+        thumbnail.setAttribute("aria-label", t("photos.alt", { title: book.title, number: index + 1 }));
+        thumbnail.title = t("photos.your_photo");
         const image = document.createElement("img");
         image.src = url;
         image.alt = t("photos.alt", { title: book.title, number: index + 1 });
         image.addEventListener("error", () => fail(new Error("Photo could not be displayed"), "photos.load_error"));
-        const remove = document.createElement("button");
-        remove.type = "button";
-        remove.className = "secondary-btn";
-        remove.textContent = t("photos.delete");
-        remove.setAttribute("aria-label", t("photos.delete_label", { number: index + 1 }));
-        remove.addEventListener("click", async () => {
-          if (!active()) return;
-          const confirmed = await showAppConfirm(t("photos.delete_confirm"), {
-            title: t("photos.delete"), confirmLabel: t("photos.delete"), danger: true,
-          });
-          if (!confirmed || !active()) return;
-          remove.disabled = true;
-          try {
-            await removeBookPhotos(client, [photo.path]);
-            if (active()) await load();
-          } catch (error) {
-            fail(error, "photos.delete_error");
-            remove.disabled = false;
-          }
-        });
-        figure.append(image, remove);
-        grid.append(figure);
+        thumbnail.append(image);
+        thumbnail.addEventListener("click", () => select(index + 1));
+        grid.append(thumbnail);
       }
-      if (active() && current === generation) status.textContent = t(photos.length ? "photos.loaded" : "photos.empty");
+      if (active() && current === generation) {
+        const preferredIndex = photos.findIndex((photo) => photo.path === preferredPath);
+        select(preferredIndex < 0 ? 0 : preferredIndex + 1);
+        status.textContent = "";
+      }
     } catch (error) {
       if (current === generation) {
         clear();
@@ -4382,20 +4457,51 @@ function createPrivateBookPhotoGallery(book) {
         retry.hidden = false;
       }
     } finally {
-      if (active() && current === generation) input.disabled = false;
+      if (active() && current === generation) {
+        input.disabled = busy;
+        retry.disabled = busy;
+      }
     }
   };
-  retry.addEventListener("click", load);
+  retry.addEventListener("click", () => load());
+  remove.addEventListener("click", async () => {
+    const photo = photos[selected - 1];
+    if (!photo || !active() || busy) return;
+    const confirmed = await showAppConfirm(t("photos.delete_confirm"), {
+      title: t("photos.delete"), confirmLabel: t("photos.delete"), danger: true,
+    });
+    if (!confirmed || !active() || busy || !photos.some((item) => item.path === photo.path)) return;
+    busy = true;
+    remove.disabled = true;
+    input.disabled = true;
+    retry.disabled = true;
+    try {
+      await removeBookPhotos(client, [photo.path]);
+      if (active()) await load();
+    } catch (error) {
+      fail(error, "photos.delete_error");
+    } finally {
+      busy = false;
+      if (active()) {
+        remove.disabled = false;
+        input.disabled = false;
+        retry.disabled = false;
+      }
+    }
+  });
   input.addEventListener("change", async () => {
     const file = input.files?.[0];
-    if (!file || !active()) return;
+    if (!file || !active() || busy) return;
+    busy = true;
+    remove.disabled = true;
     input.disabled = true;
+    retry.disabled = true;
     status.textContent = t("photos.uploading");
     try {
-      await uploadBookPhoto(client, userId, book.id, file);
+      const path = await uploadBookPhoto(client, userId, book.id, file);
       if (active()) {
         showToast(t("photos.uploaded"));
-        await load();
+        await load(path);
       }
     } catch (error) {
       console.error("Private book photo upload", error);
@@ -4404,8 +4510,13 @@ function createPrivateBookPhotoGallery(book) {
         showToast(status.textContent);
       }
     } finally {
+      busy = false;
       input.value = "";
-      if (active()) input.disabled = false;
+      if (active()) {
+        input.disabled = false;
+        remove.disabled = false;
+        retry.disabled = false;
+      }
     }
   });
   queueMicrotask(() => {
@@ -4589,8 +4700,12 @@ function updateBookPageDetails(book, { clearMissingPageCount = false } = {}) {
   if (heading) heading.textContent = book.title || "Untitled";
   const breadcrumb = page.querySelector(".book-breadcrumb [aria-current='page']");
   if (breadcrumb) breadcrumb.textContent = book.title || "Book";
-  const existingCover = page.querySelector(".book-detail-cover");
-  if (existingCover) existingCover.replaceWith(createBookCover(book, "book-detail-cover"));
+  const gallery = page.querySelector(".book-cover-gallery");
+  if (gallery) gallery.dispatchEvent(new CustomEvent("book-cover-update", { detail: book }));
+  else {
+    const existingCover = page.querySelector(".book-detail-cover");
+    if (existingCover) existingCover.replaceWith(createBookCover(book, "book-detail-cover"));
+  }
   const values = {
     Genre: book.genre || null,
     ISBN: book.isbn || null,

@@ -151,25 +151,42 @@ class Element {
   events = {};
   attributes = {};
   isConnected = true;
-  append(...children) { this.children.push(...children); }
-  replaceChildren(...children) { this.children = children; }
+  constructor(tagName = "div") { this.tagName = tagName.toUpperCase(); }
+  append(...children) {
+    children.forEach((child) => { if (child instanceof Element) child.parent = this; });
+    this.children.push(...children);
+  }
+  replaceChildren(...children) { this.children = []; this.append(...children); }
+  replaceWith(child) {
+    const index = this.parent.children.indexOf(this);
+    child.parent = this.parent;
+    this.parent.children[index] = child;
+  }
+  removeAttribute(name) { delete this.attributes[name]; if (name === "src") delete this.src; }
   setAttribute(name, value) { this.attributes[name] = value; }
   addEventListener(name, callback) { this.events[name] = callback; }
+  querySelectorAll(selector) {
+    return this.children.flatMap((child) => child instanceof Element
+      ? [...(selector === "button" && child.tagName === "BUTTON" ? [child] : []), ...child.querySelectorAll(selector)]
+      : []);
+  }
 }
 
-async function galleryHarness({ loadError = false } = {}) {
+async function galleryHarness({ loadError = false, empty = false } = {}) {
   const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
   const gallerySource = source.slice(source.indexOf("function createPrivateBookPhotoGallery("),
     source.indexOf("\nfunction createBookEditionPicker("));
   let start;
   let observe;
   const revoked = [];
+  let urlCount = 0;
   const writes = [];
+  let files = empty ? [] : [{ path: `${user}/${book}/${name}` }];
   const state = { session: { user: { id: user } }, supabase: {}, books: [{ id: book }], view: "book" };
   const context = {
     state, t: translate,
     document: {
-      createElement: () => new Element(), createTextNode: (text) => text,
+      createElement: (tag) => new Element(tag), createTextNode: (text) => text,
       getElementById: () => new Element(),
     },
     MutationObserver: class {
@@ -177,53 +194,211 @@ async function galleryHarness({ loadError = false } = {}) {
       observe() {}
       disconnect() {}
     },
-    URL: { createObjectURL: () => "blob:private", revokeObjectURL: (url) => revoked.push(url) },
+    URL: {
+      createObjectURL: () => urlCount++ === 0 ? "blob:private" : `blob:private-${urlCount}`,
+      revokeObjectURL: (url) => revoked.push(url),
+    },
     queueMicrotask: (callback) => { start = callback; },
+    createBookCover: (record, className) => {
+      const cover = new Element();
+      cover.className = className;
+      cover.book = record;
+      return cover;
+    },
     console: { error() {} }, showToast() {}, showAppConfirm: async () => true,
     listBookPhotos: async () => {
       if (loadError) throw new Error("offline");
-      return [{ path: `${user}/${book}/${name}` }];
+      return files;
     },
     downloadBookPhoto: async () => new Blob(["private"]),
-    uploadBookPhoto: async (...args) => writes.push(["upload", ...args]),
-    removeBookPhotos: async (...args) => writes.push(["remove", ...args]),
+    uploadBookPhoto: async (...args) => {
+      writes.push(["upload", ...args]);
+      const path = `${user}/${book}/new-photo.jpg`;
+      files = [...files, { path }];
+      return path;
+    },
+    removeBookPhotos: async (...args) => {
+      writes.push(["remove", ...args]);
+      files = files.filter((file) => !args[1].includes(file.path));
+    },
   };
   const create = runInNewContext(`${gallerySource}\ncreatePrivateBookPhotoGallery`, context);
   const section = create({ id: book, title: "My book" });
   await start();
-  return { section, state, writes, revoked, observe: () => observe(), context };
+  const [stage, label, grid, remove, status, retry] = section.children;
+  const [primary, uploaded, badge, navigation] = stage.children;
+  return {
+    section, state, writes, revoked, observe: () => observe(), context,
+    stage, primary, uploaded, badge, navigation, input: label.children[1], label, grid, remove, status, retry,
+  };
 }
 
 test("gallery loads private photos, supports uploads and deletion, and revokes images when accounts change", async () => {
-  const { section, state, writes, revoked, observe } = await galleryHarness();
-  const [, , label, status, , grid] = section.children;
-  assert.equal(grid.children.length, 1);
-  assert.equal(grid.children[0].children[0].src, "blob:private");
-  const input = label.children[1];
+  const { section, state, writes, revoked, observe, grid, input, status, remove, uploaded, badge, primary } = await galleryHarness();
+  assert.equal(grid.children.length, 2);
+  assert.equal(grid.children[1].children[0].src, "blob:private");
+  assert.equal(primary.hidden, false);
+  assert.equal(badge.hidden, true);
   input.files = [{ type: "image/jpeg" }];
   await input.events.change();
   assert.equal(writes[0][0], "upload");
   assert.equal(writes[0][2], user);
   assert.equal(writes[0][3], book);
-  assert.equal(status.textContent, "Your private photos");
-  await grid.children[0].children[1].events.click();
+  assert.equal(status.textContent, "");
+  assert.equal(primary.hidden, true);
+  assert.equal(uploaded.hidden, false);
+  assert.equal(badge.hidden, false);
+  assert.equal(grid.children[2].attributes["aria-pressed"], "true");
+  await remove.events.click();
   assert.equal(writes[1][0], "remove");
+  assert.equal(writes[1][2][0], `${user}/${book}/new-photo.jpg`);
+  assert.equal(primary.hidden, false);
+  assert.equal(badge.hidden, true);
   state.session = { user: { id: other } };
   observe();
   assert.equal(section.children.length, 0);
-  assert.equal(revoked.length, 3);
+  assert.equal(revoked.length, 4);
   await input.events.change();
   assert.equal(writes.length, 2);
 });
 
+test("cover thumbnails and arrow controls cycle with wraparound and a badge only on private images", async () => {
+  const { grid, primary, uploaded, badge, navigation, section } = await galleryHarness();
+  const [previous, position, next] = navigation.children;
+  assert.equal(navigation.hidden, false);
+  assert.equal(position.textContent, "1 / 2");
+  assert.equal(grid.children[0].attributes["aria-pressed"], "true");
+  next.events.click();
+  assert.equal(primary.hidden, true);
+  assert.equal(uploaded.hidden, false);
+  assert.equal(badge.hidden, false);
+  assert.equal(badge.textContent, "Your photo");
+  assert.equal(position.textContent, "2 / 2");
+  assert.equal(grid.children[1].attributes["aria-pressed"], "true");
+  next.events.click();
+  assert.equal(primary.hidden, false);
+  assert.equal(badge.hidden, true);
+  previous.events.click();
+  assert.equal(badge.hidden, false);
+  grid.children[0].events.click();
+  assert.equal(badge.hidden, true);
+  grid.children[1].events.click();
+  assert.equal(badge.hidden, false);
+  let prevented = false;
+  section.events.keydown({
+    target: next, key: "ArrowRight", preventDefault() { prevented = true; },
+  });
+  assert.equal(prevented, true);
+  assert.equal(badge.hidden, true);
+});
+
+test("edition cover updates preserve the chosen private image and update both primary cover surfaces", async () => {
+  const harness = await galleryHarness();
+  harness.grid.children[1].events.click();
+  const edition = { title: "Another edition", cover_url: "https://example.test/edition.jpg" };
+  harness.section.events["book-cover-update"]({ detail: edition });
+  const primary = harness.stage.children[0];
+  assert.equal(primary.book, edition);
+  assert.equal(harness.grid.children[0].children[0].book, edition);
+  assert.equal(primary.hidden, true);
+  assert.equal(harness.badge.hidden, false);
+  harness.grid.children[0].events.click();
+  assert.equal(primary.hidden, false);
+  assert.equal(harness.badge.hidden, true);
+  assert.equal(harness.uploaded.src, undefined);
+});
+
+test("catalog detail updates notify the inline gallery instead of replacing its private display", async () => {
+  const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
+  const updateSource = source.slice(source.indexOf("function updateBookPageDetails("),
+    source.indexOf("\nfunction normalizeBookIsbn("));
+  const harness = await galleryHarness();
+  const bookUpdate = { title: "Updated cover", cover_url: "https://example.test/updated.jpg" };
+  harness.grid.children[1].events.click();
+  const page = {
+    querySelector(selector) { return selector === ".book-cover-gallery" ? {
+      dispatchEvent(event) { harness.section.events[event.type](event); },
+    } : null; },
+    querySelectorAll: () => [],
+  };
+  const context = {
+    state: harness.state,
+    document: { getElementById: () => page },
+    CustomEvent: class {
+      constructor(type, options) { this.type = type; this.detail = options.detail; }
+    },
+    updateBookReadingProgress() {},
+  };
+  const update = runInNewContext(`${updateSource}\nupdateBookPageDetails`, context);
+  update(bookUpdate);
+  assert.equal(harness.stage.children[0].book, bookUpdate);
+  assert.equal(harness.stage.children[0].hidden, true);
+  assert.equal(harness.badge.hidden, false);
+});
+
+test("deleting the last upload restores the primary cover and hides the empty thumbnail strip", async () => {
+  const harness = await galleryHarness();
+  harness.grid.children[1].events.click();
+  await harness.remove.events.click();
+  assert.equal(harness.grid.children.length, 1);
+  assert.equal(harness.grid.hidden, true);
+  assert.equal(harness.navigation.hidden, true);
+  assert.equal(harness.primary.hidden, false);
+  assert.equal(harness.remove.hidden, true);
+  assert.equal(harness.badge.hidden, true);
+});
+
+test("books without private photos show only the primary cover and compact upload option", async () => {
+  const harness = await galleryHarness({ empty: true });
+  assert.equal(harness.label.children[0], "+ Upload");
+  assert.equal(harness.primary.hidden, false);
+  assert.equal(harness.uploaded.hidden, true);
+  assert.equal(harness.navigation.hidden, true);
+  assert.equal(harness.grid.hidden, true);
+  assert.equal(harness.badge.hidden, true);
+  assert.equal(harness.remove.hidden, true);
+  assert.equal(harness.status.textContent, "");
+  assert.equal(harness.input.disabled, false);
+});
+
+test("failed uploads and deletions surface errors and restore enabled controls without losing the selected photo", async () => {
+  const harness = await galleryHarness();
+  harness.grid.children[1].events.click();
+  harness.context.uploadBookPhoto = async () => { throw new Error("Upload unavailable"); };
+  harness.input.files = [{}];
+  await harness.input.events.change();
+  assert.equal(harness.status.textContent, "Upload unavailable");
+  assert.equal(harness.input.disabled, false);
+  assert.equal(harness.remove.disabled, false);
+  assert.equal(harness.badge.hidden, false);
+  harness.context.removeBookPhotos = async () => { throw new Error("Delete unavailable"); };
+  await harness.remove.events.click();
+  assert.match(harness.status.textContent, /Could not delete/);
+  assert.equal(harness.input.disabled, false);
+  assert.equal(harness.remove.disabled, false);
+  assert.equal(harness.badge.hidden, false);
+  assert.equal(harness.primary.hidden, true);
+});
+
+test("gallery stays frameless and has compact thumbnails at desktop and mobile sizes", async () => {
+  const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  assert.doesNotMatch(css, /\.private-book-photos\s*\{/);
+  assert.match(css, /\.book-cover-gallery\s*\{[^}]*width: min\(100%, 11rem\)/);
+  assert.match(css, /\.private-book-photo-grid\s*\{[^}]*display: flex;[^}]*overflow-x: auto/);
+  assert.match(css, /\.book-photo-thumbnail\s*\{[^}]*height: 3\.5rem/);
+  assert.match(css, /\.book-cover-gallery \[hidden\]\s*\{[^}]*display: none/);
+  assert.match(css, /@media \(max-width: 1150px\)[\s\S]*?\.book-detail-cover,\s*\.book-cover-gallery\s*\{[^}]*grid-row: span 2/);
+  assert.match(css, /@media \(max-width: 680px\)[\s\S]*?\.book-detail-cover,\s*\.book-cover-gallery\s*\{[^}]*width: min\(58vw, 12rem\);[^}]*grid-row: auto/);
+});
+
 test("failed gallery loads surface a retry, and removing a library book prevents further uploads", async () => {
-  const { section, state, writes } = await galleryHarness({ loadError: true });
-  const [, , label, status, retry, grid] = section.children;
+  const { state, writes, status, retry, grid, input, primary } = await galleryHarness({ loadError: true });
   assert.equal(retry.hidden, false);
   assert.match(status.textContent, /Could not load/);
-  assert.equal(grid.children.length, 0);
+  assert.equal(grid.children.length, 1);
+  assert.equal(grid.hidden, true);
+  assert.equal(primary.hidden, false);
   state.books = [];
-  const input = label.children[1];
   input.files = [{}];
   await input.events.change();
   assert.equal(writes.length, 0);
@@ -238,7 +413,7 @@ test("in-flight photos never appear after sign-out, and leaving the book page re
     finish = resolve;
     downloading();
   });
-  const retry = harness.section.children[4];
+  const retry = harness.retry;
   const pending = retry.events.click();
   await started;
   harness.state.session = null;

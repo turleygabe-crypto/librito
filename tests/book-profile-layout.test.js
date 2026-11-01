@@ -43,7 +43,7 @@ function renderProfile(ownedBook, signedIn = false) {
     toggleBookFavorite: (book) => calls.push(["favorite", book]),
     navigateTo() {},
     createBookEditionPicker: () => new Element("edition-picker"),
-    createPrivateBookPhotoGallery: () => new Element("private-book-photos"),
+    createPrivateBookPhotoGallery: () => new Element("book-cover-gallery"),
     createBookAudiobookPanel: () => new Element("book-audiobook-panel"),
     createProfileRecommendationSection: () => ({ section: new Element("book-profile-recommendation") }),
     loadBookProfileCatalog() {},
@@ -82,7 +82,8 @@ test("private gallery appears only for signed-in readers with the book in their 
     [owned, true, true], [owned, false, false], [null, true, false], [null, false, false],
   ]) {
     const { page } = renderProfile(book, signedIn);
-    assert.equal(page.children.some((child) => child.className === "private-book-photos"), visible);
+    assert.equal(page.children[1].children[0].className, visible ? "book-cover-gallery" : "book-detail-cover");
+    assert.equal(page.children.length, 3);
   }
 });
 
