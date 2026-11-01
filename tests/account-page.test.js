@@ -91,7 +91,7 @@ test("admin shortcuts are hidden unless the current signed-in user has verified 
   }
 });
 
-test("account navigation and help links meet normal-text contrast requirements on the light theme", async () => {
+test("account navigation and help links meet normal-text contrast requirements on their themed surfaces", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const rule = (selector) => {
     const start = css.indexOf(`${selector} {`);
@@ -99,8 +99,9 @@ test("account navigation and help links meet normal-text contrast requirements o
     return css.slice(start, css.indexOf("}", start));
   };
   const color = (declarations, property) => {
-    const match = declarations.match(new RegExp(`(?:[;{]|^)\\s*${property}:\\s*(#[a-f0-9]{6})`, "i"));
+    const match = declarations.match(new RegExp(`(?:[;{]|^)\\s*${property}:\\s*(#[a-f0-9]{6}|var\\(--[a-z-]+\\))`, "i"));
     assert.ok(match, `Missing explicit ${property}`);
+    if (match[1].startsWith("var(")) return color(css, match[1].slice(4, -1));
     return match[1];
   };
   const luminance = (hex) => hex.slice(1).match(/../g).map((value) => {
@@ -112,11 +113,10 @@ test("account navigation and help links meet normal-text contrast requirements o
     const ratio = (values[0] + 0.05) / (values[1] + 0.05);
     assert.ok(ratio >= 4.5, `${foreground} on ${background}: ${ratio.toFixed(2)}:1`);
   };
-  const theme = css.slice(css.lastIndexOf(":root {"), css.indexOf("}", css.lastIndexOf(":root {")));
-  const panel = color(theme, "--panel");
-  check(color(rule(".account-navigation a"), "color"), panel);
-  check(color(rule(".account-navigation .text-btn"), "color"), panel);
-  check(color(rule(".account-card a"), "color"), panel);
+  const menu = color(rule(".account-navigation"), "background");
+  check(color(rule(".account-navigation a"), "color"), menu);
+  check(color(rule(".account-navigation .text-btn"), "color"), menu);
+  check(color(rule(".account-card a"), "color"), color(css, "--panel"));
   for (const selector of [
     ".account-navigation a[aria-current=\"page\"]",
     ".account-navigation a:hover, .account-navigation .text-btn:hover",

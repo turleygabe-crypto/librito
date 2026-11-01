@@ -1,17 +1,17 @@
-:root { --bg: #f5f1eb; --card: #fffaf3; --line: #e8dccb; --ink: #3b2a1e; --muted: #8a7461; --brown: #8b5e3c; --tan: #d8b898; --side: #3a2c22; }
+:root { color-scheme: light; --bg: #dbc4a5; --card: #fff9f3; --line: #a08670; --ink: #443223; --muted: #443223; --brown: #443223; --tan: #7c7960; --side: #72583e; }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); }
 .center { max-width: 360px; margin: 12vh auto; padding: 0 16px; }
 .center input { width: 100%; margin-bottom: 8px; }
 .shell { display: grid; grid-template-columns: 230px 1fr; min-height: 100vh; }
-.side { background: var(--side); color: #ead9c7; padding: 20px 14px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; }
+.side { background: var(--side); color: #fff9f3; padding: 20px 14px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; }
 .side .brand { display: flex; gap: 10px; align-items: center; margin-bottom: 18px; }
 .side .mark { width: 36px; height: 36px; border-radius: 10px; background: #e7cbb7; color: var(--side); display: grid; place-items: center; font-weight: 700; }
-.side small { display: block; letter-spacing: .08em; font-size: .65rem; color: #bda68f; }
-.side .label { font-size: .7rem; letter-spacing: .1em; color: #bda68f; margin: 8px 8px 4px; }
-.side button, .side a { all: unset; cursor: pointer; padding: 10px 12px; border-radius: 10px; color: #ead9c7; display: block; }
+.side small { display: block; letter-spacing: .08em; font-size: .65rem; color: #fff9f3; }
+.side .label { font-size: .7rem; letter-spacing: .1em; color: #fff9f3; margin: 8px 8px 4px; }
+.side button, .side a { all: unset; cursor: pointer; padding: 10px 12px; border-radius: 10px; color: #fff9f3; display: block; }
 .side button:hover, .side a:hover { background: rgba(255,255,255,.07); }
-.side button.active { background: #6b4d38; color: #fff; }
+.side button.active { background: var(--brown); color: #fff9f3; }
 .side .spacer { flex: 1; }
 main { padding: 26px 28px 40px; min-width: 0; }
 .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }

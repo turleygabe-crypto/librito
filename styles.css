@@ -1,11 +1,18 @@
 :root {
-  color-scheme: dark;
-  --black: #160d0a;
-  --panel: #281a16;
-  --muted: #b8aaa3;
-  --accent: #c97b4d;
-  --paper: #fff8ef;
-  --ink: #3f2e23;
+  color-scheme: light;
+  --latte: #dbc4a5;
+  --clockwork: #72583e;
+  --cafe-noir: #443223;
+  --cedar: #7c7960;
+  --weathered: #a08670;
+  --linen: #fff9f3;
+  --deep-olive: #44422d;
+  --black: var(--latte);
+  --panel: var(--linen);
+  --muted: var(--cafe-noir);
+  --accent: var(--cafe-noir);
+  --paper: var(--linen);
+  --ink: var(--cafe-noir);
 }
 
 * { box-sizing: border-box; }
@@ -53,17 +60,17 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
 .support-email { font-size: 1.15rem; font-weight: bold; }
 .support-notice { padding: 1rem; border: 1px solid #c97b4d; border-radius: 0.75rem; background: var(--panel); }
 .account-layout { display: grid; grid-template-columns: minmax(180px, 220px) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
-.account-navigation { display: grid; gap: 0.35rem; padding: 0.75rem; border-radius: 0.8rem; background: var(--panel); }
-.account-navigation a { padding: 0.8rem; border-radius: 0.5rem; text-decoration: none; color: #33251d; font-weight: 600; line-height: 1.5; }
-.account-navigation a:hover, .account-navigation .text-btn:hover { background: #eee1d1; color: #33251d; }
-.account-navigation a[aria-current="page"] { background: #684630; color: #fffaf3; font-weight: bold; }
-.account-navigation a:focus-visible, .account-navigation .text-btn:focus-visible { outline: 3px solid #684630; outline-offset: 3px; }
-.account-navigation .text-btn { padding: 0.8rem; text-align: left; color: #33251d; line-height: 1.5; border-radius: 0.5rem; }
+.account-navigation { display: grid; gap: 0.35rem; padding: 0.75rem; border-radius: 0.8rem; background: var(--clockwork); }
+.account-navigation a { padding: 0.8rem; border-radius: 0.5rem; text-decoration: none; color: var(--linen); font-weight: 600; line-height: 1.5; }
+.account-navigation a:hover, .account-navigation .text-btn:hover { background: var(--cafe-noir); color: var(--linen); }
+.account-navigation a[aria-current="page"] { background: var(--cafe-noir); color: var(--linen); font-weight: bold; }
+.account-navigation a:focus-visible, .account-navigation .text-btn:focus-visible { outline: 3px solid var(--linen); outline-offset: 3px; }
+.account-navigation .text-btn { padding: 0.8rem; text-align: left; color: var(--linen); line-height: 1.5; border-radius: 0.5rem; }
 .account-content { display: grid; gap: 1.25rem; min-width: 0; }
 .account-card { padding: 1.5rem; border: 1px solid #65493a; border-radius: 0.8rem; background: var(--panel); overflow-wrap: anywhere; }
 .account-card h2 { font-size: 1.3rem; }
 .account-card p { line-height: 1.6; }
-.account-card a { display: block; margin-top: 0.75rem; color: #754127; text-underline-offset: 0.2em; }
+.account-card a { display: block; margin-top: 0.75rem; color: var(--cafe-noir); text-underline-offset: 0.2em; }
 .account-card a[hidden] { display: none; }
 .account-card input { width: 100%; }
 .upgrade-plan-options { display: grid; gap: 1.5rem; }
@@ -2529,17 +2536,11 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
 :root {
   color-scheme: light;
   font-size: max(16px, 1rem);
-  --black: #f5f1eb;
-  --panel: #fffdf9;
-  --muted: #716860;
-  --accent: #b64d2c;
-  --paper: #fffaf3;
-  --ink: #33251d;
 }
 
 body {
-  color: #302720;
-  background: #f5f1eb;
+  color: var(--ink);
+  background: var(--latte);
   font-family: "Trebuchet MS", "Segoe UI", sans-serif;
 }
 
@@ -2566,7 +2567,7 @@ body {
   gap: 0.85rem;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-color: #91643d transparent;
+  scrollbar-color: var(--weathered) transparent;
   scrollbar-width: thin;
 }
 
@@ -2776,8 +2777,8 @@ body {
   min-width: 0;
   margin: 0;
   padding: 0 clamp(0.75rem, 1.5vw, 1.25rem);
-  color: #302720;
-  background: #f5f1eb;
+  color: var(--ink);
+  background: var(--latte);
 }
 
 .spotify-topbar {
@@ -3003,11 +3004,10 @@ body {
   }
 
   .sidebar {
-    --sidebar-height: calc(100dvh + 1.25rem);
     align-self: start;
-    top: -0.75rem;
-    height: var(--sidebar-height);
-    margin: -0.75rem 0 0;
+    top: 1rem;
+    height: calc(100dvh - 2rem);
+    margin: 1rem 0 1rem 1rem;
     gap: 0.85rem;
     padding: 1rem;
     border: 0;
@@ -3191,12 +3191,13 @@ body {
   position: sticky;
   isolation: isolate;
   overflow: hidden;
-  padding: calc(var(--sidebar-height, calc(100dvh - 2rem)) * 0.085) 1.75rem calc(var(--sidebar-height, calc(100dvh - 2rem)) * 0.28);
-  border: 0;
-  border-radius: 0;
-  background: transparent url("/assets/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel.png") center / 250% 100% no-repeat;
+  padding: 1rem;
+  border: 1px solid var(--weathered);
+  border-radius: 0.85rem;
+  background: var(--clockwork);
+  color: var(--linen);
   clip-path: none;
-  box-shadow: none;
+  box-shadow: inset 0 0 0 4px var(--clockwork), inset 0 0 0 5px var(--weathered), 0 4px 16px rgba(68, 50, 35, 0.12);
 }
 
 .sidebar-content {
@@ -3210,7 +3211,7 @@ body {
 
 .sidebar .sidebar-brand {
   padding: 0.5rem 0 0.9rem;
-  border-bottom-color: rgba(224, 172, 103, 0.42);
+  border-bottom-color: var(--weathered);
   text-align: center;
 }
 
@@ -3223,7 +3224,7 @@ body {
 
 .sidebar .sidebar-nav,
 .sidebar .sidebar-library-nav {
-  border-bottom-color: rgba(224, 172, 103, 0.36);
+  border-bottom-color: var(--weathered);
 }
 
 .sidebar .nav-pill,
@@ -3256,19 +3257,19 @@ body {
 }
 
 .sidebar .nav-pill.active {
-  background: linear-gradient(90deg, rgba(199, 111, 65, 0.38), rgba(170, 116, 69, 0.18));
-  box-shadow: inset 3px 0 #df8052, inset 0 0 0 1px rgba(224, 172, 103, 0.16);
+  background: var(--cafe-noir);
+  box-shadow: inset 3px 0 var(--latte);
 }
 
 .sidebar .nav-pill:hover,
 .sidebar .shelf-item:hover,
 .sidebar .shelf-item:focus-visible,
 .sidebar .sidebar-create-shelf:hover {
-  background-color: rgba(224, 172, 103, 0.14);
+  background-color: var(--cafe-noir);
 }
 
 .sidebar .sidebar-shelf-heading h2 {
-  color: #d3a66d !important;
+  color: var(--linen) !important;
   font-family: inherit;
   font-size: 0.72rem !important;
   letter-spacing: 0.1em;
@@ -3286,12 +3287,12 @@ body {
 }
 
 .sidebar .shelf-item.active {
-  background: rgba(224, 172, 103, 0.2);
-  box-shadow: inset 2px 0 #df8052;
+  background: var(--cafe-noir);
+  box-shadow: inset 3px 0 var(--latte);
 }
 
 .sidebar .shelf-thumbnail {
-  border: 1px solid rgba(224, 172, 103, 0.55);
+  border: 1px solid var(--weathered);
   box-shadow: 0 2px 6px rgba(9, 5, 3, 0.35);
 }
 
@@ -3305,7 +3306,7 @@ body {
 }
 
 .sidebar .shelf-item-count {
-  color: #e4bd8b;
+  color: var(--linen);
   flex-shrink: 0;
   font-size: 0.8rem;
 }
@@ -3313,22 +3314,15 @@ body {
 .sidebar .mobile-sidebar-close {
   z-index: 2;
   place-items: center;
-  width: 3rem;
-  height: 3rem;
+  width: 2.75rem;
+  height: 2.75rem;
   padding: 0;
   border: 0;
-  border-radius: 50%;
-  background: transparent;
-  opacity: 0.82;
+  border-radius: 0.5rem;
+  background: var(--cafe-noir);
+  color: var(--linen);
+  opacity: 1;
   transition: opacity 150ms ease, transform 150ms ease;
-}
-
-.sidebar .mobile-sidebar-close-medallion {
-  display: block;
-  width: 3rem;
-  height: 3rem;
-  filter: drop-shadow(0 1px 2px rgba(16, 8, 4, 0.45));
-  pointer-events: none;
 }
 
 .sidebar .mobile-sidebar-close:hover {
@@ -3341,25 +3335,25 @@ body {
 
 .sidebar .mobile-sidebar-close:focus-visible {
   opacity: 1;
-  outline: 2px solid #ffe4b2;
-  outline-offset: 0;
+  outline: 2px solid var(--linen);
+  outline-offset: 3px;
 }
 
 @media (max-width: 899px) {
   .sidebar {
-    --sidebar-height: calc((100dvh + 0.75rem) / 0.84);
     position: fixed;
-    top: -0.75rem;
-    bottom: auto;
-    width: min(15rem, 86vw);
-    height: var(--sidebar-height);
-    padding-top: max(calc(5.5rem + env(safe-area-inset-top)), calc(var(--sidebar-height) * 0.085));
-    padding-bottom: calc(var(--sidebar-height) * 0.26);
+    top: 0.75rem;
+    bottom: 0.75rem;
+    left: 0.75rem;
+    width: min(18rem, calc(100vw - 1.5rem));
+    height: calc(100dvh - 1.5rem);
+    padding-top: max(4.25rem, calc(3.25rem + env(safe-area-inset-top)));
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
 
   .sidebar .mobile-sidebar-close {
-    top: max(2.625rem, calc(env(safe-area-inset-top) + 2rem));
-    right: 1.25rem;
+    top: max(0.75rem, env(safe-area-inset-top));
+    right: 0.75rem;
   }
 }
 
@@ -7332,5 +7326,288 @@ body.book-actions-open {
   @keyframes book-actions-enter {
     from { transform: translateY(100%); }
     to { transform: translateY(0); }
+  }
+}
+
+/* Shared palette for navigation, popovers, and reading controls. */
+.sidebar .nav-pill,
+.sidebar .nav-pill::before,
+.sidebar .shelf-item,
+.sidebar .shelf-item-copy strong,
+.sidebar .shelf-item-copy > span,
+.sidebar .shelf-item::after,
+.sidebar .sidebar-empty,
+.sidebar .sidebar-create-shelf,
+.sidebar .library-filter-count {
+  color: var(--linen);
+}
+
+.sidebar .sidebar-shelf-heading h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-size: 1rem !important;
+}
+
+.page-description,
+.row-empty-state,
+.card-open-button .book-cover-author,
+.card-shelf-tag,
+.book-loader-message,
+.genre-summary,
+.genre-pager-gap,
+.search-loading-copy,
+.book-breadcrumb [aria-current="page"] {
+  color: var(--ink);
+}
+
+.sidebar button:focus-visible,
+.sidebar .shelf-item:focus-visible {
+  outline: 2px solid var(--linen);
+  outline-offset: -2px;
+}
+
+.home-hero {
+  background-color: var(--clockwork);
+  background-image:
+    linear-gradient(90deg, #72583e 0%, #72583e 29%, rgba(114, 88, 62, 0.96) 39%, rgba(114, 88, 62, 0.68) 51%, rgba(114, 88, 62, 0) 66%),
+    url("/cozy%20banner%20librito.png");
+  color: var(--linen);
+}
+
+.global-search,
+.library-search,
+.book-form input,
+.book-form select,
+.book-form textarea,
+.global-search-language {
+  border-color: var(--weathered);
+  background-color: var(--linen);
+  color: var(--ink);
+}
+
+.global-search:focus-within {
+  border-color: var(--cedar);
+  box-shadow: 0 0 0 3px rgba(124, 121, 96, 0.3);
+}
+
+.global-search > button,
+.show-all-btn,
+.page-back,
+.page-header .eyebrow,
+.book-breadcrumb button,
+.support-page a,
+.account-card a,
+.browse-sort select {
+  color: var(--cafe-noir);
+}
+
+.card-row-section,
+.account-card,
+.support-content section,
+.upgrade-plan,
+.upgrade-billing-panel,
+.book-table-wrap,
+.book-table th,
+.book-table td {
+  border-color: var(--weathered);
+}
+
+.shelf-hero {
+  border-color: var(--weathered);
+  background: linear-gradient(135deg, var(--latte), var(--linen));
+}
+
+.book-shelf-status.is-on-shelf {
+  border-color: var(--cedar);
+  background: var(--linen);
+  color: var(--deep-olive);
+}
+
+.book-detail-content .book-reading-progress-track > span,
+.book-reading-progress-track > span,
+.reading-feature-progress-bar > span,
+.book-actions-handle {
+  background: var(--cedar);
+}
+
+.card-shelf-tag.is-on-shelf,
+.shelf-picker-option .shelf-check {
+  color: var(--deep-olive);
+}
+
+.account-menu-panel,
+.account-navigation,
+.book-actions-sheet,
+.book-status-menu-panel,
+.book-more-menu-panel,
+.card-add-actions,
+.edition-language-list,
+.browse-popover .browse-panel,
+.disposition-options {
+  border-color: var(--weathered);
+  background: var(--clockwork);
+  color: var(--linen);
+}
+
+:is(.account-menu-panel, .account-navigation, .book-actions-sheet, .book-status-menu-panel, .book-more-menu-panel, .card-add-actions, .edition-language-list, .browse-popover .browse-panel, .disposition-options)
+  :is(p, label, small, h2, h3, .book-actions-icon, .bookmarked-page-field, .currently-reading-bookmark-time, .shelf-menu-heading, .shelf-check, .edition-language-group, .text-btn, .account-menu-link, .disposition-links a, .disposition-mark) {
+  color: var(--linen);
+}
+
+.account-navigation a,
+.account-navigation .text-btn,
+.book-actions-list .book-status-menu > summary,
+.book-actions-list .book-status-menu > summary.currently-reading-button,
+.book-status-menu-panel > button,
+.book-status-menu-panel > .status-remove-option,
+.book-more-menu-panel button,
+.card-add-actions button,
+.card-add-actions .shelf-create-option,
+.edition-language-option,
+.global-search .edition-language-option,
+.disposition-option {
+  background: transparent;
+  color: var(--linen);
+}
+
+.account-navigation a:hover,
+.account-navigation .text-btn:hover,
+.account-navigation a[aria-current="page"],
+.account-menu-link:hover,
+.book-actions-option:hover,
+.book-actions-close:hover,
+.book-actions-list .book-status-menu > summary:hover,
+.book-actions-list .book-status-menu[open] > summary,
+.book-status-menu-panel > button:hover,
+.book-status-menu-panel > button[aria-pressed="true"],
+.book-more-menu-panel button:hover,
+.card-add-actions button:hover,
+.card-add-actions .is-on-shelf,
+.edition-language-option:hover,
+.edition-language-option[aria-selected="true"],
+.global-search .edition-language-option:hover,
+.global-search .edition-language-option[aria-selected="true"] {
+  background: var(--cafe-noir);
+  color: var(--linen);
+}
+
+.book-actions-option.danger-action,
+.book-more-menu-panel .danger-action {
+  color: var(--linen);
+  text-decoration: underline;
+  text-decoration-color: var(--latte);
+  text-underline-offset: 0.2em;
+}
+
+.book-actions-header,
+.book-status-menu-panel > .status-remove-option,
+.card-add-actions .shelf-create-option {
+  border-color: var(--weathered);
+}
+
+.action-btn,
+.secondary-btn,
+.app-dialog-actions .action-btn,
+.app-dialog-actions .secondary-btn,
+.edition-dialog-actions .action-btn,
+.edition-dialog-actions .secondary-btn,
+.google-auth-btn,
+.reading-continue-btn,
+.book-detail-content .book-continue-reading,
+.search-empty-back,
+.home-hero .action-btn,
+.account-menu-panel .action-btn,
+.account-avatar,
+.library-toggle-btn,
+.card-menu,
+.card-action,
+.card-shelf-button > summary,
+.book-detail-content .page-actions > :is(.action-btn, .secondary-btn, .currently-reading-button),
+.book-detail-content .book-profile-actions > :is(.book-shelf-menu, .book-more-menu) > summary,
+.book-detail-content .book-profile-actions > .secondary-btn,
+.book-detail-content .reading-actions > :is(.book-continue-reading, .currently-reading-button),
+.book-detail-content .reading-actions > .book-shelf-menu > summary,
+.book-more-menu > summary,
+.book-status-menu > summary,
+.book-status-menu > summary.currently-reading-button,
+.edition-picker-button,
+.edition-language-trigger,
+.global-search .edition-language-trigger,
+.audiobook-sample-button,
+.book-audiobook-find,
+.upgrade-cta:not(.is-current),
+.cc-btn,
+.genre-pager-btn.active,
+.genre-sort-tab.active,
+.browse-chip.active {
+  border-color: var(--cafe-noir);
+  background: var(--cafe-noir);
+  color: var(--linen);
+}
+
+.action-btn:hover,
+.secondary-btn:hover,
+.home-hero .action-btn:hover,
+.book-detail-content .page-actions > :is(.action-btn, .secondary-btn, .currently-reading-button):hover,
+.book-detail-content .book-profile-actions > :is(.book-shelf-menu, .book-more-menu) > summary:hover,
+.book-detail-content .book-profile-actions > .secondary-btn:hover,
+.book-detail-content .reading-actions > .book-shelf-menu > summary:hover,
+.book-more-menu > summary:hover,
+.book-status-menu > summary:hover,
+.book-status-menu[open] > summary,
+.edition-picker-button:hover,
+.edition-language-trigger:hover,
+.audiobook-sample-button:hover,
+.book-audiobook-find:hover {
+  border-color: var(--clockwork);
+  background: var(--clockwork);
+  color: var(--linen);
+}
+
+.book-detail-content .page-actions > .secondary-btn[aria-pressed="true"],
+.book-detail-content .book-profile-actions > .secondary-btn[aria-pressed="true"] {
+  background: var(--deep-olive);
+  color: var(--linen);
+}
+
+.book-status-menu > summary::before,
+.ownership-status-menu > summary::before {
+  filter: brightness(0) invert(1);
+}
+
+.book-status-menu > summary::after {
+  border-color: var(--latte);
+}
+
+.edition-language-trigger::after {
+  border-color: var(--latte);
+}
+
+.library-view-shelf-toggle[aria-pressed="true"] {
+  border-color: var(--cedar);
+  background: var(--deep-olive);
+  color: var(--linen);
+}
+
+.status-shelf-thumbnail {
+  background: var(--cedar);
+}
+
+:is(button, a, summary, input, select, textarea):focus-visible {
+  outline: 2px solid var(--deep-olive);
+  outline-offset: 3px;
+}
+
+:is(.account-menu-panel, .account-navigation, .book-actions-sheet, .book-status-menu-panel, .book-more-menu-panel, .card-add-actions, .edition-language-list, .browse-panel)
+  :is(button, a, summary, input, select):focus-visible {
+  outline-color: var(--linen);
+}
+
+@media (max-width: 600px) {
+  .home-hero {
+    background-image:
+      linear-gradient(180deg, rgba(114, 88, 62, 0) 0%, rgba(114, 88, 62, 0) 22%, #72583e 58%),
+      url("/cozy%20banner%20librito.png");
   }
 }

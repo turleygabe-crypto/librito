@@ -18,14 +18,12 @@ class Element {
   addEventListener(name, handler) { this.events[name] = handler; }
 }
 
-test("the sidebar uses the transparent bookmark artwork and precaches it", async () => {
+test("the sidebar uses a Clockwork menu frame without bookmark artwork", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
-  assert.match(css, /url\("\/assets\/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel\.png"\)/);
+  assert.match(css, /\.sidebar\s*\{[^}]*border: 1px solid var\(--weathered\)[^}]*border-radius: 0\.85rem[^}]*background: var\(--clockwork\)/);
+  assert.doesNotMatch(css, /Elegant%20Brown%20Leather%20Bookmark/);
   const worker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
-  assert.match(worker, /"\/assets\/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel\.png"/);
-  const image = await readFile(new URL("../assets/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel.png", import.meta.url));
-  assert.equal(image.readUInt32BE(16), 819);
-  assert.equal(image.readUInt32BE(20), 1920);
+  assert.doesNotMatch(worker, /Elegant%20Brown%20Leather%20Bookmark/);
 });
 
 test("sidebar uses the accessible logo artwork and precaches it", async () => {
@@ -74,7 +72,7 @@ test("slim sidebar keeps branding restrained and shelf counts within the content
   assert.match(css, /\.sidebar \.nav-pill,\s*\.sidebar \.shelf-item-copy strong,\s*\.sidebar \.sidebar-empty\s*\{\s*font-size: 0\.9rem/);
   assert.match(css, /\.sidebar \.shelf-item-copy\s*\{[^}]*min-width: 0[^}]*flex: 1/);
   assert.match(css, /\.sidebar \.shelf-item-count\s*\{[^}]*flex-shrink: 0/);
-  assert.match(css, /\.sidebar\s*\{[^}]*position: fixed[^}]*width: min\(15rem, 86vw\)/);
+  assert.match(css, /\.sidebar\s*\{[^}]*position: fixed[^}]*width: min\(18rem, calc\(100vw - 1\.5rem\)\)/);
 });
 
 test("sidebar shelf covers use portrait book proportions", async () => {
@@ -84,45 +82,42 @@ test("sidebar shelf covers use portrait book proportions", async () => {
   assert.match(css, /\.book-cover-art img\s*\{[^}]*object-fit: cover/);
 });
 
-test("mobile bookmark extends beyond both screen edges with the tassel below the viewport", async () => {
+test("mobile menu frame stays inside the viewport and respects safe areas", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const sidebar = [...css.matchAll(/\.sidebar\s*\{([^}]+)\}/g)].at(-1)[1];
-  assert.match(sidebar, /--sidebar-height: calc\(\(100dvh \+ 0\.75rem\) \/ 0\.84\)/);
-  assert.match(sidebar, /top: -0\.75rem/);
-  assert.match(sidebar, /bottom: auto/);
-  assert.match(sidebar, /height: var\(--sidebar-height\)/);
-  assert.match(sidebar, /padding-top: max\(calc\(5\.5rem \+ env\(safe-area-inset-top\)\), calc\(var\(--sidebar-height\) \* 0\.085\)\)/);
-  assert.match(sidebar, /padding-bottom: calc\(var\(--sidebar-height\) \* 0\.26\)/);
-  assert.match(css, /\.sidebar \.mobile-sidebar-close\s*\{[^}]*top: max\(2\.625rem, calc\(env\(safe-area-inset-top\) \+ 2rem\)\)[^}]*right: 1\.25rem/);
+  assert.match(sidebar, /top: 0\.75rem/);
+  assert.match(sidebar, /bottom: 0\.75rem/);
+  assert.match(sidebar, /height: calc\(100dvh - 1\.5rem\)/);
+  assert.match(sidebar, /padding-top: max\(4\.25rem, calc\(3\.25rem \+ env\(safe-area-inset-top\)\)\)/);
+  assert.match(sidebar, /padding-bottom: max\(1rem, env\(safe-area-inset-bottom\)\)/);
+  assert.match(css, /\.sidebar \.mobile-sidebar-close\s*\{[^}]*top: max\(0\.75rem, env\(safe-area-inset-top\)\)[^}]*right: 0\.75rem/);
 });
 
-test("mobile close button is an understated, keyboard-accessible golden medallion", async () => {
+test("mobile close button is simple, touch-friendly, and keyboard-accessible", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
-  assert.match(html, /id="closeLibraryBtn"[^>]*type="button"[^>]*aria-label="Close library">\s*<img class="mobile-sidebar-close-medallion" src="\/assets\/Ornate%20Golden%20X%20Medallion\.png" alt="" aria-hidden="true"/);
+  assert.match(html, /id="closeLibraryBtn"[^>]*type="button"[^>]*aria-label="Close library">\s*<span aria-hidden="true">&times;<\/span>/);
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
-  assert.match(css, /\.sidebar \.mobile-sidebar-close\s*\{[^}]*width: 3rem[^}]*height: 3rem[^}]*border: 0[^}]*background: transparent[^}]*opacity: 0\.82/);
-  assert.match(css, /\.sidebar \.mobile-sidebar-close-medallion\s*\{[^}]*width: 3rem/);
-  assert.match(css, /\.sidebar \.mobile-sidebar-close:focus-visible\s*\{[^}]*outline: 2px solid #ffe4b2/);
+  assert.match(css, /\.sidebar \.mobile-sidebar-close\s*\{[^}]*width: 2\.75rem[^}]*height: 2\.75rem[^}]*border: 0[^}]*background: var\(--cafe-noir\)/);
+  assert.match(css, /\.sidebar \.mobile-sidebar-close:focus-visible\s*\{[^}]*outline: 2px solid var\(--linen\)/);
   const sw = await readFile(new URL("../sw.js", import.meta.url), "utf8");
-  assert.match(sw, /"\/assets\/Ornate%20Golden%20X%20Medallion\.png"/);
+  assert.doesNotMatch(sw, /Ornate%20Golden%20X%20Medallion/);
 });
 
-test("sidebar artwork replaces CSS ornaments and reserves room for the eyelet and tassel", async () => {
+test("menu frame replaces decorative ornaments while preserving navigation", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const sidebarRules = [...css.matchAll(/\.sidebar\s*\{([^}]+)\}/g)];
-  const bookmark = sidebarRules.find((rule) => rule[1].includes("Elegant%20Brown"));
-  assert.match(bookmark[1], /transparent url/);
-  assert.match(bookmark[1], /250% 100% no-repeat/);
-  assert.match(bookmark[1], /padding: calc\(var\(--sidebar-height, calc\(100dvh - 2rem\)\) \* 0\.085\) 1\.75rem calc\(var\(--sidebar-height, calc\(100dvh - 2rem\)\) \* 0\.28\)/);
-  assert.match(bookmark[1], /clip-path: none/);
+  const frame = sidebarRules.find((rule) => rule[1].includes("background: var(--clockwork)"));
+  assert.match(frame[1], /padding: 1rem/);
+  assert.match(frame[1], /box-shadow: inset/);
+  assert.match(frame[1], /clip-path: none/);
   assert.doesNotMatch(css, /\.sidebar::(?:before|after)/);
   assert.match(sidebarRules.at(-1)[1], /position: fixed/);
-  assert.match(css, /\.sidebar \.nav-pill\.active\s*\{[^}]*#df8052/);
+  assert.match(css, /\.sidebar \.nav-pill\.active\s*\{[^}]*background: var\(--cafe-noir\)/);
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   assert.doesNotMatch(html, /sidebar-ornament/);
   assert.match(css, /\.sidebar-content\s*\{[^}]*overflow-y: auto/);
   assert.match(css, /\.sidebar\.is-open\s*\{[^}]*display: flex/);
-  assert.match(css, /--sidebar-height: calc\(100dvh \+ 1\.25rem\);[\s\S]*top: -0\.75rem;[\s\S]*height: var\(--sidebar-height\);[\s\S]*margin: -0\.75rem 0 0;/);
+  assert.match(css, /top: 1rem;[\s\S]*height: calc\(100dvh - 2rem\);[\s\S]*margin: 1rem 0 1rem 1rem;/);
 });
 
 test("startup keeps the library pending until account initialization", () => {

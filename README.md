@@ -37,13 +37,9 @@ Then open http://127.0.0.1:3000/.
 
 ## Branding and home loading states
 
-The sidebar uses [Elegant Brown Leather Bookmark with Tassel](assets/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel.png) as its background, including the brass eyelet and tassel, with the [Librito Digital Home Library logo](assets/Librito%20Digital%20Home%20Library%20Logo.png) replacing text branding. The slim desktop panel is 13.5–15rem wide, with a matching compact mobile drawer. Navigation is inset 1.75rem on both sides to stay inside the stitching; long shelf names truncate without displacing their counts. The artwork scales to the viewport-height panel, compensating for its transparent side margins, with space reserved above and below the scrollable controls for the decorative details. Both images are precached for offline use; desktop navigation stays sticky and both layouts keep their scrollable content.
+The site follows [the asset color palette](assets/colorpalet.jpg): Latte (`#DBC4A5`) backgrounds, Clockwork (`#72583E`) menus, Cafe Noir (`#443223`) buttons, and Cedar (`#7C7960`) / Weathered (`#A08670`) accents. Linen (`#FFF9F3`) provides readable menu text and light card surfaces.
 
-On desktop, the bookmark begins slightly above the viewport and extends to its bottom edge so the tassel nearly touches the bottom of the screen. Content insets scale with the bookmark height to keep the menu clear of the eyelet and pointed base.
-
-The mobile drawer also starts slightly above the viewport, but extends farther below it: the lower cord remains visible while the tassel sits offscreen, leaving more room for navigation. The close button stays inside the visible safe area, and the menu scrolls within the leather body.
-
-The mobile close control uses the subtle Ornate Golden X Medallion artwork, sits inside the stitching beside the eyelet, and keeps a 44px tap target, an accessible label, and a visible keyboard-focus outline.
+The sidebar is a simple rounded Clockwork menu frame with a Weathered inset border, warm serif headings, and the [Librito Digital Home Library logo](assets/Librito%20Digital%20Home%20Library%20Logo.png). It no longer uses bookmark, tassel, or medallion artwork. The 13.5–15rem desktop column stays sticky with a small viewport inset; the mobile drawer stays within the viewport and respects safe areas. Both keep scrollable navigation and truncated shelf names without displacing counts. The mobile close button retains its 44px tap target, accessible label, and visible keyboard focus. The logo is precached for offline use.
 
 Home rows use the bouncing-book loader while the account library or catalog requests are pending (animation respects reduced-motion preferences). Once a new account's empty library has loaded, Currently reading and Recently added show prompts to add books, and author recommendations need books in the library first. These empty states are not ongoing loading states; general recommendations remain available under Picked for your library.
 
