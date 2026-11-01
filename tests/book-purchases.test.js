@@ -87,16 +87,21 @@ test("admin cards show seller price, shipping, seller photo, and correct listing
   const ui = purchaseUi({
     client: { rpc: async () => ({ data: true, error: null }) },
     listings: [{ id: "copy", title: "A Book", price_cents: 1250, shipping_cents: 300,
-      sellerName: "Reader shop", condition: "very_good", book_format: "Paperback", photoUrl: "https://example.test/photo" }],
+      sellerName: "Reader shop", condition: "very_good", book_format: "Paperback",
+      photoUrls: ["https://example.test/photo", "https://example.test/photo-back"] }],
   });
   await ui.refresh();
   const card = ui.section.marketplace.children[0];
   assert.match(card.className, /is-librito/);
-  assert.equal(card.children[2].textContent, "Sold by Reader shop");
-  assert.equal(card.children[3].textContent, "$12.50");
-  assert.match(card.children[4].textContent, /very good.*Paperback.*Shipping \$3.00/);
   assert.equal(card.children[0].book.cover_i, null);
   assert.equal(card.children[0].book.cover_url, "https://example.test/photo");
+  const additionalPhotos = card.children.find((child) => child.className === "book-purchase-additional-photos");
+  assert.equal(additionalPhotos.children.length, 1);
+  assert.equal(additionalPhotos.children[0].src, "https://example.test/photo-back");
+  assert.equal(additionalPhotos.children[0].alt, "Additional seller photograph 2 of A Book");
+  assert.equal(card.children.find((child) => child.textContent === "Sold by Reader shop").textContent, "Sold by Reader shop");
+  assert.ok(card.children.some((child) => child.textContent === "$12.50"));
+  assert.ok(card.children.some((child) => /very good.*Paperback.*Shipping \$3.00/.test(child.textContent)));
   card.children.at(-1).events.click();
   assert.equal(ui.calls[0][0], "marketplace-listing");
   assert.equal(ui.calls[0][1].id, "copy");
@@ -145,9 +150,16 @@ test("navigation or sign-out during a pending request does not render stale list
   }
 });
 
-function listingClient(rows, { queryError = null, sellerError = null } = {}) {
+function listingClient(rows, { queryError = null, sellerError = null, photoRows = [] } = {}) {
   const calls = [];
   const client = {
+    storage: {
+      from() {
+        return {
+          createSignedUrl: async (path) => ({ data: { signedUrl: `https://example.test/${path}` }, error: null }),
+        };
+      },
+    },
     from(table) {
       const filters = [];
       const query = {
@@ -161,7 +173,8 @@ function listingClient(rows, { queryError = null, sellerError = null } = {}) {
           calls.push({ table, filters });
           const result = table === "marketplace_listings" ? { data: rows, error: queryError }
             : table === "seller_profiles" ? { data: [{ user_id: "seller", display_name: "Reader shop" }], error: sellerError }
-              : { data: [], error: null };
+              : table === "marketplace_listing_photos" ? { data: photoRows, error: null }
+                : { data: [], error: null };
           return Promise.resolve(result).then(resolve, reject);
         },
       };
@@ -179,7 +192,7 @@ test("matching uses bounded active/in-stock queries, exact title/author, and ISB
   });
   assert.equal(listings.length, 1);
   assert.equal(listings[0].sellerName, "Reader shop");
-  assert.equal(listings[0].photoUrl, null);
+  assert.deepEqual(listings[0].photoUrls, []);
   const queries = calls.filter((call) => call.table === "marketplace_listings");
   assert.equal(queries.length, 2);
   for (const query of queries) {
@@ -190,6 +203,20 @@ test("matching uses bounded active/in-stock queries, exact title/author, and ISB
   assert.deepEqual(queries[0].filters.find((item) => item[0] === "in")[2], ["978-0-123456-78-9", "9780123456789"]);
   assert.ok(queries[1].filters.some((item) => item[1] === "normalized_title" && item[2] === "a book"));
   assert.ok(queries[1].filters.some((item) => item[1] === "normalized_author" && item[2] === "a reader"));
+});
+
+test("book purchase listings include all available seller photos in position order", async () => {
+  const row = { id: "copy", seller_id: "seller", created_at: "2026-11-01" };
+  const photoRows = [
+    { listing_id: "copy", storage_path: "seller/copy/back.jpg", position: 1 },
+    { listing_id: "copy", storage_path: "seller/copy/front.jpg", position: 0 },
+  ].sort((a, b) => a.position - b.position);
+  const { client } = listingClient([row], { photoRows });
+  const listings = await loadMarketplaceBookListings(client, { isbn: "123456789X" });
+  assert.deepEqual(listings[0].photoUrls, [
+    "https://example.test/seller/copy/front.jpg",
+    "https://example.test/seller/copy/back.jpg",
+  ]);
 });
 
 test("listing and seller errors propagate, rather than appearing as empty inventory", async () => {

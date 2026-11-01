@@ -4906,6 +4906,23 @@ body {
   align-self: flex-start;
 }
 
+.book-purchase-additional-photos,
+.marketplace-listing-additional-photos {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 0.15rem;
+}
+
+.book-purchase-additional-photo {
+  width: 2.8rem;
+  height: 4rem;
+  flex: 0 0 auto;
+  border-radius: 0.3rem;
+  background: #f5f1eb;
+  object-fit: contain;
+}
+
 .book-purchase-card h3 {
   margin: 0;
   color: #302720;
@@ -6771,6 +6788,14 @@ body {
   background: #f5f1eb;
 }
 .marketplace-listing-photo { aspect-ratio: 4 / 3; }
+.marketplace-listing-additional-photo {
+  width: 4.5rem;
+  height: 5.5rem;
+  flex: 0 0 auto;
+  border-radius: 0.45rem;
+  background: #f5f1eb;
+  object-fit: contain;
+}
 .marketplace-listing-price { color: var(--accent); font-weight: 700; }
 .marketplace-detail { display: grid; gap: 0.75rem; }
 .marketplace-photo-gallery {

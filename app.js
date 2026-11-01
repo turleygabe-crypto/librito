@@ -5031,12 +5031,28 @@ function createBookPurchaseSection(book) {
   return { section, status, marketplace };
 }
 
-function createBookPurchaseCard(book, { source, note, price, detail, photoUrl = null }) {
+function createBookPurchaseCard(book, { source, note, price, detail, photoUrls = [], photoUrl = null }) {
   const card = document.createElement("article");
   card.className = "book-purchase-card";
+  const listingPhotos = photoUrls.length ? photoUrls : photoUrl ? [photoUrl] : [];
   const cover = createBookCover({
-    ...book, cover_i: photoUrl ? null : book.cover_i, cover_url: photoUrl || book.cover_url,
+    ...book, cover_i: listingPhotos.length ? null : book.cover_i,
+    cover_url: listingPhotos[0] || book.cover_url,
   }, "book-purchase-cover");
+  card.append(cover);
+  if (listingPhotos.length > 1) {
+    const additionalPhotos = document.createElement("div");
+    additionalPhotos.className = "book-purchase-additional-photos";
+    for (const [index, url] of listingPhotos.slice(1).entries()) {
+      const image = document.createElement("img");
+      image.className = "book-purchase-additional-photo";
+      image.src = url;
+      image.alt = `Additional seller photograph ${index + 2} of ${book.title}`;
+      image.loading = "lazy";
+      additionalPhotos.append(image);
+    }
+    card.append(additionalPhotos);
+  }
   const heading = document.createElement("h3");
   heading.textContent = source;
   const seller = document.createElement("p");
@@ -5046,7 +5062,7 @@ function createBookPurchaseCard(book, { source, note, price, detail, photoUrl = 
   amount.textContent = price;
   const details = document.createElement("p");
   details.textContent = detail;
-  card.append(cover, heading, seller, amount, details);
+  card.append(heading, seller, amount, details);
   return card;
 }
 
@@ -5094,7 +5110,7 @@ async function loadBookPurchaseOptions(book, { section, status, marketplace }) {
         note: `Sold by ${listing.sellerName}`,
         price: money(listing.price_cents),
         detail: `${listing.condition.replace(/_/g, " ")}${listing.book_format ? ` · ${listing.book_format}` : ""} · Shipping ${money(listing.shipping_cents)}`,
-        photoUrl: listing.photoUrl,
+        photoUrls: listing.photoUrls,
       });
       card.classList.add("is-librito");
       const view = document.createElement("button");
