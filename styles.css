@@ -1,8 +1,8 @@
 @font-face {
   font-family: "Librito Script";
-  src: url("/assets/Tangerine-Bold.ttf") format("truetype");
+  src: url("/assets/DancingScript.ttf") format("truetype");
   font-style: normal;
-  font-weight: 700;
+  font-weight: 400 700;
   font-display: swap;
 }
 
@@ -2915,9 +2915,9 @@ body {
 
 .home-hero.hero-english h1 {
   font-family: "Librito Script", cursive;
-  font-size: clamp(2.6rem, 3.8vw, 3.4rem);
+  font-size: clamp(2rem, 3vw, 2.8rem);
   letter-spacing: normal;
-  line-height: 1;
+  line-height: 1.15;
 }
 
 .home-hero.hero-english .home-hero-copy {
@@ -7842,7 +7842,7 @@ body .book-profile-actions > .secondary-btn,
 body :is(.book-continue-reading, .reading-continue-btn, .edition-picker-button),
 body .account-menu > summary {
   border: 1px solid var(--parchment) !important;
-  box-shadow: inset 0 0 0 2px var(--botanical-ink), inset 0 0 0 3px var(--parchment) !important;
+  box-shadow: none !important;
 }
 
 .account-avatar {
@@ -7957,7 +7957,7 @@ body .edition-picker-button:hover {
 
 .home-hero .action-btn,
 .home-hero .action-btn:hover {
-  background-color: var(--accent-plum);
+  background-color: #783f2d;
 }
 
 .card-row-section:nth-of-type(3n + 1) {

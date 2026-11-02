@@ -126,7 +126,7 @@ test("three-dot buttons and the pictured language, account, and book controls ke
     ".upgrade-cta:not(.is-current)", ".search-empty-back", ".audiobook-sample-button", ".book-audiobook-find",
   ]) assert(controls.includes(selector), `${selector} must have persistent trim`);
   assert.match(controls, /border: 1px solid var\(--parchment\) !important/);
-  assert.match(controls, /box-shadow: inset 0 0 0 2px var\(--botanical-ink\), inset 0 0 0 3px var\(--parchment\)/);
+  assert.match(controls, /box-shadow: none !important/);
   assert.doesNotMatch(controls, /\.nav-pill|\.shelf-item/);
   assert.match(css, /\.account-avatar\s*\{\s*border: 1px solid var\(--parchment\)/);
 });
@@ -168,9 +168,9 @@ test("language label wraps rather than truncating and English cursive is self-ho
   assert.match(span, /white-space: normal/);
   assert.doesNotMatch(span, /ellipsis|overflow: hidden/);
   assert.match(css, /\.home-hero\.hero-english h1\s*\{[^}]*font-family: "Librito Script", cursive/);
-  assert.match(css, /@font-face\s*\{[^}]*Tangerine-Bold\.ttf/);
+  assert.match(css, /@font-face\s*\{[^}]*DancingScript\.ttf/);
   const worker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
-  assert.match(worker, /"\/assets\/Tangerine-Bold\.ttf"/);
-  const license = await readFile(new URL("../assets/Tangerine-OFL.txt", import.meta.url), "utf8");
+  assert.match(worker, /"\/assets\/DancingScript\.ttf"/);
+  const license = await readFile(new URL("../assets/DancingScript-OFL.txt", import.meta.url), "utf8");
   assert.match(license, /SIL OPEN FONT LICENSE/);
 });
