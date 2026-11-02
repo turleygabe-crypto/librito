@@ -41,6 +41,16 @@ test("sidebar uses the accessible logo artwork and precaches it", async () => {
   assert.match(sidebar, /id="closeLibraryBtn"[\s\S]*class="sidebar-content"[\s\S]*class="sidebar-nav"[\s\S]*id="shelfList"/);
 });
 
+test("bookmark stitching and top ring retain antique gold without recoloring leather or cords", async () => {
+  const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  assert.match(html, /class="sidebar-gold-details" aria-hidden="true"/);
+  assert.match(css, /\.sidebar-gold-details\s*\{[^}]*mask-image: url\("data:image\/svg\+xml,[^}]*stroke-width='8'[^}]*mask-size: 250% 100%[^}]*pointer-events: none/);
+  assert.match(css, /\.sidebar \.sidebar-shelf-heading h2\s*\{[^}]*color: var\(--antique-gold\)/);
+  assert.match(css, /\.sidebar \.status-shelf-remove\s*\{[^}]*color: var\(--antique-gold\)/);
+  assert.match(css, /\.sidebar \.shelf-item-count\s*\{[^}]*color: var\(--antique-gold\)/);
+});
+
 test("sidebar content flows naturally and scrolls on short screens", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const content = css.match(/\.sidebar-content\s*\{([^}]+)\}/)[1];

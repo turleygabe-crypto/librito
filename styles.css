@@ -11,6 +11,7 @@
   --deep-clay: #a9553a;
   --text: #302d24;
   --sage-ink: #45523a;
+  --antique-gold: #e4bd8b;
   --black: var(--warm-sand);
   --panel: var(--cream);
   --muted: var(--sage-ink);
@@ -3226,6 +3227,18 @@ body {
   mask-repeat: no-repeat;
 }
 
+.sidebar-gold-details {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: url("/assets/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel.png") center / 250% 100% no-repeat;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 819 1920' preserveAspectRatio='none'%3E%3Cpath d='M273 1398V87Q273 62 298 62H519Q544 62 544 87V1398L431 1483Q425 1489 422 1490Q410 1478 397 1490Q392 1490 386 1485Z' fill='none' stroke='black' stroke-width='8'/%3E%3Cpath d='M394 77C370 86 372 117 389 128C400 137 420 137 432 126C448 112 444 87 425 78L424 94C433 106 426 119 410 120C395 120 386 108 395 95Z'/%3E%3C/svg%3E");
+  mask-size: 250% 100%;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  pointer-events: none;
+}
+
 .sidebar-content {
   position: relative;
   z-index: 1;
@@ -3297,7 +3310,7 @@ body {
 }
 
 .sidebar .sidebar-shelf-heading h2 {
-  color: var(--cream) !important;
+  color: var(--antique-gold) !important;
   font-family: inherit;
   font-size: 0.72rem !important;
   letter-spacing: 0.1em;
@@ -3334,7 +3347,7 @@ body {
 }
 
 .sidebar .shelf-item-count {
-  color: var(--cream);
+  color: var(--antique-gold);
   flex-shrink: 0;
   font-size: 0.8rem;
 }
@@ -7366,16 +7379,25 @@ body.book-actions-open {
 
 /* Shared palette for navigation, popovers, and reading controls. */
 .sidebar .nav-pill,
+.sidebar .nav-pill.active,
+.sidebar .nav-pill:hover,
 .sidebar .nav-pill::before,
 .sidebar .shelf-item,
+.sidebar .shelf-item:hover,
+.sidebar .shelf-item:focus-visible,
 .sidebar .shelf-item-copy strong,
 .sidebar .shelf-item-copy > span,
 .sidebar .shelf-item::after,
 .sidebar .sidebar-empty,
 .sidebar .sidebar-create-shelf,
+.sidebar .sidebar-create-shelf:hover,
 .sidebar .library-filter-count,
 .sidebar .status-shelf-remove {
-  color: var(--cream);
+  color: var(--antique-gold);
+}
+
+.sidebar .nav-pill.library-heading-btn::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e4bd8b' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5C9 3 5 3 2 4v15c3-1 7-1 10 1 3-2 7-2 10-1V4c-3-1-7-1-10 1Zm0 0v15'/%3E%3C/svg%3E");
 }
 
 .sidebar-content {
