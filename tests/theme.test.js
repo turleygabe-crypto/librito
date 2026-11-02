@@ -155,18 +155,24 @@ test("dropdown surfaces follow their trigger color even when portaled to the bod
   assert.match(css, /color-mix\(in srgb, var\(--menu-surface, var\(--logo-bronze\)\) 85%, transparent\)/);
 });
 
-test("home rows share a background and use alternating ornamental dividers", () => {
+test("home rows share a background and use alternating ornamental dividers", async () => {
   const rows = css.slice(css.lastIndexOf("\n.card-row-section {"));
   assert.match(rows, /background: transparent/);
   assert.doesNotMatch(rows, /background: linear-gradient|rgba\(232, 195, 174/);
   assert.match(rows, /--row-divider: var\(--logo-bronze\)/);
   assert.match(rows, /:nth-of-type\(3n \+ 1\)\s*\{\s*--row-divider: var\(--sage\)/);
   assert.match(rows, /:nth-of-type\(3n \+ 2\)\s*\{\s*--row-divider: var\(--terracotta\)/);
-  assert.match(rows, /::after\s*\{[^}]*border: 1px solid var\(--row-divider\)[^}]*border-radius: 12px 3px 12px 3px/);
-  assert.match(rows, /::before\s*\{[^}]*left: 22%[^}]*width: clamp\(2\.5rem, 8vw, 6rem\)[^}]*pointer-events: none/);
-  assert.match(rows, /:nth-of-type\(3n \+ 1\)::before\s*\{[^}]*left: 4%[^}]*border-radius: 16px 0 0 4px/);
-  assert.match(rows, /:nth-of-type\(3n \+ 2\)::before\s*\{[^}]*right: 6%[^}]*left: auto[^}]*border-radius: 0 4px 16px 0/);
+  assert.match(rows, /::before\s*\{[^}]*mask: url\("\/assets\/divider-scroll.svg"\) 78% center \/ 180px 28px no-repeat[^}]*pointer-events: none/);
+  assert.match(rows, /:nth-of-type\(3n \+ 1\)::before\s*\{[^}]*divider-vine.svg[^}]*48px 24px repeat-x/);
+  assert.match(rows, /:nth-of-type\(3n \+ 2\)::before\s*\{[^}]*divider-arrow.svg[^}]*mask-position: left center, right center[^}]*mask-size: 96px 24px/);
   assert.doesNotMatch(rows, /50%|dotted|rotate\(/);
+  const sw = await readFile(new URL("../sw.js", import.meta.url), "utf8");
+  for (const name of ["arrow", "vine", "scroll"]) {
+    const asset = `assets/divider-${name}.svg`;
+    assert(sw.includes(`"/${asset}"`), `${asset} must be cached offline`);
+    const svg = await readFile(new URL(`../${asset}`, import.meta.url), "utf8");
+    assert.match(svg, /<svg[^>]*viewBox=/);
+  }
 });
 
 test("account menu has botanical links and contains long account names", () => {

@@ -8009,7 +8009,7 @@ body .book-actions-list .book-status-menu[open] > summary {
 .card-row-section {
   --row-divider: var(--logo-bronze);
   position: relative;
-  padding-bottom: 1.4rem;
+  padding-bottom: 2rem;
   border-bottom: 0;
   background: transparent;
 }
@@ -8017,12 +8017,11 @@ body .book-actions-list .book-status-menu[open] > summary {
 .card-row-section::after {
   content: "";
   position: absolute;
-  right: 0.25rem;
-  bottom: 0;
-  left: 0.25rem;
-  height: 6px;
-  border: 1px solid var(--row-divider);
-  border-radius: 12px 3px 12px 3px;
+  right: 0;
+  bottom: 13px;
+  left: 0;
+  height: 1px;
+  background: var(--row-divider);
   pointer-events: none;
 }
 
@@ -8030,14 +8029,12 @@ body .book-actions-list .book-status-menu[open] > summary {
   content: "";
   position: absolute;
   z-index: 1;
-  bottom: -4px;
-  left: 22%;
-  width: clamp(2.5rem, 8vw, 6rem);
-  height: 14px;
-  border: 1px solid var(--row-divider);
-  border-right: 0;
-  border-radius: 16px 0 0 16px;
-  background: var(--warm-sand);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 28px;
+  background: var(--row-divider);
+  mask: url("/assets/divider-scroll.svg") 78% center / 180px 28px no-repeat;
   pointer-events: none;
 }
 
@@ -8046,28 +8043,22 @@ body .book-actions-list .book-status-menu[open] > summary {
 }
 
 .card-row-section:nth-of-type(3n + 1)::after {
-  border-radius: 14px 14px 3px 3px;
+  display: none;
 }
 
 .card-row-section:nth-of-type(3n + 1)::before {
-  left: 4%;
-  border-radius: 16px 0 0 4px;
+  mask: url("/assets/divider-vine.svg") left center / 48px 24px repeat-x;
 }
 
 .card-row-section:nth-of-type(3n + 2) {
   --row-divider: var(--terracotta);
 }
 
-.card-row-section:nth-of-type(3n + 2)::after {
-  border-radius: 3px 12px 3px 12px;
-}
-
 .card-row-section:nth-of-type(3n + 2)::before {
-  right: 6%;
-  left: auto;
-  border-right: 1px solid var(--row-divider);
-  border-left: 0;
-  border-radius: 0 4px 16px 0;
+  mask-image: url("/assets/divider-arrow.svg"), url("/assets/divider-arrow.svg");
+  mask-position: left center, right center;
+  mask-size: 96px 24px;
+  mask-repeat: no-repeat;
 }
 
 .card-row-section:nth-of-type(3n) .section-heading-row h2 {
