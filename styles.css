@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Librito Script";
+  src: url("/assets/Tangerine-Bold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
 :root {
   color-scheme: light;
   --warm-sand: #f3e6d8;
@@ -18,6 +26,7 @@
   --logo-cream: #f2c88f;
   --logo-bronze: #735032;
   --brand-font: Georgia, "Times New Roman", serif;
+  --accent-plum: #644453;
   --black: var(--warm-sand);
   --panel: var(--cream);
   --muted: var(--sage-ink);
@@ -2902,6 +2911,25 @@ body {
   font-weight: 400;
   line-height: 1.02;
   letter-spacing: -0.035em;
+}
+
+.home-hero.hero-english h1 {
+  font-family: "Librito Script", cursive;
+  font-size: clamp(2.6rem, 3.8vw, 3.4rem);
+  letter-spacing: normal;
+  line-height: 1;
+}
+
+.home-hero.hero-english .home-hero-copy {
+  width: min(45%, 26rem);
+  padding: 1.4rem 1.8rem;
+}
+
+@media (max-width: 899px) {
+  .home-hero.hero-english .home-hero-copy {
+    width: 100%;
+    padding: 1.2rem 1.4rem;
+  }
 }
 
 .home-hero p {
@@ -6192,7 +6220,7 @@ body {
   height: auto;
   min-width: 0;
   min-height: 2.1rem;
-  max-width: 10rem;
+  max-width: 20rem;
   padding: 0.25rem 0.75rem;
   border-radius: 999px;
   font-size: 0.85rem;
@@ -6200,9 +6228,8 @@ body {
 }
 
 .global-search .edition-language-trigger span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .global-search .edition-language-list {
@@ -6231,7 +6258,7 @@ body {
 
 @media (max-width: 600px) {
   .global-search .edition-language-trigger {
-    max-width: 6rem;
+    max-width: none;
   }
 }
 
@@ -6296,8 +6323,30 @@ body {
   }
 
   .global-search .edition-language-trigger {
-    max-width: 4.5rem;
+    max-width: none;
     padding: 0.25rem 0.55rem;
+  }
+
+  .global-search {
+    flex-wrap: wrap;
+  }
+
+  .global-search input {
+    flex: 1 1 calc(100% - 3rem);
+  }
+
+  .global-search > button {
+    order: 0;
+    flex: 0 0 1.8rem;
+  }
+
+  .global-search .global-language-menu {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .global-search .edition-language-trigger {
+    width: 100%;
   }
 
   .page-view h1 {
@@ -7894,4 +7943,33 @@ body .book-actions-list .book-status-menu[open] > summary {
 
 .sidebar :is(.nav-pill, .shelf-item, .shelf-item-copy strong, .shelf-item-copy > span, .shelf-item-count, .sidebar-empty, .sidebar-create-shelf) {
   color: var(--logo-cream);
+}
+
+body .secondary-btn,
+body .edition-picker-button {
+  background-color: var(--logo-bronze);
+}
+
+body .secondary-btn:hover,
+body .edition-picker-button:hover {
+  background-color: var(--botanical-ink);
+}
+
+.home-hero .action-btn,
+.home-hero .action-btn:hover {
+  background-color: var(--accent-plum);
+}
+
+.card-row-section:nth-of-type(3n + 1) {
+  background: linear-gradient(110deg, var(--cream), transparent);
+  border-bottom-color: var(--sage);
+}
+
+.card-row-section:nth-of-type(3n + 2) {
+  background: linear-gradient(110deg, rgba(232, 195, 174, 0.4), transparent);
+  border-bottom-color: var(--terracotta);
+}
+
+.card-row-section:nth-of-type(3n) .section-heading-row h2 {
+  color: var(--accent-plum);
 }

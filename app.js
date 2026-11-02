@@ -1705,6 +1705,7 @@ function renderBooks() {
 function createHomeHero() {
   const hero = document.createElement("section");
   hero.className = "home-hero";
+  hero.classList.toggle("hero-english", /^en(?:-|$)/i.test(navigator.language));
   hero.setAttribute("aria-labelledby", "homeHeroTitle");
 
   const copy = document.createElement("div");

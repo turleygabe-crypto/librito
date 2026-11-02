@@ -20,6 +20,7 @@ const palette = {
   parchment: "#e5d4ae",
   "logo-cream": "#f2c88f",
   "logo-bronze": "#735032",
+  "accent-plum": "#644453",
 };
 
 function luminance(hex) {
@@ -46,6 +47,8 @@ test("theme tokens match the asset palette and use accessible text pairs", () =>
     ["logo-cream", "sage-ink"],
     ["logo-bronze", "warm-sand"],
     ["logo-bronze", "cream"],
+    ["logo-cream", "logo-bronze"],
+    ["logo-cream", "accent-plum"],
   ]) {
     const values = [luminance(palette[foreground]), luminance(palette[background])].sort((a, b) => b - a);
     assert((values[0] + 0.05) / (values[1] + 0.05) >= 4.5, `${foreground} on ${background} must meet WCAG AA`);
@@ -158,4 +161,16 @@ test("logo-inspired typography uses warm gold on green and readable bronze on li
   assert.match(css, /\.home-hero\s*\{[^}]*color: var\(--logo-cream\)/);
   assert.match(css, /\.home-hero h1\s*\{[^}]*font-family: var\(--brand-font\);[^}]*font-weight: 700/);
   assert.match(css, /\.home-hero p,\s*\.home-hero \.action-btn\s*\{[^}]*color: var\(--logo-cream\)/);
+});
+
+test("language label wraps rather than truncating and English cursive is self-hosted", async () => {
+  const span = css.match(/\.global-search \.edition-language-trigger span\s*\{([^}]+)\}/)[1];
+  assert.match(span, /white-space: normal/);
+  assert.doesNotMatch(span, /ellipsis|overflow: hidden/);
+  assert.match(css, /\.home-hero\.hero-english h1\s*\{[^}]*font-family: "Librito Script", cursive/);
+  assert.match(css, /@font-face\s*\{[^}]*Tangerine-Bold\.ttf/);
+  const worker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
+  assert.match(worker, /"\/assets\/Tangerine-Bold\.ttf"/);
+  const license = await readFile(new URL("../assets/Tangerine-OFL.txt", import.meta.url), "utf8");
+  assert.match(license, /SIL OPEN FONT LICENSE/);
 });

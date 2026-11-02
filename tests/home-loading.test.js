@@ -5,6 +5,23 @@ import { test } from "node:test";
 
 const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
 
+test("home hero uses cursive only for English browser languages", () => {
+  const heroSource = source.slice(source.indexOf("function createHomeHero()"), source.indexOf("\nfunction shuffleBooks("));
+  for (const [language, expected] of [["en", true], ["en-US", true], ["en-GB", true], ["fr-FR", false], ["ja-JP", false], ["de-DE", false]]) {
+    let cursive;
+    const context = {
+      Element, navigator: { language },
+      document: { createElement: () => {
+        const el = new Element();
+        el.classList = { toggle: (name, value) => { assert.equal(name, "hero-english"); cursive = value; } };
+        return el;
+      } },
+    };
+    runInNewContext(`${heroSource}\ncreateHomeHero();`, context);
+    assert.equal(cursive, expected, language);
+  }
+});
+
 class Element {
   children = [];
   attributes = {};
