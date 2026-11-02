@@ -15,6 +15,9 @@ const palette = {
   "sage-ink": "#45523a",
   text: "#302d24",
   cream: "#fffaf2",
+  "botanical-green": "#4b543d",
+  "botanical-ink": "#303b29",
+  parchment: "#e5d4ae",
 };
 
 function luminance(hex) {
@@ -35,6 +38,8 @@ test("theme tokens match the asset palette and use accessible text pairs", () =>
     ["deep-clay", "cream"],
     ["cream", "deep-sage"],
     ["cream", "sage-ink"],
+    ["parchment", "botanical-green"],
+    ["parchment", "botanical-ink"],
   ]) {
     const values = [luminance(palette[foreground]), luminance(palette[background])].sort((a, b) => b - a);
     assert((values[0] + 0.05) / (values[1] + 0.05) >= 4.5, `${foreground} on ${background} must meet WCAG AA`);
@@ -50,7 +55,10 @@ test("menus, buttons, and progress accents share the palette across app surfaces
     ".account-navigation", ".book-actions-sheet", ".book-status-menu-panel",
     ".book-more-menu-panel", ".card-add-actions", ".edition-language-list", ".browse-popover .browse-panel",
   ]) assert(menus.includes(selector), `${selector} must share the menu surface`);
-  assert.match(menus, /background: var\(--deep-sage\);[\s\S]*color: var\(--cream\)/);
+  assert.match(menus, /--deep-sage: var\(--botanical-green\)/);
+  assert.match(menus, /--sage-ink: var\(--botanical-ink\)/);
+  assert.match(menus, /--antique-gold: var\(--parchment\)/);
+  assert.match(menus, /background: var\(--deep-sage\);[\s\S]*color: var\(--parchment\)/);
   const buttons = theme.slice(theme.indexOf("\n.action-btn,"), theme.indexOf("\n.action-btn:hover"));
   for (const selector of [".reading-continue-btn", ".secondary-btn", ".edition-picker-button", ".cc-btn", ".upgrade-cta"]) {
     assert(buttons.includes(selector), `${selector} must share the button palette`);
@@ -73,8 +81,12 @@ test("browser chrome, installed app, support pages, and admin use matching color
   assert.match(admin, /--brown: #5e6f4f/);
 });
 
-test("logo-gold outlines cover buttons, top-bar controls, and book menus without framing covers", () => {
-  assert.match(css, /--antique-gold: #d9aa62/);
-  assert.match(css, /body :is\(button, summary, \[role="button"\]\):not\(\.sidebar-backdrop, \.card-open-button, \.reading-feature-cover, \.reading-feature-title, \.table-book-title, \.table-sort\)\s*\{[^}]*border: 1px solid var\(--antique-gold\) !important/);
-  assert.match(css, /\.global-search,\s*\.account-menu > summary,\s*\.account-avatar,[^}]*border-color: var\(--antique-gold\)/);
+test("buttons have a simple parchment trim only when selected or open", async () => {
+  assert.match(css, /body :is\(button, summary, \[role="button"\]\):where\(:not\([^}]+\)\)\s*\{\s*border: 1px solid transparent !important/);
+  assert.match(css, /:is\(\.active, \.is-on-shelf, \[aria-pressed="true"\], \[aria-selected="true"\], \[aria-expanded="true"\], \[aria-current="page"\]\),\s*body details\[open\] > summary,\s*\.account-navigation a\[aria-current="page"\]\s*\{\s*border: 1px solid var\(--parchment\) !important/);
+  assert.match(css, /\.sidebar \.nav-pill\.active\s*\{[^}]*box-shadow: none/);
+  assert.match(css, /\.sidebar \.shelf-item\.active\s*\{[^}]*box-shadow: none/);
+  const admin = await readFile(new URL("../admin.css", import.meta.url), "utf8");
+  assert.match(admin, /body :is\(button, summary, \.btn\) \{ border: 1px solid transparent !important/);
+  assert.match(admin, /body details\[open\] > summary \{ border-color: #e5d4ae !important/);
 });

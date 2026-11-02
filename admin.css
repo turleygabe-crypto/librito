@@ -59,7 +59,9 @@ td { padding: 10px 6px; border-bottom: 1px solid var(--line); }
 .account-dialog label { display: block; margin-bottom: 12px; }
 .account-dialog input { display: block; width: 100%; margin-top: 6px; }
 .btn:disabled, select:disabled { opacity: .6; cursor: not-allowed; }
-body :is(button, summary, .btn) { border: 1px solid #d9aa62 !important; }
+body :is(button, summary, .btn) { border: 1px solid transparent !important; }
+body :is(button, summary, .btn):is(.active, [aria-pressed="true"], [aria-selected="true"], [aria-expanded="true"]),
+body details[open] > summary { border-color: #e5d4ae !important; }
 .side button, .side a { color: #d9aa62; }
 @media (max-width: 760px) {
   .shell { grid-template-columns: 1fr; }

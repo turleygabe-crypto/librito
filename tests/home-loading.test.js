@@ -20,12 +20,12 @@ class Element {
 
 test("the sidebar uses the transparent bookmark artwork and precaches it", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
-  assert.match(css, /url\("\/assets\/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel\.png"\)/);
+  assert.match(css, /url\("\/assets\/Elegant%20Botanical%20Green%20Bookmark\.png"\)/);
   const worker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
-  assert.match(worker, /"\/assets\/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel\.png"/);
-  const image = await readFile(new URL("../assets/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel.png", import.meta.url));
-  assert.equal(image.readUInt32BE(16), 819);
-  assert.equal(image.readUInt32BE(20), 1920);
+  assert.match(worker, /"\/assets\/Elegant%20Botanical%20Green%20Bookmark\.png"/);
+  const image = await readFile(new URL("../assets/Elegant%20Botanical%20Green%20Bookmark.png", import.meta.url));
+  assert.equal(image.readUInt32BE(16), 750);
+  assert.equal(image.readUInt32BE(20), 2097);
 });
 
 test("sidebar uses the accessible logo artwork and precaches it", async () => {
@@ -41,11 +41,12 @@ test("sidebar uses the accessible logo artwork and precaches it", async () => {
   assert.match(sidebar, /id="closeLibraryBtn"[\s\S]*class="sidebar-content"[\s\S]*class="sidebar-nav"[\s\S]*id="shelfList"/);
 });
 
-test("bookmark stitching and top ring retain antique gold without recoloring leather or cords", async () => {
+test("botanical bookmark retains its own border, foliage and tassel without legacy overlays", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
-  assert.match(html, /class="sidebar-gold-details" aria-hidden="true"/);
-  assert.match(css, /\.sidebar-gold-details\s*\{[^}]*mask-image: url\("data:image\/svg\+xml,[^}]*stroke-width='12'[^}]*stroke-linejoin='round'[^}]*mask-size: 250% 100%[^}]*pointer-events: none/);
+  assert.doesNotMatch(html, /sidebar-gold-details/);
+  assert.doesNotMatch(css, /sidebar-gold-details|\.sidebar::after|Elegant%20Brown/);
+  assert.match(css, /\.sidebar\s*\{[^}]*--sage-ink: var\(--botanical-ink\)[^}]*--antique-gold: var\(--parchment\)/);
   assert.match(css, /\.sidebar \.sidebar-shelf-heading h2\s*\{[^}]*color: var\(--antique-gold\)/);
   assert.match(css, /\.sidebar \.status-shelf-remove\s*\{[^}]*color: var\(--antique-gold\)/);
   assert.match(css, /\.sidebar \.shelf-item-count\s*\{[^}]*color: var\(--antique-gold\)/);
@@ -102,7 +103,7 @@ test("mobile bookmark extends beyond both screen edges with the tassel below the
   assert.match(sidebar, /bottom: auto/);
   assert.match(sidebar, /height: var\(--sidebar-height\)/);
   assert.match(sidebar, /padding-top: max\(calc\(5\.5rem \+ env\(safe-area-inset-top\)\), calc\(var\(--sidebar-height\) \* 0\.085\)\)/);
-  assert.match(sidebar, /padding-bottom: calc\(var\(--sidebar-height\) \* 0\.26\)/);
+  assert.match(sidebar, /padding-bottom: calc\(var\(--sidebar-height\) \* 0\.22\)/);
   assert.match(css, /\.sidebar \.mobile-sidebar-close\s*\{[^}]*top: max\(2\.625rem, calc\(env\(safe-area-inset-top\) \+ 2rem\)\)[^}]*right: 1\.25rem/);
 });
 
@@ -117,18 +118,17 @@ test("mobile close button is an understated, keyboard-accessible golden medallio
   assert.match(sw, /"\/assets\/Ornate%20Golden%20X%20Medallion\.png"/);
 });
 
-test("sage bookmark layer preserves artwork, eyelet and tassel without filtering navigation", async () => {
+test("botanical bookmark layer preserves original artwork without filtering navigation", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const sidebarRules = [...css.matchAll(/\.sidebar\s*\{([^}]+)\}/g)];
   const bookmark = sidebarRules.find((rule) => rule[1].includes("isolation: isolate"));
-  const artwork = css.match(/\.sidebar::before,\s*\.sidebar::after\s*\{([^}]+)\}/)[1];
-  assert.match(artwork, /Elegant%20Brown/);
-  assert.match(artwork, /250% 100% no-repeat/);
-  assert.match(css, /\.sidebar::before\s*\{[^}]*filter: sepia\(1\).*hue-rotate/);
+  const artwork = css.match(/\.sidebar::before\s*\{([^}]+)\}/)[1];
+  assert.match(artwork, /Elegant%20Botanical%20Green/);
+  assert.match(artwork, /180% 100% no-repeat/);
+  assert.doesNotMatch(artwork, /filter:|mask-image:/);
   assert.match(artwork, /pointer-events: none/);
   assert.match(artwork, /z-index: -1/);
-  assert.match(css, /\.sidebar::after\s*\{[^}]*hue-rotate\(335deg\)[^}]*mask-image: url\("data:image\/svg\+xml,[^}]*viewBox='0 0 819 1920'[^}]*mask-size: 250% 100%[^}]*mask-position: center[^}]*mask-repeat: no-repeat/);
-  assert.match(bookmark[1], /padding: calc\(var\(--sidebar-height, calc\(100dvh - 2rem\)\) \* 0\.085\) 1\.75rem calc\(var\(--sidebar-height, calc\(100dvh - 2rem\)\) \* 0\.28\)/);
+  assert.match(bookmark[1], /padding: calc\(var\(--sidebar-height, calc\(100dvh - 2rem\)\) \* 0\.04\) 1\.75rem calc\(var\(--sidebar-height, calc\(100dvh - 2rem\)\) \* 0\.2\)/);
   assert.match(bookmark[1], /clip-path: none/);
   assert.doesNotMatch(bookmark[1], /filter:/);
   assert.match(sidebarRules.at(-1)[1], /position: fixed/);
