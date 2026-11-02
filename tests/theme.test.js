@@ -158,29 +158,28 @@ test("dropdown surfaces follow their trigger color even when portaled to the bod
 test("home rows share a background and use alternating ornamental dividers", async () => {
   const rows = css.slice(css.lastIndexOf("\n.card-row-section {"));
   assert.match(rows, /background: transparent/);
+  assert.match(rows, /padding-bottom: 5\.5rem/);
   assert.doesNotMatch(rows, /background: linear-gradient|rgba\(232, 195, 174/);
   assert.match(rows, /--row-divider: var\(--logo-bronze\)/);
   assert.match(rows, /:nth-of-type\(3n \+ 1\)\s*\{\s*--row-divider: var\(--sage\)/);
   assert.match(rows, /:nth-of-type\(3n \+ 2\)\s*\{\s*--row-divider: var\(--terracotta\)/);
-  assert.match(rows, /::before\s*\{[^}]*mask: url\("\/assets\/divider-fan.svg"\) 24% center \/ 180px 28px no-repeat[^}]*pointer-events: none/);
+  assert.match(rows, /::before\s*\{[^}]*mask: url\("\/assets\/divider-knot.png"\) left center \/ contain no-repeat[^}]*pointer-events: none/);
   for (const [selector, name, position] of [
-    ["6n + 1", "vine", "8%"],
-    ["6n + 2", "arrow", "right"],
-    ["6n + 4", "quill", "70%"],
-    ["6n + 5", "buds", "left"],
-    ["6n", "petals", "88%"],
+    ["4n + 2", "braid", "right: 0"],
+    ["4n + 3", "spear", "left: min(12%, 4rem)"],
+    ["4n", "floral", "right: min(5%, 2rem)"],
   ]) {
     const rule = rows.slice(rows.indexOf(`.card-row-section:nth-of-type(${selector})::before`)).split("}")[0];
-    assert(rule.includes(`divider-${name}.svg`));
-    assert(rule.includes(`mask-position: ${position} center`));
+    assert(rule.includes(`divider-${name}.png`));
+    assert(rule.includes(position));
   }
-  assert.doesNotMatch(rows, /divider-scroll|repeat-x|50%|dotted|rotate\(/);
+  assert.doesNotMatch(rows, /::after|divider-.*\.svg|repeat-x|rotate\(/);
   const sw = await readFile(new URL("../sw.js", import.meta.url), "utf8");
-  for (const name of ["arrow", "vine", "fan", "quill", "buds", "petals"]) {
-    const asset = `assets/divider-${name}.svg`;
+  for (const name of ["knot", "braid", "spear", "floral"]) {
+    const asset = `assets/divider-${name}.png`;
     assert(sw.includes(`"/${asset}"`), `${asset} must be cached offline`);
-    const svg = await readFile(new URL(`../${asset}`, import.meta.url), "utf8");
-    assert.match(svg, /<svg[^>]*viewBox=/);
+    const png = await readFile(new URL(`../${asset}`, import.meta.url));
+    assert.equal(png.subarray(1, 4).toString(), "PNG");
   }
 });
 

@@ -8009,32 +8009,20 @@ body .book-actions-list .book-status-menu[open] > summary {
 .card-row-section {
   --row-divider: var(--logo-bronze);
   position: relative;
-  padding-bottom: 2rem;
+  padding-bottom: 5.5rem;
   border-bottom: 0;
   background: transparent;
-}
-
-.card-row-section::after {
-  content: "";
-  position: absolute;
-  right: 0;
-  bottom: 13px;
-  left: 0;
-  height: 1px;
-  background: var(--row-divider);
-  pointer-events: none;
 }
 
 .card-row-section::before {
   content: "";
   position: absolute;
-  z-index: 1;
-  right: 0;
   bottom: 0;
   left: 0;
-  height: 28px;
+  width: min(100%, 32.375rem);
+  height: 76px;
   background: var(--row-divider);
-  mask: url("/assets/divider-fan.svg") 24% center / 180px 28px no-repeat;
+  mask: url("/assets/divider-knot.png") left center / contain no-repeat;
   pointer-events: none;
 }
 
@@ -8046,29 +8034,23 @@ body .book-actions-list .book-status-menu[open] > summary {
   --row-divider: var(--terracotta);
 }
 
-.card-row-section:nth-of-type(6n + 1)::before {
-  mask-image: url("/assets/divider-vine.svg");
-  mask-position: 8% center;
+.card-row-section:nth-of-type(4n + 2)::before {
+  right: 0;
+  left: auto;
+  mask-image: url("/assets/divider-braid.png");
 }
 
-.card-row-section:nth-of-type(6n + 2)::before {
-  mask-image: url("/assets/divider-arrow.svg");
-  mask-position: right center;
+.card-row-section:nth-of-type(4n + 3)::before {
+  left: min(12%, 4rem);
+  width: min(88%, 32.375rem);
+  mask-image: url("/assets/divider-spear.png");
 }
 
-.card-row-section:nth-of-type(6n + 4)::before {
-  mask-image: url("/assets/divider-quill.svg");
-  mask-position: 70% center;
-}
-
-.card-row-section:nth-of-type(6n + 5)::before {
-  mask-image: url("/assets/divider-buds.svg");
-  mask-position: left center;
-}
-
-.card-row-section:nth-of-type(6n)::before {
-  mask-image: url("/assets/divider-petals.svg");
-  mask-position: 88% center;
+.card-row-section:nth-of-type(4n)::before {
+  right: min(5%, 2rem);
+  left: auto;
+  width: min(95%, 32.375rem);
+  mask-image: url("/assets/divider-floral.png");
 }
 
 .card-row-section:nth-of-type(3n) .section-heading-row h2 {
