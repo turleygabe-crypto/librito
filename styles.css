@@ -3220,9 +3220,9 @@ body {
 
 .sidebar::after {
   filter: sepia(1) saturate(2) hue-rotate(335deg) brightness(1.5);
-  mask-image: linear-gradient(#000, #000), linear-gradient(#000, #000);
-  mask-size: 11% 5.4%, 38% 22.6%;
-  mask-position: center top, center bottom;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 819 1920' preserveAspectRatio='none'%3E%3Cpath d='M394 0H424L426 39C432 43 434 48 432 53L424 60L423 91Q424 104 414 104H404Q396 103 396 94L396 62L389 52Q387 45 393 40ZM410 1487C400 1487 396 1492 396 1500L394 1512L391 1525H350V1920H470V1525H432L426 1512L425 1500C425 1492 420 1487 410 1487Z'/%3E%3C/svg%3E");
+  mask-size: 250% 100%;
+  mask-position: center;
   mask-repeat: no-repeat;
 }
 

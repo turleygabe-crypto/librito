@@ -117,7 +117,7 @@ test("sage bookmark layer preserves artwork, eyelet and tassel without filtering
   assert.match(css, /\.sidebar::before\s*\{[^}]*filter: sepia\(1\).*hue-rotate/);
   assert.match(artwork, /pointer-events: none/);
   assert.match(artwork, /z-index: -1/);
-  assert.match(css, /\.sidebar::after\s*\{[^}]*hue-rotate\(335deg\)[^}]*mask-size: 11% 5\.4%, 38% 22\.6%[^}]*mask-position: center top, center bottom[^}]*mask-repeat: no-repeat/);
+  assert.match(css, /\.sidebar::after\s*\{[^}]*hue-rotate\(335deg\)[^}]*mask-image: url\("data:image\/svg\+xml,[^}]*viewBox='0 0 819 1920'[^}]*mask-size: 250% 100%[^}]*mask-position: center[^}]*mask-repeat: no-repeat/);
   assert.match(bookmark[1], /padding: calc\(var\(--sidebar-height, calc\(100dvh - 2rem\)\) \* 0\.085\) 1\.75rem calc\(var\(--sidebar-height, calc\(100dvh - 2rem\)\) \* 0\.28\)/);
   assert.match(bookmark[1], /clip-path: none/);
   assert.doesNotMatch(bookmark[1], /filter:/);
