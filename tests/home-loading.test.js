@@ -70,7 +70,7 @@ test("sidebar provides room for readable navigation and shelf text", async () =>
 
 test("slim sidebar keeps branding restrained and shelf counts within the content", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
-  assert.match(css, /\.sidebar-logo\s*\{[^}]*width: 100%[^}]*height: auto[^}]*object-fit: contain/);
+  assert.match(css, /\.sidebar-logo\s*\{[^}]*width: 125%[^}]*max-width: none[^}]*height: auto[^}]*margin-left: -12\.5%[^}]*object-fit: contain/);
   assert.match(css, /\.sidebar \.nav-pill,\s*\.sidebar \.shelf-item-copy strong,\s*\.sidebar \.sidebar-empty\s*\{\s*font-size: 0\.9rem/);
   assert.match(css, /\.sidebar \.shelf-item-copy\s*\{[^}]*min-width: 0[^}]*flex: 1/);
   assert.match(css, /\.sidebar \.shelf-item-count\s*\{[^}]*flex-shrink: 0/);

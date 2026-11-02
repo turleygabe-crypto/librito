@@ -3243,8 +3243,10 @@ body {
 
 .sidebar-logo {
   display: block;
-  width: 100%;
+  width: 125%;
+  max-width: none;
   height: auto;
+  margin-left: -12.5%;
   object-fit: contain;
 }
 
