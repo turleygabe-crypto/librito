@@ -158,28 +158,30 @@ test("dropdown surfaces follow their trigger color even when portaled to the bod
 test("home rows share a background and use alternating ornamental dividers", async () => {
   const rows = css.slice(css.lastIndexOf("\n.card-row-section {"));
   assert.match(rows, /background: transparent/);
-  assert.match(rows, /padding-bottom: 5\.5rem/);
+  assert.match(rows, /padding-bottom: 2rem/);
   assert.doesNotMatch(rows, /background: linear-gradient|rgba\(232, 195, 174/);
   assert.match(rows, /--row-divider: var\(--logo-bronze\)/);
   assert.match(rows, /:nth-of-type\(3n \+ 1\)\s*\{\s*--row-divider: var\(--sage\)/);
   assert.match(rows, /:nth-of-type\(3n \+ 2\)\s*\{\s*--row-divider: var\(--terracotta\)/);
-  assert.match(rows, /::before\s*\{[^}]*mask: url\("\/assets\/divider-knot.png"\) left center \/ contain no-repeat[^}]*pointer-events: none/);
+  assert.match(rows, /::before\s*\{[^}]*right: 0[^}]*left: 0[^}]*height: 20px[^}]*mask: url\("\/assets\/divider-knot.svg"\) 22% center \/ 100px 20px no-repeat[^}]*pointer-events: none/);
   for (const [selector, name, position] of [
-    ["4n + 2", "braid", "right: 0"],
-    ["4n + 3", "spear", "left: min(12%, 4rem)"],
-    ["4n", "floral", "right: min(5%, 2rem)"],
+    ["4n + 2", "braid", "64px 16px repeat-x"],
+    ["4n + 3", "spear", "mask-position: left center, right center"],
+    ["4n", "floral", "76% center / 160px 24px no-repeat"],
   ]) {
     const rule = rows.slice(rows.indexOf(`.card-row-section:nth-of-type(${selector})::before`)).split("}")[0];
-    assert(rule.includes(`divider-${name}.png`));
+    assert(rule.includes(`divider-${name}.svg`));
     assert(rule.includes(position));
   }
-  assert.doesNotMatch(rows, /::after|divider-.*\.svg|repeat-x|rotate\(/);
+  assert.match(rows, /::after\s*\{[^}]*right: 0[^}]*left: 0[^}]*height: 1px/);
+  assert.doesNotMatch(rows, /divider-.*\.png|76px|32\.375rem/);
   const sw = await readFile(new URL("../sw.js", import.meta.url), "utf8");
   for (const name of ["knot", "braid", "spear", "floral"]) {
-    const asset = `assets/divider-${name}.png`;
+    const asset = `assets/divider-${name}.svg`;
     assert(sw.includes(`"/${asset}"`), `${asset} must be cached offline`);
-    const png = await readFile(new URL(`../${asset}`, import.meta.url));
-    assert.equal(png.subarray(1, 4).toString(), "PNG");
+    const svg = await readFile(new URL(`../${asset}`, import.meta.url), "utf8");
+    assert.match(svg, /<svg[^>]*viewBox=/);
+    assert.doesNotMatch(svg, /<image/);
   }
 });
 
