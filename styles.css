@@ -7713,6 +7713,18 @@ body details[open] > summary,
   border: 1px solid var(--parchment) !important;
 }
 
+body :is(.card-menu, .card-action, .edition-language-trigger, .library-toggle-btn),
+body :is(.book-more-menu, .book-shelf-menu, .book-status-menu, .card-shelf-button) > summary,
+body .book-profile-actions > .secondary-btn,
+body :is(.book-continue-reading, .edition-picker-button),
+body .account-menu > summary {
+  border: 1px solid var(--parchment) !important;
+}
+
+.account-avatar {
+  border: 1px solid var(--parchment);
+}
+
 .sidebar .sidebar-brand,
 .sidebar .sidebar-nav,
 .sidebar .sidebar-library-nav {

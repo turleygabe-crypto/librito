@@ -81,7 +81,7 @@ test("browser chrome, installed app, support pages, and admin use matching color
   assert.match(admin, /--brown: #5e6f4f/);
 });
 
-test("buttons have a simple parchment trim only when selected or open", async () => {
+test("navigation uses selected trim and menu triggers retain parchment borders", async () => {
   assert.match(css, /body :is\(button, summary, \[role="button"\]\):where\(:not\([^}]+\)\)\s*\{\s*border: 1px solid transparent !important/);
   assert.match(css, /:is\(\.active, \.is-on-shelf, \[aria-pressed="true"\], \[aria-selected="true"\], \[aria-expanded="true"\], \[aria-current="page"\]\),\s*body details\[open\] > summary,\s*\.account-navigation a\[aria-current="page"\]\s*\{\s*border: 1px solid var\(--parchment\) !important/);
   assert.match(css, /\.sidebar \.nav-pill\.active\s*\{[^}]*box-shadow: none/);
@@ -89,4 +89,17 @@ test("buttons have a simple parchment trim only when selected or open", async ()
   const admin = await readFile(new URL("../admin.css", import.meta.url), "utf8");
   assert.match(admin, /body :is\(button, summary, \.btn\) \{ border: 1px solid transparent !important/);
   assert.match(admin, /body details\[open\] > summary \{ border-color: #e5d4ae !important/);
+});
+
+test("three-dot buttons and the pictured language, account, and book controls keep thin trim", () => {
+  const rule = css.slice(css.indexOf("body :is(.card-menu, .card-action"));
+  const controls = rule.slice(0, rule.indexOf("\n}"));
+  for (const selector of [
+    ".card-menu", ".card-action", ".edition-language-trigger", ".book-more-menu",
+    ".book-shelf-menu", ".book-status-menu", ".book-profile-actions > .secondary-btn",
+    ".book-continue-reading", ".edition-picker-button", ".account-menu > summary",
+  ]) assert(controls.includes(selector), `${selector} must have persistent trim`);
+  assert.match(controls, /border: 1px solid var\(--parchment\) !important/);
+  assert.doesNotMatch(controls, /\.nav-pill|\.shelf-item/);
+  assert.match(css, /\.account-avatar\s*\{\s*border: 1px solid var\(--parchment\)/);
 });
