@@ -8020,8 +8020,10 @@ body .book-actions-list .book-status-menu[open] > summary {
   right: 0;
   bottom: 0;
   left: 0;
-  height: clamp(12px, 2.2vw, 28px);
-  background: url("/assets/divider-botanical-1.png") center / 100% 100% no-repeat;
+  width: min(86%, 48rem);
+  height: 20px;
+  margin-inline: auto;
+  background: url("/assets/divider-botanical-1.png") center / contain no-repeat;
   pointer-events: none;
 }
 
