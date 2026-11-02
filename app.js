@@ -1148,35 +1148,55 @@ function createBookCover(book, className = "") {
   const isbn = Array.isArray(book.isbn)
     ? book.isbn[0]
     : book.isbn || (Array.isArray(book.isbnList) ? book.isbnList[0] : "");
-  const coverSize = "L";
-  const coverUrl = book.cover_i
-    ? `https://covers.openlibrary.org/b/id/${book.cover_i}-${coverSize}.jpg?default=false`
+  const rawCoverUrl = book.cover_i
+    ? `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg?default=false`
     : book.cover_url || (isbn
-      ? `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(isbn)}-${coverSize}.jpg?default=false`
+      ? `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(isbn)}-M.jpg?default=false`
       : "");
+  const openLibraryCover = /^https:\/\/covers\.openlibrary\.org\/.*-[SML]\.jpg/.test(rawCoverUrl);
+  const coverUrl = openLibraryCover ? rawCoverUrl.replace(/-[SL]\.jpg/, "-M.jpg") : rawCoverUrl;
   if (coverUrl) {
     const image = document.createElement("img");
-    let currentCoverSize = coverSize;
     image.src = coverUrl;
     image.alt = `${book.title || "Book"} cover`;
     image.loading = className.includes("book-loader-art") ? "eager" : "lazy";
-    image.addEventListener("load", () => cover.classList.add("has-cover"), { once: true });
-    image.addEventListener("error", () => {
-      if (currentCoverSize === "L") {
-        currentCoverSize = "M";
-        const mediumCoverUrl = coverUrl.replace("-L.jpg", "-M.jpg");
-        if (mediumCoverUrl === coverUrl) {
-          image.remove();
-        } else {
-          image.src = mediumCoverUrl;
-        }
-      } else {
-        image.remove();
-      }
-    });
+    image.decoding = "async";
+    image.addEventListener("load", () => {
+      cover.classList.add("has-cover");
+      // Medium covers paint quickly; sharper large covers replace them once downloaded.
+      if (openLibraryCover) queueCoverUpgrade(image, coverUrl.replace("-M.jpg", "-L.jpg"));
+    }, { once: true });
+    image.addEventListener("error", () => image.remove(), { once: true });
     cover.prepend(image);
   }
   return cover;
+}
+
+const COVER_UPGRADE_CONCURRENCY = 2;
+const coverUpgradeQueue = [];
+let activeCoverUpgrades = 0;
+
+function queueCoverUpgrade(image, url) {
+  coverUpgradeQueue.push({ image, url });
+  pumpCoverUpgrades();
+}
+
+function pumpCoverUpgrades() {
+  while (activeCoverUpgrades < COVER_UPGRADE_CONCURRENCY && coverUpgradeQueue.length) {
+    const { image, url } = coverUpgradeQueue.shift();
+    activeCoverUpgrades += 1;
+    const preload = new Image();
+    const done = () => {
+      activeCoverUpgrades -= 1;
+      pumpCoverUpgrades();
+    };
+    preload.addEventListener("load", () => {
+      image.src = url;
+      done();
+    }, { once: true });
+    preload.addEventListener("error", done, { once: true });
+    preload.src = url;
+  }
 }
 
 function updateAuthButton() {
