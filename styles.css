@@ -7401,11 +7401,21 @@ body.book-actions-open {
 }
 
 .home-hero {
+  border: 1px solid var(--parchment);
   background-color: var(--deep-sage);
   background-image:
     linear-gradient(90deg, #45523a 0%, #45523a 25%, rgba(69, 82, 58, 0.94) 38%, rgba(69, 82, 58, 0.55) 54%, rgba(69, 82, 58, 0) 72%),
     url("/cozy%20banner%20librito.png");
   color: var(--cream);
+}
+
+.home-hero::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px solid var(--parchment);
+  border-radius: max(0px, calc(0.45rem - 5px));
+  pointer-events: none;
 }
 
 .global-search,

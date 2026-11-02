@@ -91,6 +91,11 @@ test("navigation uses selected trim and menu triggers retain parchment borders",
   assert.match(admin, /body details\[open\] > summary \{ border-color: #e5d4ae !important/);
 });
 
+test("hero banner has matching outer and inset parchment trim without blocking interactions", () => {
+  assert.match(css, /\.home-hero\s*\{\s*border: 1px solid var\(--parchment\)/);
+  assert.match(css, /\.home-hero::before\s*\{[^}]*position: absolute;[^}]*inset: 5px;[^}]*border: 1px solid var\(--parchment\);[^}]*border-radius:[^}]*pointer-events: none/);
+});
+
 test("three-dot buttons and the pictured language, account, and book controls keep thin trim", () => {
   const rule = css.slice(css.indexOf("body :is(.card-menu, .card-action"));
   const controls = rule.slice(0, rule.indexOf("\n}"));
