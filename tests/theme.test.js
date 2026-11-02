@@ -162,12 +162,21 @@ test("home rows share a background and use alternating ornamental dividers", asy
   assert.match(rows, /--row-divider: var\(--logo-bronze\)/);
   assert.match(rows, /:nth-of-type\(3n \+ 1\)\s*\{\s*--row-divider: var\(--sage\)/);
   assert.match(rows, /:nth-of-type\(3n \+ 2\)\s*\{\s*--row-divider: var\(--terracotta\)/);
-  assert.match(rows, /::before\s*\{[^}]*mask: url\("\/assets\/divider-scroll.svg"\) 78% center \/ 180px 28px no-repeat[^}]*pointer-events: none/);
-  assert.match(rows, /:nth-of-type\(3n \+ 1\)::before\s*\{[^}]*divider-vine.svg[^}]*48px 24px repeat-x/);
-  assert.match(rows, /:nth-of-type\(3n \+ 2\)::before\s*\{[^}]*divider-arrow.svg[^}]*mask-position: left center, right center[^}]*mask-size: 96px 24px/);
-  assert.doesNotMatch(rows, /50%|dotted|rotate\(/);
+  assert.match(rows, /::before\s*\{[^}]*mask: url\("\/assets\/divider-fan.svg"\) 24% center \/ 180px 28px no-repeat[^}]*pointer-events: none/);
+  for (const [selector, name, position] of [
+    ["6n + 1", "vine", "8%"],
+    ["6n + 2", "arrow", "right"],
+    ["6n + 4", "quill", "70%"],
+    ["6n + 5", "buds", "left"],
+    ["6n", "petals", "88%"],
+  ]) {
+    const rule = rows.slice(rows.indexOf(`.card-row-section:nth-of-type(${selector})::before`)).split("}")[0];
+    assert(rule.includes(`divider-${name}.svg`));
+    assert(rule.includes(`mask-position: ${position} center`));
+  }
+  assert.doesNotMatch(rows, /divider-scroll|repeat-x|50%|dotted|rotate\(/);
   const sw = await readFile(new URL("../sw.js", import.meta.url), "utf8");
-  for (const name of ["arrow", "vine", "scroll"]) {
+  for (const name of ["arrow", "vine", "fan", "quill", "buds", "petals"]) {
     const asset = `assets/divider-${name}.svg`;
     assert(sw.includes(`"/${asset}"`), `${asset} must be cached offline`);
     const svg = await readFile(new URL(`../${asset}`, import.meta.url), "utf8");

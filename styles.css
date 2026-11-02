@@ -8034,7 +8034,7 @@ body .book-actions-list .book-status-menu[open] > summary {
   left: 0;
   height: 28px;
   background: var(--row-divider);
-  mask: url("/assets/divider-scroll.svg") 78% center / 180px 28px no-repeat;
+  mask: url("/assets/divider-fan.svg") 24% center / 180px 28px no-repeat;
   pointer-events: none;
 }
 
@@ -8042,23 +8042,33 @@ body .book-actions-list .book-status-menu[open] > summary {
   --row-divider: var(--sage);
 }
 
-.card-row-section:nth-of-type(3n + 1)::after {
-  display: none;
-}
-
-.card-row-section:nth-of-type(3n + 1)::before {
-  mask: url("/assets/divider-vine.svg") left center / 48px 24px repeat-x;
-}
-
 .card-row-section:nth-of-type(3n + 2) {
   --row-divider: var(--terracotta);
 }
 
-.card-row-section:nth-of-type(3n + 2)::before {
-  mask-image: url("/assets/divider-arrow.svg"), url("/assets/divider-arrow.svg");
-  mask-position: left center, right center;
-  mask-size: 96px 24px;
-  mask-repeat: no-repeat;
+.card-row-section:nth-of-type(6n + 1)::before {
+  mask-image: url("/assets/divider-vine.svg");
+  mask-position: 8% center;
+}
+
+.card-row-section:nth-of-type(6n + 2)::before {
+  mask-image: url("/assets/divider-arrow.svg");
+  mask-position: right center;
+}
+
+.card-row-section:nth-of-type(6n + 4)::before {
+  mask-image: url("/assets/divider-quill.svg");
+  mask-position: 70% center;
+}
+
+.card-row-section:nth-of-type(6n + 5)::before {
+  mask-image: url("/assets/divider-buds.svg");
+  mask-position: left center;
+}
+
+.card-row-section:nth-of-type(6n)::before {
+  mask-image: url("/assets/divider-petals.svg");
+  mask-position: 88% center;
 }
 
 .card-row-section:nth-of-type(3n) .section-heading-row h2 {
