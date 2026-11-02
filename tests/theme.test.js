@@ -100,6 +100,7 @@ test("three-dot buttons and the pictured language, account, and book controls ke
     ".book-continue-reading", ".edition-picker-button", ".account-menu > summary",
   ]) assert(controls.includes(selector), `${selector} must have persistent trim`);
   assert.match(controls, /border: 1px solid var\(--parchment\) !important/);
+  assert.match(controls, /box-shadow: inset 0 0 0 2px var\(--botanical-ink\), inset 0 0 0 3px var\(--parchment\)/);
   assert.doesNotMatch(controls, /\.nav-pill|\.shelf-item/);
   assert.match(css, /\.account-avatar\s*\{\s*border: 1px solid var\(--parchment\)/);
 });
