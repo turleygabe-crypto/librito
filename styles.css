@@ -8014,17 +8014,6 @@ body .book-actions-list .book-status-menu[open] > summary {
   background: transparent;
 }
 
-.card-row-section::after {
-  content: "";
-  position: absolute;
-  right: 0;
-  bottom: 9.5px;
-  left: 0;
-  height: 1px;
-  background: var(--row-divider);
-  pointer-events: none;
-}
-
 .card-row-section::before {
   content: "";
   position: absolute;
@@ -8032,9 +8021,9 @@ body .book-actions-list .book-status-menu[open] > summary {
   right: 0;
   bottom: 0;
   left: 0;
-  height: 20px;
+  height: clamp(12px, 2.2vw, 28px);
   background: var(--row-divider);
-  mask: url("/assets/divider-knot.svg") 22% center / 100px 20px no-repeat;
+  mask: url("/assets/divider-collection-1.png") center / 100% 100% no-repeat;
   pointer-events: none;
 }
 
@@ -8046,24 +8035,32 @@ body .book-actions-list .book-status-menu[open] > summary {
   --row-divider: var(--terracotta);
 }
 
-.card-row-section:nth-of-type(4n + 2)::before {
-  mask: url("/assets/divider-braid.svg") left center / 64px 16px repeat-x;
+.card-row-section:nth-of-type(8n + 2)::before {
+  mask-image: url("/assets/divider-collection-2.png");
 }
 
-.card-row-section:nth-of-type(4n + 2)::after {
-  display: none;
+.card-row-section:nth-of-type(8n + 3)::before {
+  mask-image: url("/assets/divider-collection-3.png");
 }
 
-.card-row-section:nth-of-type(4n + 3)::before {
-  mask-image: url("/assets/divider-spear.svg"), url("/assets/divider-spear.svg");
-  mask-position: left center, right center;
-  mask-size: 80px 20px;
+.card-row-section:nth-of-type(8n + 4)::before {
+  mask-image: url("/assets/divider-collection-4.png");
 }
 
-.card-row-section:nth-of-type(4n)::before {
-  height: 24px;
-  bottom: -2px;
-  mask: url("/assets/divider-floral.svg") 76% center / 160px 24px no-repeat;
+.card-row-section:nth-of-type(8n + 5)::before {
+  mask-image: url("/assets/divider-collection-5.png");
+}
+
+.card-row-section:nth-of-type(8n + 6)::before {
+  mask-image: url("/assets/divider-collection-6.png");
+}
+
+.card-row-section:nth-of-type(8n + 7)::before {
+  mask-image: url("/assets/divider-collection-7.png");
+}
+
+.card-row-section:nth-of-type(8n)::before {
+  mask-image: url("/assets/divider-collection-8.png");
 }
 
 .card-row-section:nth-of-type(3n) .section-heading-row h2 {
