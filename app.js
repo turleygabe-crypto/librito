@@ -1148,7 +1148,7 @@ function createBookCover(book, className = "") {
   const isbn = Array.isArray(book.isbn)
     ? book.isbn[0]
     : book.isbn || (Array.isArray(book.isbnList) ? book.isbnList[0] : "");
-  const coverSize = className.includes("book-detail-cover") ? "L" : "M";
+  const coverSize = "L";
   const coverUrl = book.cover_i
     ? `https://covers.openlibrary.org/b/id/${book.cover_i}-${coverSize}.jpg?default=false`
     : book.cover_url || (isbn
@@ -1164,7 +1164,12 @@ function createBookCover(book, className = "") {
     image.addEventListener("error", () => {
       if (currentCoverSize === "L") {
         currentCoverSize = "M";
-        image.src = coverUrl.replace("-L.jpg", "-M.jpg");
+        const mediumCoverUrl = coverUrl.replace("-L.jpg", "-M.jpg");
+        if (mediumCoverUrl === coverUrl) {
+          image.remove();
+        } else {
+          image.src = mediumCoverUrl;
+        }
       } else {
         image.remove();
       }
