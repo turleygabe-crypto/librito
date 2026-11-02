@@ -156,7 +156,9 @@ test("dropdown surfaces follow their trigger color even when portaled to the bod
 });
 
 test("home rows share a background and use alternating ornamental dividers", async () => {
-  const rows = css.slice(css.lastIndexOf("\n.card-row-section {"));
+  const rows = css.slice(css.lastIndexOf("\n.home-rows > .card-row-section {"));
+  assert.match(rows, /\.home-rows > \.card-row-section::before/);
+  assert.doesNotMatch(rows, /(?<!\.home-rows > )\.card-row-section(?::|\s*\{)/);
   assert.match(rows, /background: transparent/);
   assert.match(rows, /padding-bottom: 2rem/);
   assert.doesNotMatch(rows, /background: linear-gradient|rgba\(232, 195, 174/);
@@ -164,7 +166,7 @@ test("home rows share a background and use alternating ornamental dividers", asy
   assert.doesNotMatch(rows, /100% 100%|background-size:.*%/);
   for (let index = 2; index <= 6; index += 1) {
     const selector = index === 6 ? "6n" : `6n + ${index}`;
-    const rule = rows.slice(rows.indexOf(`.card-row-section:nth-of-type(${selector})::before`)).split("}")[0];
+    const rule = rows.slice(rows.indexOf(`.home-rows > .card-row-section:nth-of-type(${selector})::before`)).split("}")[0];
     assert(rule.includes(`background-image: url("/assets/divider-botanical-${index}.png")`));
   }
   assert.doesNotMatch(rows, /::after|mask:|filter:|divider-collection-|\.svg|repeat-x/);
