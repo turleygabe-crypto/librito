@@ -7493,7 +7493,34 @@ body.book-actions-open {
   --antique-gold: var(--parchment);
   border-color: var(--parchment);
   background: var(--deep-sage);
+  background-image:
+    linear-gradient(rgba(48, 59, 41, 0.3), rgba(48, 59, 41, 0.5)),
+    url("/assets/Elegant%20Botanical%20Green%20Bookmark.png");
+  background-size: 100% 100%, 200% auto;
+  background-position: center, center 40%;
+  background-repeat: no-repeat;
+  box-shadow: inset 0 0 0 4px var(--botanical-green),
+    inset 0 0 0 5px var(--parchment),
+    0 12px 30px rgba(30, 38, 25, 0.28);
+  font-family: Georgia, "Times New Roman", serif;
   color: var(--parchment);
+}
+
+.book-actions-header {
+  margin: 0 0.5rem;
+  padding-top: 1.25rem;
+  border-bottom-color: var(--parchment);
+}
+
+.book-actions-header h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.book-actions-list {
+  padding: 0.65rem;
+  gap: 0.15rem;
 }
 
 :is(.account-menu-panel, .account-navigation, .book-actions-sheet, .book-status-menu-panel, .book-more-menu-panel, .card-add-actions, .edition-language-list, .browse-popover .browse-panel, .disposition-options)
@@ -7724,9 +7751,10 @@ body details[open] > summary,
 }
 
 body :is(.card-menu, .card-action, .edition-language-trigger, .library-toggle-btn),
+body :is(.action-btn, .secondary-btn, .google-auth-btn, .cc-btn, .upgrade-cta:not(.is-current), .search-empty-back, .audiobook-sample-button, .book-audiobook-find),
 body :is(.book-more-menu, .book-shelf-menu, .book-status-menu, .card-shelf-button) > summary,
 body .book-profile-actions > .secondary-btn,
-body :is(.book-continue-reading, .edition-picker-button),
+body :is(.book-continue-reading, .reading-continue-btn, .edition-picker-button),
 body .account-menu > summary {
   border: 1px solid var(--parchment) !important;
   box-shadow: inset 0 0 0 2px var(--botanical-ink), inset 0 0 0 3px var(--parchment) !important;
@@ -7744,6 +7772,48 @@ body .account-menu > summary {
 
 .account-menu > summary {
   border-radius: 999px;
+  max-width: min(15rem, 24vw);
+  min-width: 0;
+  padding: 0.3rem 0.65rem 0.3rem 0.3rem;
+  background: var(--botanical-green);
+  color: var(--parchment);
+}
+
+.account-menu .account-avatar {
+  flex-shrink: 0;
+  background: var(--botanical-ink);
+  color: var(--parchment);
+}
+
+.account-menu .account-menu-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--parchment);
+}
+
+.account-menu-panel {
+  padding: 1.25rem 1rem 1rem;
+}
+
+.account-menu-panel .account-menu-link {
+  background: rgba(48, 59, 41, 0.65);
+  border: 1px solid var(--parchment);
+  color: var(--parchment);
+  text-align: left;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.account-menu-panel .account-menu-link:hover {
+  background: var(--botanical-ink);
+}
+
+.account-menu-panel p {
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--parchment);
+  overflow-wrap: anywhere;
 }
 
 :is(.account-menu-panel, .account-navigation, .book-actions-sheet, .book-status-menu-panel, .book-more-menu-panel, .card-add-actions, .edition-language-list, .browse-popover .browse-panel, .disposition-options)

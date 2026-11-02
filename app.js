@@ -1181,8 +1181,13 @@ function updateAuthButton() {
     : "Sign in to build your own shelves.";
   const upgradeLink = document.getElementById("upgradeLink");
   if (upgradeLink) upgradeLink.textContent = "Book Lover plan";
-  const accountName = state.session?.user?.email || "Account";
-  document.querySelector(".account-menu-label").textContent = accountName;
+  const accountName = state.session
+    ? state.profile?.full_name?.trim() || state.session.user.user_metadata?.full_name?.trim()
+      || state.session.user.email || "Account"
+    : "Account";
+  const accountLabel = document.querySelector(".account-menu-label");
+  accountLabel.textContent = accountName;
+  accountLabel.title = accountName;
   document.querySelector(".account-avatar").textContent = accountName.slice(0, 1).toUpperCase();
   updateAdminLink();
 }

@@ -81,6 +81,15 @@ test("browser chrome, installed app, support pages, and admin use matching color
   assert.match(admin, /--brown: #5e6f4f/);
 });
 
+test("popup menus reuse botanical artwork for texture and an inset parchment frame", () => {
+  const theme = css.slice(css.indexOf("/* Shared palette"));
+  const menus = theme.slice(theme.indexOf(".account-menu-panel,"), theme.indexOf("\n.book-actions-header"));
+  assert.match(menus, /background-image:[\s\S]*linear-gradient\([\s\S]*Elegant%20Botanical%20Green%20Bookmark\.png/);
+  assert.match(menus, /background-size: 100% 100%, 200% auto/);
+  assert.match(menus, /inset 0 0 0 5px var\(--parchment\)/);
+  assert.match(menus, /font-family: Georgia, "Times New Roman", serif/);
+});
+
 test("navigation uses selected trim and menu triggers retain parchment borders", async () => {
   assert.match(css, /body :is\(button, summary, \[role="button"\]\):where\(:not\([^}]+\)\)\s*\{\s*border: 1px solid transparent !important/);
   assert.match(css, /:is\(\.active, \.is-on-shelf, \[aria-pressed="true"\], \[aria-selected="true"\], \[aria-expanded="true"\], \[aria-current="page"\]\),\s*body details\[open\] > summary,\s*\.account-navigation a\[aria-current="page"\]\s*\{\s*border: 1px solid var\(--parchment\) !important/);
@@ -102,10 +111,23 @@ test("three-dot buttons and the pictured language, account, and book controls ke
   for (const selector of [
     ".card-menu", ".card-action", ".edition-language-trigger", ".book-more-menu",
     ".book-shelf-menu", ".book-status-menu", ".book-profile-actions > .secondary-btn",
-    ".book-continue-reading", ".edition-picker-button", ".account-menu > summary",
+    ".book-continue-reading", ".reading-continue-btn", ".edition-picker-button", ".account-menu > summary",
+    ".action-btn", ".secondary-btn", ".google-auth-btn", ".cc-btn",
+    ".upgrade-cta:not(.is-current)", ".search-empty-back", ".audiobook-sample-button", ".book-audiobook-find",
   ]) assert(controls.includes(selector), `${selector} must have persistent trim`);
   assert.match(controls, /border: 1px solid var\(--parchment\) !important/);
   assert.match(controls, /box-shadow: inset 0 0 0 2px var\(--botanical-ink\), inset 0 0 0 3px var\(--parchment\)/);
   assert.doesNotMatch(controls, /\.nav-pill|\.shelf-item/);
   assert.match(css, /\.account-avatar\s*\{\s*border: 1px solid var\(--parchment\)/);
+});
+
+test("admin action buttons share the parchment inset trim", async () => {
+  const admin = await readFile(new URL("../admin.css", import.meta.url), "utf8");
+  assert.match(admin, /body \.btn\s*\{\s*border: 1px solid #e5d4ae !important;[^}]*box-shadow: inset 0 0 0 2px #303b29, inset 0 0 0 3px #e5d4ae/);
+});
+
+test("account menu has botanical links and contains long account names", () => {
+  assert.match(css, /\.account-menu > summary\s*\{[^}]*max-width: min\(15rem, 24vw\)/);
+  assert.match(css, /\.account-menu \.account-menu-label\s*\{[^}]*min-width: 0;[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap/);
+  assert.match(css, /\.account-menu-panel \.account-menu-link\s*\{[^}]*background: rgba\(48, 59, 41, 0\.65\);[^}]*border: 1px solid var\(--parchment\)/);
 });

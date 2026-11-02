@@ -20,6 +20,30 @@ const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
 const functions = source.slice(source.indexOf("function createAccountLink("), source.indexOf("\nfunction showUpgradePage()"));
 const profileFunction = source.slice(source.indexOf("async function ensureProfile("), source.indexOf("\nasync function loadShelvesFromSupabase("));
 
+test("account trigger prefers the saved display name and falls back to email", () => {
+  const update = source.slice(source.indexOf("function updateAuthButton()"), source.indexOf("\nasync function updateAdminLink("));
+  for (const [profile, metadata, email, expected] of [
+    ["  Bookworm  ", "Old name", "reader@example.test", "Bookworm"],
+    [null, "Signup name", "reader@example.test", "Signup name"],
+    ["   ", " ", "reader@example.test", "reader@example.test"],
+    [null, null, null, "Account"],
+  ]) {
+    const label = {}, avatar = {};
+    const context = {
+      state: { session: { user: { email, user_metadata: { full_name: metadata } } }, profile: { full_name: profile } },
+      authButton: {}, sidebarAuthCopy: {}, getAccountTier: () => ({ name: "Free" }), updateAdminLink() {},
+      document: { getElementById: () => null, querySelector: (selector) => selector === ".account-menu-label" ? label : avatar },
+    };
+    runInNewContext(`${update}\nupdateAuthButton();`, context);
+    assert.equal(label.textContent, expected);
+    assert.equal(label.title, expected);
+    assert.equal(avatar.textContent, expected[0].toUpperCase());
+    context.state.session = null;
+    runInNewContext("updateAuthButton();", context);
+    assert.equal(label.textContent, "Account");
+  }
+});
+
 test("account dropdown closes on outside clicks without closing on clicks inside it", () => {
   const handler = source.slice(source.indexOf('document.addEventListener("click", (event) => {'), source.indexOf('\nlibraryToggleBtn.addEventListener("click"'));
   const menus = [".account-menu", ".card-menu", ".card-like-menu", ".book-shelf-menu"].map((selector) => ({
