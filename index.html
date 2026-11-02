@@ -54,7 +54,7 @@
           <button id="topHomeBtn" class="home-button" type="button" aria-label="Home">⌂</button>
           <form id="globalSearchForm" class="global-search" role="search">
             <label class="visually-hidden" for="globalSearchInput">Find a book</label>
-            <input id="globalSearchInput" type="search" placeholder="Search your library or discover books..." autocomplete="off" />
+            <input id="globalSearchInput" type="search" enterkeyhint="search" placeholder="Search your library or discover books..." autocomplete="off" />
             <label class="visually-hidden" for="globalSearchLanguage">Search language</label>
             <select id="globalSearchLanguage" class="global-search-language"></select>
             <button id="previewBtn" type="submit" aria-label="Search books"><span class="search-icon" aria-hidden="true"></span></button>
@@ -199,11 +199,11 @@
               <div id="titleLookupPanel" class="lookup-panel" role="tabpanel" aria-labelledby="lookupSearchTab">
                 <label>
                   Title
-                  <input id="lookupTitleInput" placeholder="Book title" />
+                  <input id="lookupTitleInput" enterkeyhint="search" placeholder="Book title" />
                 </label>
                 <label>
                   Author (optional)
-                  <input id="lookupAuthorInput" placeholder="Author name" />
+                  <input id="lookupAuthorInput" enterkeyhint="search" placeholder="Author name" />
                 </label>
                 <label>
                   Book language
@@ -222,7 +222,7 @@
               <div id="isbnLookupPanel" class="lookup-panel hidden" role="tabpanel" aria-labelledby="lookupScanTab">
                 <label>
                   ISBN
-                  <input id="isbnInput" name="isbn" placeholder="Enter ISBN" />
+                  <input id="isbnInput" name="isbn" enterkeyhint="search" placeholder="Enter ISBN" />
                 </label>
                 <div class="scan-actions">
                   <button id="scanIsbnBtn" type="button" class="secondary-btn">Scan with camera</button>

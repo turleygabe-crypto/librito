@@ -7,7 +7,10 @@ import { translate } from "../translations.js";
 const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
 
 class Element {
+  static activeElement = null;
   children = [];
+  parent = null;
+  isConnected = true;
   attributes = {};
   events = {};
   dataset = {};
@@ -15,10 +18,28 @@ class Element {
     add() {},
     toggle() {},
   };
-  append(...children) { this.children.push(...children); }
-  replaceChildren(...children) { this.children = children; }
+  append(...children) {
+    for (const child of children) {
+      child.parent?.removeChild(child);
+      child.parent = this;
+      this.children.push(child);
+    }
+  }
+  removeChild(child) {
+    if (child.contains(Element.activeElement)) Element.activeElement = null;
+    this.children = this.children.filter((item) => item !== child);
+    child.parent = null;
+  }
+  contains(child) {
+    return child === this || this.children.some((item) => item.contains(child));
+  }
+  replaceChildren(...children) {
+    [...this.children].forEach((child) => this.removeChild(child));
+    this.append(...children);
+  }
   setAttribute(name, value) { this.attributes[name] = value; }
   addEventListener(name, handler) { this.events[name] = handler; }
+  focus() { Element.activeElement = this; }
 }
 
 test("library filter counts and custom shelf filtering exclude system collections", () => {
@@ -62,7 +83,7 @@ test("library filter counts and custom shelf filtering exclude system collection
   );
 });
 
-test("library route filters books by status and exposes categories for sorting and filtering", () => {
+function createLibraryPage() {
   const helperSource = source.slice(
     source.indexOf("function getLibraryFilterOptions("),
     source.indexOf("\nfunction setLibraryDrawerOpen(")
@@ -81,7 +102,15 @@ test("library route filters books by status and exposes categories for sorting a
   const page = new Element();
   const browserCalls = [];
   const routes = [];
+  const timers = new Map();
+  let nextTimer = 0;
   const context = {
+    setTimeout: (callback, delay) => {
+      const id = ++nextTimer;
+      timers.set(id, { callback, delay });
+      return id;
+    },
+    clearTimeout: (id) => timers.delete(id),
     getReadingStatusLabel: (status) => translate(`status.${status}`),
     getOwnershipStatusLabel: (status) => translate(`ownership.${status}`),
     t: translate,
@@ -97,7 +126,7 @@ test("library route filters books by status and exposes categories for sorting a
     createShelfBrowser: (filteredBooks, scope, leading) => {
       browserCalls.push({ titles: filteredBooks.map((book) => book.title), scope });
       const browser = new Element();
-      browser.append(leading);
+      if (leading) browser.append(leading);
       return browser;
     },
     navigateTo: (...args) => routes.push(args),
@@ -112,15 +141,100 @@ test("library route filters books by status and exposes categories for sorting a
     applyBookMeta() {},
   };
   runInNewContext(`${helperSource}\n${pageSource}\nthis.show = showLibraryPage;`, context);
+  const flush = () => {
+    for (const [id, timer] of timers) {
+      timers.delete(id);
+      timer.callback();
+    }
+  };
+  return { context, page, browserCalls, routes, timers, flush };
+}
 
+test("library route filters books by status and exposes categories for sorting and filtering", () => {
+  const { context, page, browserCalls, routes } = createLibraryPage();
   context.show("read");
   assert.deepEqual(browserCalls[0].titles, ["Read"]);
   assert.equal(browserCalls[0].scope, "library:read");
-  const results = page.children[1];
-  const categoryFilters = results.children[0].children[0].children[0];
+  const categoryFilters = page.children[1].children[0];
   assert.equal(categoryFilters.className, "library-category-filters");
   categoryFilters.children[0].events.click();
   assert.deepEqual(JSON.parse(JSON.stringify(routes[0])), ["library", { filter: "" }]);
+});
+
+test("library search waits for a typing pause and stays focused through results and empty states", () => {
+  const { context, page, browserCalls, timers, flush } = createLibraryPage();
+  context.show("");
+  const leading = page.children[1];
+  const search = leading.children[1];
+  search.focus();
+  const type = (value) => {
+    search.value = value;
+    search.events.input({ isComposing: false });
+  };
+  type("R");
+  type("Re");
+  type("Read");
+  assert.equal(browserCalls.length, 1);
+  assert.equal(timers.size, 1);
+  assert.equal([...timers.values()][0].delay, 300);
+  context.shelfBrowse.page = 3;
+  flush();
+  assert.deepEqual(browserCalls.at(-1).titles, ["Reading", "Read"]);
+  assert.equal(context.shelfBrowse.page, 1);
+  assert.equal(Element.activeElement, search);
+  type("No match");
+  flush();
+  assert.equal(page.children[2].children[0].textContent, "No books match your search.");
+  assert.equal(Element.activeElement, search);
+  type("");
+  flush();
+  assert.equal(browserCalls.at(-1).titles.length, 5);
+  assert.equal(Element.activeElement, search);
+  assert.equal(search.parent, leading);
+  assert.equal(leading.parent, page);
+});
+
+test("library Enter searches immediately and cancels the queued search", () => {
+  const { context, page, browserCalls, timers, flush } = createLibraryPage();
+  context.show("");
+  const search = page.children[1].children[1];
+  search.value = "Next";
+  search.events.input({});
+  let prevented = false;
+  search.events.keydown({ key: "Enter", preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.deepEqual(browserCalls.at(-1).titles, ["Next"]);
+  assert.equal(timers.size, 0);
+  flush();
+  assert.equal(browserCalls.length, 2);
+});
+
+test("library search waits for composition to finish and ignores delayed work after navigation", () => {
+  const { context, page, browserCalls, timers, flush } = createLibraryPage();
+  context.show("");
+  const search = page.children[1].children[1];
+  search.value = "R";
+  search.events.input({});
+  search.events.compositionstart();
+  assert.equal(timers.size, 0);
+  search.value = "Read";
+  search.events.input({ isComposing: true });
+  search.events.keydown({ key: "Enter", isComposing: true });
+  assert.equal(timers.size, 0);
+  assert.equal(browserCalls.length, 1);
+  search.events.compositionend();
+  flush();
+  assert.deepEqual(browserCalls.at(-1).titles, ["Reading", "Read"]);
+  search.value = "Next";
+  search.events.input({});
+  context.state.view = "home";
+  flush();
+  assert.equal(browserCalls.length, 2);
+  context.state.view = "library";
+  search.events.input({});
+  search.isConnected = false;
+  flush();
+  assert.equal(browserCalls.length, 2);
 });
 
 test("shelf browsers group sorting with page size and show pagination above and below books", () => {

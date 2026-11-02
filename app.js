@@ -4056,6 +4056,7 @@ function showLibraryPage(filter = state.library.filter || "") {
   });
   const search = document.createElement("input");
   search.type = "search";
+  search.enterKeyHint = "search";
   search.className = "library-search";
   search.placeholder = "Search title, author, or genre…";
   search.setAttribute("aria-label", "Search your library");
@@ -4087,7 +4088,6 @@ function showLibraryPage(filter = state.library.filter || "") {
       .filter((book) => !query || [book.title, book.author, book.genre].some((v) => String(v || "").toLowerCase().includes(query)));
     results.replaceChildren();
     if (!books.length) {
-      results.append(leading);
       const empty = document.createElement("p");
       empty.className = "row-empty-state";
       empty.textContent = query
@@ -4098,13 +4098,32 @@ function showLibraryPage(filter = state.library.filter || "") {
       results.append(empty);
       return;
     }
-    results.append(createShelfBrowser(books, `library:${state.library.filter || "all"}`, leading));
+    results.append(createShelfBrowser(books, `library:${state.library.filter || "all"}`));
   };
-  page.append(header, results);
-  search.addEventListener("input", () => {
+  page.append(header, leading, results);
+  let searchTimer;
+  const applySearch = () => {
+    clearTimeout(searchTimer);
+    if (!search.isConnected || state.view !== "library") return;
     state.library.query = search.value;
     shelfBrowse.page = 1;
     build();
+  };
+  const scheduleSearch = () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(applySearch, 300);
+  };
+  search.addEventListener("input", (event) => {
+    state.library.query = search.value;
+    clearTimeout(searchTimer);
+    if (!event.isComposing) scheduleSearch();
+  });
+  search.addEventListener("compositionstart", () => clearTimeout(searchTimer));
+  search.addEventListener("compositionend", scheduleSearch);
+  search.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || event.isComposing) return;
+    event.preventDefault();
+    applySearch();
   });
   build();
 }
@@ -9416,11 +9435,31 @@ async function saveBookToSupabase(book) {
   return true;
 }
 
+function setupTextInputDismissal() {
+  const textFieldSelector = 'input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]), textarea';
+  const dismiss = (event) => {
+    if (!window.matchMedia("(any-pointer: coarse)").matches) return;
+    const active = document.activeElement;
+    if (!active?.matches(textFieldSelector)) return;
+    if (event.type === "submit" && event.target.contains(active)) active.blur();
+    if (event.type === "keydown" && event.key === "Enter" && !event.isComposing
+      && event.target === active && active.matches("input")
+      && ["search", "done"].includes(active.enterKeyHint)) active.blur();
+    if (event.type === "pointerdown" && event.target instanceof Element
+      && !event.target.closest('input, textarea, select, label, [contenteditable]:not([contenteditable="false"])')) active.blur();
+  };
+  document.addEventListener("submit", dismiss, true);
+  document.addEventListener("keydown", dismiss, true);
+  document.addEventListener("pointerdown", dismiss, true);
+}
+
 globalSearchForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const query = globalSearchInput.value.trim();
   await runNaturalSearch(query, { language: globalSearchLanguage.value });
 });
+
+setupTextInputDismissal();
 
 document.getElementById("topHomeBtn").addEventListener("click", () => {
   navigateTo("home");
@@ -9574,21 +9613,21 @@ lookupTitleBtn.addEventListener("click", () => {
 });
 
 lookupTitleInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
+  if (event.key === "Enter" && !event.isComposing) {
     event.preventDefault();
     lookupBooksByTitleOrAuthor();
   }
 });
 
 lookupAuthorInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
+  if (event.key === "Enter" && !event.isComposing) {
     event.preventDefault();
     lookupBooksByTitleOrAuthor();
   }
 });
 
 isbnInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
+  if (event.key === "Enter" && !event.isComposing) {
     event.preventDefault();
     lookupBookByIsbn(isbnInput.value);
   }
