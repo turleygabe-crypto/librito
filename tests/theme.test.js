@@ -67,7 +67,7 @@ test("menus, buttons, and progress accents share the palette across app surfaces
   assert.match(menus, /--deep-sage: var\(--botanical-green\)/);
   assert.match(menus, /--sage-ink: var\(--botanical-ink\)/);
   assert.match(menus, /--antique-gold: var\(--parchment\)/);
-  assert.match(menus, /background: var\(--deep-sage\);[\s\S]*color: var\(--parchment\)/);
+  assert.match(menus, /background: var\(--menu-surface, var\(--logo-bronze\)\);[\s\S]*color: var\(--parchment\)/);
   const buttons = theme.slice(theme.indexOf("\n.action-btn,"), theme.indexOf("\n.action-btn:hover"));
   for (const selector of [".reading-continue-btn", ".secondary-btn", ".edition-picker-button", ".cc-btn", ".upgrade-cta"]) {
     assert(buttons.includes(selector), `${selector} must share the button palette`);
@@ -146,6 +146,28 @@ test("shared controls swap olive and bronze on interaction rather than striping 
   assert.match(alternation, /background-color: var\(--control-interaction, var\(--logo-bronze\)\) !important/);
   assert.doesNotMatch(alternation, /nth-child|rgba\(115, 80, 50, 0\.65\)/);
   assert.match(alternation, /\.book-actions-list \.book-status-menu > summary\s*\{[^}]*background-color: transparent !important/);
+});
+
+test("dropdown surfaces follow their trigger color even when portaled to the body", async () => {
+  const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
+  assert.match(app, /getComputedStyle\(summary\)[\s\S]*getPropertyValue\("--control-interaction"\)[\s\S]*panel\.style\.setProperty\("--menu-surface", menuSurface\)[\s\S]*document\.body\.append\(panel\)/);
+  assert.match(css, /\.ownership-status-menu,\s*\.book-shelf-menu:has\(> \.secondary-btn\)\s*\{\s*--menu-surface: var\(--botanical-green\)/);
+  assert.match(css, /color-mix\(in srgb, var\(--menu-surface, var\(--logo-bronze\)\) 85%, transparent\)/);
+});
+
+test("home rows share a background and use alternating ornamental dividers", () => {
+  const rows = css.slice(css.lastIndexOf("\n.card-row-section {"));
+  assert.match(rows, /background: transparent/);
+  assert.doesNotMatch(rows, /background: linear-gradient|rgba\(232, 195, 174/);
+  assert.match(rows, /--row-divider: var\(--logo-bronze\)/);
+  assert.match(rows, /:nth-of-type\(3n \+ 1\)\s*\{\s*--row-divider: var\(--sage\)/);
+  assert.match(rows, /:nth-of-type\(3n \+ 2\)\s*\{\s*--row-divider: var\(--terracotta\)/);
+  assert.match(rows, /::after\s*\{[^}]*background-size: 100% 2px[^}]*border-bottom: 1px solid var\(--row-divider\)/);
+  assert.match(rows, /::before\s*\{[^}]*transform: rotate\(45deg\)[^}]*pointer-events: none/);
+  assert.match(rows, /:nth-of-type\(3n \+ 1\)::after\s*\{[^}]*background-size: 100% 3px[^}]*border-bottom: 0/);
+  assert.match(rows, /:nth-of-type\(3n \+ 1\)::before\s*\{[^}]*border-radius: 0 75%[^}]*transform: rotate\(-30deg\)/);
+  assert.match(rows, /:nth-of-type\(3n \+ 2\)::after\s*\{[^}]*border-bottom-style: dotted/);
+  assert.match(rows, /:nth-of-type\(3n \+ 2\)::before\s*\{[^}]*border-radius: 50%[^}]*transform: none/);
 });
 
 test("account menu has botanical links and contains long account names", () => {

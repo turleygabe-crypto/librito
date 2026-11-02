@@ -3366,15 +3366,15 @@ body {
 .sidebar .mobile-sidebar-close {
   z-index: 2;
   place-items: center;
-  width: 3rem;
-  height: 3rem;
+  width: 2rem;
+  height: 2rem;
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: var(--botanical-green);
   color: var(--parchment);
   font-family: sans-serif;
-  font-size: 1.6rem;
+  font-size: 1.25rem;
   line-height: 1;
   opacity: 1;
   transition: opacity 150ms ease, transform 150ms ease;
@@ -3407,8 +3407,8 @@ body {
   }
 
   .sidebar .mobile-sidebar-close {
-    top: max(0.5rem, env(safe-area-inset-top));
-    right: 1.25rem;
+    top: max(1.5rem, env(safe-area-inset-top));
+    right: 1.75rem;
   }
 }
 
@@ -7553,14 +7553,16 @@ body.book-actions-open {
   --sage-ink: var(--botanical-ink);
   --antique-gold: var(--parchment);
   border-color: var(--parchment);
-  background: var(--deep-sage);
+  background: var(--menu-surface, var(--logo-bronze));
   background-image:
-    linear-gradient(rgba(48, 59, 41, 0.3), rgba(48, 59, 41, 0.5)),
+    linear-gradient(
+      color-mix(in srgb, var(--menu-surface, var(--logo-bronze)) 85%, transparent),
+      color-mix(in srgb, var(--menu-surface, var(--logo-bronze)) 70%, transparent)),
     url("/assets/Elegant%20Botanical%20Green%20Bookmark.png");
   background-size: 100% 100%, 240% auto;
   background-position: center, center 40%;
   background-repeat: no-repeat;
-  box-shadow: inset 0 0 0 4px var(--botanical-green),
+  box-shadow: inset 0 0 0 4px var(--menu-surface, var(--logo-bronze)),
     inset 0 0 0 5px var(--parchment),
     0 12px 30px rgba(30, 38, 25, 0.28);
   font-family: Georgia, "Times New Roman", serif;
@@ -7956,6 +7958,24 @@ body .edition-picker-button:hover {
 }
 
 /* Keep shared controls consistent across pages without changing the bookmark. */
+.book-status-menu,
+.book-shelf-menu,
+.book-more-menu,
+.edition-language-menu,
+.account-menu {
+  --menu-surface: var(--logo-bronze);
+}
+
+.ownership-status-menu,
+.book-shelf-menu:has(> .secondary-btn) {
+  --menu-surface: var(--botanical-green);
+  --menu-option-hover: var(--logo-bronze);
+}
+
+body .account-menu:is(:hover, [open]) > summary {
+  background-color: var(--logo-bronze);
+}
+
 body :where(.action-btn, .secondary-btn, .reading-continue-btn, .edition-picker-button, .edition-language-trigger, .google-auth-btn, .cc-btn, .upgrade-cta:not(.is-current), .book-audiobook-find, .audiobook-sample-button, .search-empty-back, .card-action, .card-menu, .book-more-menu > summary, .book-shelf-menu > summary, .book-status-menu > summary):not(:where(.sidebar *)) {
   --control-surface: var(--botanical-green);
   --control-interaction: var(--logo-bronze);
@@ -7983,17 +8003,82 @@ body .book-actions-list .book-status-menu[open] > summary {
 
 :is(.account-menu-panel, .account-navigation, .book-status-menu-panel, .book-more-menu-panel, .card-add-actions, .edition-language-list, .browse-panel, .disposition-options)
   > :is(button, a):is(:hover, [aria-selected="true"], [aria-pressed="true"], [aria-current="page"]) {
-  background-color: var(--logo-bronze);
+  background-color: var(--menu-option-hover, var(--botanical-green));
+}
+
+.card-row-section {
+  --row-divider: var(--logo-bronze);
+  position: relative;
+  padding-bottom: 1.4rem;
+  border-bottom: 0;
+  background: transparent;
+}
+
+.card-row-section::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 7px;
+  background-image: linear-gradient(90deg, transparent, var(--row-divider) 12%, var(--row-divider) 88%, transparent);
+  background-size: 100% 2px;
+  background-repeat: no-repeat;
+  background-position: center top;
+  border-bottom: 1px solid var(--row-divider);
+  pointer-events: none;
+}
+
+.card-row-section::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  bottom: 0;
+  left: calc(50% - 4px);
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--row-divider);
+  background: var(--warm-sand);
+  transform: rotate(45deg);
+  pointer-events: none;
 }
 
 .card-row-section:nth-of-type(3n + 1) {
-  background: linear-gradient(110deg, var(--cream), transparent);
-  border-bottom-color: var(--sage);
+  --row-divider: var(--sage);
+}
+
+.card-row-section:nth-of-type(3n + 1)::after {
+  height: 5px;
+  background-size: 100% 3px;
+  border-bottom: 0;
+}
+
+.card-row-section:nth-of-type(3n + 1)::before {
+  bottom: -3px;
+  left: calc(50% - 8px);
+  width: 16px;
+  height: 10px;
+  border-radius: 0 75%;
+  transform: rotate(-30deg);
 }
 
 .card-row-section:nth-of-type(3n + 2) {
-  background: linear-gradient(110deg, rgba(232, 195, 174, 0.4), transparent);
-  border-bottom-color: var(--terracotta);
+  --row-divider: var(--terracotta);
+}
+
+.card-row-section:nth-of-type(3n + 2)::after {
+  background-size: 100% 1px;
+  border-bottom-style: dotted;
+  border-bottom-width: 2px;
+}
+
+.card-row-section:nth-of-type(3n + 2)::before {
+  bottom: -1px;
+  left: calc(50% - 5px);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transform: none;
 }
 
 .card-row-section:nth-of-type(3n) .section-heading-row h2 {

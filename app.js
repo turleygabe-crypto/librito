@@ -2400,6 +2400,7 @@ function createBookCardMenu(book) {
   menu.textContent = "⋯";
   menu.setAttribute("aria-label", `More actions for ${book.title}`);
   menu.setAttribute("aria-haspopup", "dialog");
+  menu.setAttribute("aria-expanded", "false");
   menu.addEventListener("click", (event) => openBookCardActions(book, menu, event));
   return menu;
 }
@@ -2409,6 +2410,7 @@ function openBookCardActions(book, trigger, event) {
   const sheet = document.createElement("dialog");
   sheet.className = "book-actions-sheet";
   sheet.setAttribute("aria-labelledby", "bookActionsTitle");
+  trigger.setAttribute("aria-expanded", "true");
   const triggerRect = trigger.getBoundingClientRect();
   const anchor = event?.detail
     ? { x: event.clientX, y: event.clientY }
@@ -2432,6 +2434,7 @@ function openBookCardActions(book, trigger, event) {
     resizeObserver.disconnect();
     window.removeEventListener("resize", position);
     sheet.remove();
+    trigger.setAttribute("aria-expanded", "false");
     document.body.classList.remove("book-actions-open");
   };
   const close = () => {
@@ -2575,6 +2578,11 @@ function wireCardPopover(menu, summary, panel) {
         if (otherMenu !== menu) otherMenu.open = false;
       });
       panel.hidden = false;
+      const controlStyle = getComputedStyle(summary);
+      const menuSurface = controlStyle.getPropertyValue("--control-interaction").trim();
+      if (menuSurface) panel.style.setProperty("--menu-surface", menuSurface);
+      const optionHover = controlStyle.getPropertyValue("--control-surface").trim();
+      if (optionHover) panel.style.setProperty("--menu-option-hover", optionHover);
       document.body.append(panel);
       positionPanel();
       window.addEventListener("resize", repositionPanel);
