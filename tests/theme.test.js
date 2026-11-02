@@ -160,22 +160,19 @@ test("home rows share a background and use alternating ornamental dividers", asy
   assert.match(rows, /background: transparent/);
   assert.match(rows, /padding-bottom: 2rem/);
   assert.doesNotMatch(rows, /background: linear-gradient|rgba\(232, 195, 174/);
-  assert.match(rows, /--row-divider: var\(--logo-bronze\)/);
-  assert.match(rows, /:nth-of-type\(3n \+ 1\)\s*\{\s*--row-divider: var\(--sage\)/);
-  assert.match(rows, /:nth-of-type\(3n \+ 2\)\s*\{\s*--row-divider: var\(--terracotta\)/);
-  assert.match(rows, /::before\s*\{[^}]*right: 0[^}]*left: 0[^}]*height: clamp\(12px, 2\.2vw, 28px\)[^}]*mask: url\("\/assets\/divider-collection-1.png"\) center \/ 100% 100% no-repeat[^}]*pointer-events: none/);
-  for (let index = 2; index <= 8; index += 1) {
-    const selector = index === 8 ? "8n" : `8n + ${index}`;
+  assert.match(rows, /::before\s*\{[^}]*right: 0[^}]*left: 0[^}]*height: clamp\(12px, 2\.2vw, 28px\)[^}]*background: url\("\/assets\/divider-botanical-1.png"\) center \/ 100% 100% no-repeat[^}]*pointer-events: none/);
+  for (let index = 2; index <= 6; index += 1) {
+    const selector = index === 6 ? "6n" : `6n + ${index}`;
     const rule = rows.slice(rows.indexOf(`.card-row-section:nth-of-type(${selector})::before`)).split("}")[0];
-    assert(rule.includes(`divider-collection-${index}.png`));
+    assert(rule.includes(`background-image: url("/assets/divider-botanical-${index}.png")`));
   }
-  assert.doesNotMatch(rows, /::after|\.svg|repeat-x/);
+  assert.doesNotMatch(rows, /::after|mask:|filter:|divider-collection-|\.svg|repeat-x/);
   const sw = await readFile(new URL("../sw.js", import.meta.url), "utf8");
-  assert.match(sw, /Array\.from\(\{ length: 8 \},[^;]*divider-collection-/);
-  for (let index = 1; index <= 8; index += 1) {
-    const png = await readFile(new URL(`../assets/divider-collection-${index}.png`, import.meta.url));
+  assert.match(sw, /Array\.from\(\{ length: 6 \},[^;]*divider-botanical-/);
+  for (let index = 1; index <= 6; index += 1) {
+    const png = await readFile(new URL(`../assets/divider-botanical-${index}.png`, import.meta.url));
     assert.equal(png.subarray(1, 4).toString(), "PNG");
-    assert.equal(png.readUInt32BE(16), 2132);
+    assert.equal(png.readUInt32BE(16), 2172);
   }
 });
 
