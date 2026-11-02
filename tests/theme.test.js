@@ -136,13 +136,15 @@ test("admin action buttons share the parchment inset trim", async () => {
   assert.match(admin, /body \.btn\s*\{[^}]*border: 1px solid #e5d4ae !important;[^}]*box-shadow: inset 0 0 0 2px #303b29, inset 0 0 0 3px #e5d4ae/);
 });
 
-test("shared action groups alternate olive and bronze without targeting sidebar controls", () => {
+test("shared controls swap olive and bronze on interaction rather than striping options", () => {
   const alternation = css.slice(css.indexOf("/* Keep shared controls consistent"));
   assert.match(alternation, /--control-surface: var\(--botanical-green\)/);
   assert.match(alternation, /background-color: var\(--control-surface\) !important/);
   assert.match(alternation, /\.ownership-status-menu > summary/);
-  assert.match(alternation, /:nth-child\(even of \.action-btn[^}]*:not\(:where\(\.sidebar \*\)\)[^}]*--control-surface: var\(--logo-bronze\)/);
-  assert.match(alternation, /:nth-child\(odd of \.action-btn[^}]*:not\(:where\(\.sidebar \*\)\)[^}]*--control-surface: var\(--botanical-green\)/);
+  assert.match(alternation, /--control-interaction: var\(--logo-bronze\)/);
+  assert.match(alternation, /--control-surface: var\(--logo-bronze\);[^}]*--control-interaction: var\(--botanical-green\)/);
+  assert.match(alternation, /background-color: var\(--control-interaction, var\(--logo-bronze\)\) !important/);
+  assert.doesNotMatch(alternation, /nth-child|rgba\(115, 80, 50, 0\.65\)/);
   assert.match(alternation, /\.book-actions-list \.book-status-menu > summary\s*\{[^}]*background-color: transparent !important/);
 });
 

@@ -7958,30 +7958,19 @@ body .edition-picker-button:hover {
 /* Keep shared controls consistent across pages without changing the bookmark. */
 body :where(.action-btn, .secondary-btn, .reading-continue-btn, .edition-picker-button, .edition-language-trigger, .google-auth-btn, .cc-btn, .upgrade-cta:not(.is-current), .book-audiobook-find, .audiobook-sample-button, .search-empty-back, .card-action, .card-menu, .book-more-menu > summary, .book-shelf-menu > summary, .book-status-menu > summary):not(:where(.sidebar *)) {
   --control-surface: var(--botanical-green);
+  --control-interaction: var(--logo-bronze);
   background-color: var(--control-surface) !important;
   color: var(--logo-cream);
 }
 
 body :is(.secondary-btn, .edition-picker-button, .ownership-status-menu > summary):not(:where(.sidebar *)) {
   --control-surface: var(--logo-bronze);
-}
-
-body :is(button, a):nth-child(even of .action-btn, .secondary-btn, .reading-continue-btn, .edition-picker-button, .upgrade-cta):not(:where(.sidebar *)) {
-  --control-surface: var(--logo-bronze);
-}
-
-body :is(button, a):nth-child(odd of .action-btn, .secondary-btn, .reading-continue-btn, .edition-picker-button, .upgrade-cta):not(:where(.sidebar *)) {
-  --control-surface: var(--botanical-green);
-}
-
-body :is(.book-purchase-card, .reading-feature-card, .upgrade-plan):nth-child(even)
-  :is(.action-btn, .secondary-btn, .reading-continue-btn, .upgrade-cta) {
-  --control-surface: var(--logo-bronze);
+  --control-interaction: var(--botanical-green);
 }
 
 body :is(.action-btn, .secondary-btn, .reading-continue-btn, .edition-picker-button, .edition-language-trigger, .google-auth-btn, .cc-btn, .upgrade-cta:not(.is-current), .book-audiobook-find, .audiobook-sample-button, .search-empty-back, .card-action, .card-menu, .book-more-menu > summary, .book-shelf-menu > summary, .book-status-menu > summary):is(:hover, :active, [aria-pressed="true"], [aria-expanded="true"]):not(:where(.sidebar *)),
 body details[open] > summary:not(:where(.sidebar *)) {
-  background-color: var(--botanical-ink) !important;
+  background-color: var(--control-interaction, var(--logo-bronze)) !important;
 }
 
 .book-actions-list .book-status-menu > summary {
@@ -7989,21 +7978,12 @@ body details[open] > summary:not(:where(.sidebar *)) {
 }
 
 body .book-actions-list .book-status-menu[open] > summary {
-  background-color: var(--botanical-ink) !important;
-}
-
-:is(.account-menu-panel, .account-navigation, .book-status-menu-panel, .book-more-menu-panel, .card-add-actions, .edition-language-list, .browse-panel, .disposition-options)
-  > :is(button, a):nth-child(even) {
-  background-color: rgba(115, 80, 50, 0.65);
+  background-color: var(--control-interaction) !important;
 }
 
 :is(.account-menu-panel, .account-navigation, .book-status-menu-panel, .book-more-menu-panel, .card-add-actions, .edition-language-list, .browse-panel, .disposition-options)
   > :is(button, a):is(:hover, [aria-selected="true"], [aria-pressed="true"], [aria-current="page"]) {
-  background-color: var(--botanical-ink);
-}
-
-.book-actions-list .book-status-menu-panel > button:nth-child(even) {
-  background-color: rgba(115, 80, 50, 0.65);
+  background-color: var(--logo-bronze);
 }
 
 .card-row-section:nth-of-type(3n + 1) {
