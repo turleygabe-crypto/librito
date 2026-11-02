@@ -121,15 +121,14 @@ test("mobile bookmark sits slightly below the top with the tassel below the view
   assert.match(sidebar, /height: var\(--sidebar-height\)/);
   assert.match(sidebar, /padding-top: max\(calc\(5\.5rem \+ env\(safe-area-inset-top\)\), calc\(var\(--sidebar-height\) \* 0\.085\)\)/);
   assert.match(sidebar, /padding-bottom: calc\(var\(--sidebar-height\) \* 0\.22\)/);
-  assert.match(css, /\.sidebar \.mobile-sidebar-close\s*\{[^}]*top: max\(2\.625rem, calc\(env\(safe-area-inset-top\) \+ 2rem\)\)[^}]*right: 1\.25rem/);
+  assert.match(css, /\.sidebar \.mobile-sidebar-close\s*\{[^}]*top: max\(0\.5rem, env\(safe-area-inset-top\)\)[^}]*right: 1\.25rem/);
 });
 
-test("mobile close button is an understated, keyboard-accessible golden medallion", async () => {
+test("mobile close button uses botanical colors and an accessible label", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
-  assert.match(html, /id="closeLibraryBtn"[^>]*type="button"[^>]*aria-label="Close library">\s*<img class="mobile-sidebar-close-medallion" src="\/assets\/Ornate%20Golden%20X%20Medallion\.png" alt="" aria-hidden="true"/);
+  assert.match(html, /id="closeLibraryBtn"[^>]*type="button"[^>]*aria-label="Close library">\s*<span aria-hidden="true">&times;<\/span>/);
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
-  assert.match(css, /\.sidebar \.mobile-sidebar-close\s*\{[^}]*width: 3rem[^}]*height: 3rem[^}]*border: 0[^}]*background: transparent[^}]*opacity: 0\.82/);
-  assert.match(css, /\.sidebar \.mobile-sidebar-close-medallion\s*\{[^}]*width: 3rem/);
+  assert.match(css, /\.sidebar \.mobile-sidebar-close\s*\{[^}]*width: 3rem[^}]*height: 3rem[^}]*background: var\(--botanical-green\)[^}]*color: var\(--parchment\)/);
   assert.match(css, /\.sidebar \.mobile-sidebar-close:focus-visible\s*\{[^}]*outline: 2px solid #ffe4b2/);
   const sw = await readFile(new URL("../sw.js", import.meta.url), "utf8");
   assert.match(sw, /"\/assets\/Ornate%20Golden%20X%20Medallion\.png"/);

@@ -133,7 +133,17 @@ test("three-dot buttons and the pictured language, account, and book controls ke
 
 test("admin action buttons share the parchment inset trim", async () => {
   const admin = await readFile(new URL("../admin.css", import.meta.url), "utf8");
-  assert.match(admin, /body \.btn\s*\{\s*border: 1px solid #e5d4ae !important;[^}]*box-shadow: inset 0 0 0 2px #303b29, inset 0 0 0 3px #e5d4ae/);
+  assert.match(admin, /body \.btn\s*\{[^}]*border: 1px solid #e5d4ae !important;[^}]*box-shadow: inset 0 0 0 2px #303b29, inset 0 0 0 3px #e5d4ae/);
+});
+
+test("shared action groups alternate olive and bronze without targeting sidebar controls", () => {
+  const alternation = css.slice(css.indexOf("/* Keep shared controls consistent"));
+  assert.match(alternation, /--control-surface: var\(--botanical-green\)/);
+  assert.match(alternation, /background-color: var\(--control-surface\) !important/);
+  assert.match(alternation, /\.ownership-status-menu > summary/);
+  assert.match(alternation, /:nth-child\(even of \.action-btn[^}]*:not\(:where\(\.sidebar \*\)\)[^}]*--control-surface: var\(--logo-bronze\)/);
+  assert.match(alternation, /:nth-child\(odd of \.action-btn[^}]*:not\(:where\(\.sidebar \*\)\)[^}]*--control-surface: var\(--botanical-green\)/);
+  assert.match(alternation, /\.book-actions-list \.book-status-menu > summary\s*\{[^}]*background-color: transparent !important/);
 });
 
 test("account menu has botanical links and contains long account names", () => {

@@ -63,9 +63,13 @@ body :is(button, summary, .btn) { border: 1px solid transparent !important; }
 body :is(button, summary, .btn):is(.active, [aria-pressed="true"], [aria-selected="true"], [aria-expanded="true"]),
 body details[open] > summary { border-color: #e5d4ae !important; }
 body .btn {
+  background: #4b543d;
+  color: #f2c88f;
   border: 1px solid #e5d4ae !important;
   box-shadow: inset 0 0 0 2px #303b29, inset 0 0 0 3px #e5d4ae;
 }
+body .btn:nth-child(even of .btn) { background: #735032; }
+body .btn:hover, body .btn:active { background: #303b29; }
 .side button, .side a { color: #d9aa62; }
 @media (max-width: 760px) {
   .shell { grid-template-columns: 1fr; }
