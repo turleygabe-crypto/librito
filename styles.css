@@ -1324,9 +1324,9 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
 .reading-feature-card {
   display: grid;
   min-width: 0;
-  grid-template-columns: 5.5rem minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
-  gap: 0.9rem;
+  gap: 0.55rem;
   padding: 0.65rem;
   border: 1px solid var(--blush-adobe);
   border-radius: 0.65rem;
@@ -1353,7 +1353,6 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
   display: grid;
   min-width: 0;
   gap: 0.35rem;
-  align-content: center;
 }
 
 .reading-feature-title {
@@ -1367,9 +1366,7 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
   font-weight: 600;
   text-align: left;
   text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  white-space: nowrap;
 }
 
 .reading-feature-author {
@@ -1417,7 +1414,7 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
 
 .card-row.reading-home-row {
   min-width: 0;
-  grid-auto-columns: minmax(16rem, 18rem);
+  grid-auto-columns: minmax(8.7rem, 10.5rem);
   align-items: start;
 }
 
@@ -3207,14 +3204,26 @@ body {
   box-shadow: none;
 }
 
-.sidebar::before {
+.sidebar::before,
+.sidebar::after {
   content: "";
   position: absolute;
   z-index: -1;
   inset: 0;
   background: url("/assets/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel.png") center / 250% 100% no-repeat;
-  filter: sepia(1) saturate(1.1) hue-rotate(35deg) brightness(1.7) contrast(0.8);
   pointer-events: none;
+}
+
+.sidebar::before {
+  filter: sepia(1) saturate(1.1) hue-rotate(35deg) brightness(1.7) contrast(0.8);
+}
+
+.sidebar::after {
+  filter: sepia(1) saturate(2) hue-rotate(335deg) brightness(1.5);
+  mask-image: linear-gradient(#000, #000), linear-gradient(#000, #000);
+  mask-size: 11% 5.4%, 38% 22.6%;
+  mask-position: center top, center bottom;
+  mask-repeat: no-repeat;
 }
 
 .sidebar-content {
@@ -7644,10 +7653,6 @@ body.book-actions-open {
   color: var(--ink);
 }
 
-.reading-feature-progress {
-  margin-top: 0.5rem;
-}
-
 .reading-feature-progress-bar,
 .book-reading-progress-track {
   background: var(--warm-sand);
@@ -7681,10 +7686,6 @@ body.book-actions-open {
 }
 
 @media (max-width: 480px) {
-  .card-row.reading-home-row {
-    grid-auto-columns: minmax(15rem, 85vw);
-  }
-
   .row-arrow-prev {
     left: 0;
   }

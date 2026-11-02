@@ -111,12 +111,13 @@ test("sage bookmark layer preserves artwork, eyelet and tassel without filtering
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const sidebarRules = [...css.matchAll(/\.sidebar\s*\{([^}]+)\}/g)];
   const bookmark = sidebarRules.find((rule) => rule[1].includes("isolation: isolate"));
-  const artwork = css.match(/\.sidebar::before\s*\{([^}]+)\}/)[1];
+  const artwork = css.match(/\.sidebar::before,\s*\.sidebar::after\s*\{([^}]+)\}/)[1];
   assert.match(artwork, /Elegant%20Brown/);
   assert.match(artwork, /250% 100% no-repeat/);
-  assert.match(artwork, /filter: sepia\(1\).*hue-rotate/);
+  assert.match(css, /\.sidebar::before\s*\{[^}]*filter: sepia\(1\).*hue-rotate/);
   assert.match(artwork, /pointer-events: none/);
   assert.match(artwork, /z-index: -1/);
+  assert.match(css, /\.sidebar::after\s*\{[^}]*hue-rotate\(335deg\)[^}]*mask-size: 11% 5\.4%, 38% 22\.6%[^}]*mask-position: center top, center bottom[^}]*mask-repeat: no-repeat/);
   assert.match(bookmark[1], /padding: calc\(var\(--sidebar-height, calc\(100dvh - 2rem\)\) \* 0\.085\) 1\.75rem calc\(var\(--sidebar-height, calc\(100dvh - 2rem\)\) \* 0\.28\)/);
   assert.match(bookmark[1], /clip-path: none/);
   assert.doesNotMatch(bookmark[1], /filter:/);
@@ -297,13 +298,13 @@ test("Currently reading still offers ordinary library cards when no book has bee
   assert.deepEqual(calls, [["profile", books[0]]]);
 });
 
-test("reading cards put covers beside details in a responsive, scrollable row", async () => {
+test("reading cards stack full-width covers above details in a slim, scrollable row", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
-  assert.match(css, /\.reading-feature-card\s*\{[^}]*grid-template-columns: 5\.5rem minmax\(0, 1fr\)[^}]*align-content: start/);
+  assert.match(css, /\.reading-feature-card\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\)[^}]*align-content: start/);
   assert.match(css, /\.reading-feature-cover\s*\{[^}]*width: 100%/);
-  assert.match(css, /\.reading-feature-title\s*\{[^}]*-webkit-line-clamp: 2/);
-  assert.match(css, /\.card-row\.reading-home-row\s*\{[^}]*grid-auto-columns: minmax\(16rem, 18rem\)/);
-  assert.match(css, /@media \(max-width: 480px\)\s*\{\s*\.card-row\.reading-home-row\s*\{[^}]*grid-auto-columns: minmax\(15rem, 85vw\)/);
+  assert.match(css, /\.reading-feature-title\s*\{[^}]*white-space: nowrap/);
+  assert.match(css, /\.card-row\.reading-home-row\s*\{[^}]*grid-auto-columns: minmax\(8\.7rem, 10\.5rem\)/);
+  assert.doesNotMatch(css, /grid-auto-columns: minmax\(15rem, 85vw\)/);
   assert.doesNotMatch(css, /\.reading-home-layout/);
 });
 
