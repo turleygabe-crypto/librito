@@ -1,4 +1,4 @@
-const CACHE_NAME = "librito-cache-v86";
+const CACHE_NAME = "librito-cache-v87";
 const IMAGE_CACHE = "librito-covers-v1";
 const IMAGE_CACHE_LIMIT = 400;
 const ASSETS = ["/", "/index.html", "/styles.css", "/app.js", "/lib/book-photos.js", "/lib/book-purchases.js", "/lib/marketplace-photos.js", "/lib/image-validation.js", "/translations.js", "/cookie-consent.js", "/manifest.webmanifest", "/assets/DancingScript.ttf", "/assets/Elegant%20Botanical%20Green%20Bookmark.png", "/assets/Librito%20Digital%20Home%20Library%20Logo.png", "/assets/Ornate%20Golden%20X%20Medallion.png"];

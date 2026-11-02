@@ -8017,15 +8017,12 @@ body .book-actions-list .book-status-menu[open] > summary {
 .card-row-section::after {
   content: "";
   position: absolute;
-  right: 0;
+  right: 0.25rem;
   bottom: 0;
-  left: 0;
-  height: 7px;
-  background-image: linear-gradient(90deg, transparent, var(--row-divider) 12%, var(--row-divider) 88%, transparent);
-  background-size: 100% 2px;
-  background-repeat: no-repeat;
-  background-position: center top;
-  border-bottom: 1px solid var(--row-divider);
+  left: 0.25rem;
+  height: 6px;
+  border: 1px solid var(--row-divider);
+  border-radius: 12px 3px 12px 3px;
   pointer-events: none;
 }
 
@@ -8033,13 +8030,14 @@ body .book-actions-list .book-status-menu[open] > summary {
   content: "";
   position: absolute;
   z-index: 1;
-  bottom: 0;
-  left: calc(50% - 4px);
-  width: 8px;
-  height: 8px;
-  border: 2px solid var(--row-divider);
+  bottom: -4px;
+  left: 22%;
+  width: clamp(2.5rem, 8vw, 6rem);
+  height: 14px;
+  border: 1px solid var(--row-divider);
+  border-right: 0;
+  border-radius: 16px 0 0 16px;
   background: var(--warm-sand);
-  transform: rotate(45deg);
   pointer-events: none;
 }
 
@@ -8048,18 +8046,12 @@ body .book-actions-list .book-status-menu[open] > summary {
 }
 
 .card-row-section:nth-of-type(3n + 1)::after {
-  height: 5px;
-  background-size: 100% 3px;
-  border-bottom: 0;
+  border-radius: 14px 14px 3px 3px;
 }
 
 .card-row-section:nth-of-type(3n + 1)::before {
-  bottom: -3px;
-  left: calc(50% - 8px);
-  width: 16px;
-  height: 10px;
-  border-radius: 0 75%;
-  transform: rotate(-30deg);
+  left: 4%;
+  border-radius: 16px 0 0 4px;
 }
 
 .card-row-section:nth-of-type(3n + 2) {
@@ -8067,18 +8059,15 @@ body .book-actions-list .book-status-menu[open] > summary {
 }
 
 .card-row-section:nth-of-type(3n + 2)::after {
-  background-size: 100% 1px;
-  border-bottom-style: dotted;
-  border-bottom-width: 2px;
+  border-radius: 3px 12px 3px 12px;
 }
 
 .card-row-section:nth-of-type(3n + 2)::before {
-  bottom: -1px;
-  left: calc(50% - 5px);
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  transform: none;
+  right: 6%;
+  left: auto;
+  border-right: 1px solid var(--row-divider);
+  border-left: 0;
+  border-radius: 0 4px 16px 0;
 }
 
 .card-row-section:nth-of-type(3n) .section-heading-row h2 {

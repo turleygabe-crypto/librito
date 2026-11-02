@@ -162,12 +162,11 @@ test("home rows share a background and use alternating ornamental dividers", () 
   assert.match(rows, /--row-divider: var\(--logo-bronze\)/);
   assert.match(rows, /:nth-of-type\(3n \+ 1\)\s*\{\s*--row-divider: var\(--sage\)/);
   assert.match(rows, /:nth-of-type\(3n \+ 2\)\s*\{\s*--row-divider: var\(--terracotta\)/);
-  assert.match(rows, /::after\s*\{[^}]*background-size: 100% 2px[^}]*border-bottom: 1px solid var\(--row-divider\)/);
-  assert.match(rows, /::before\s*\{[^}]*transform: rotate\(45deg\)[^}]*pointer-events: none/);
-  assert.match(rows, /:nth-of-type\(3n \+ 1\)::after\s*\{[^}]*background-size: 100% 3px[^}]*border-bottom: 0/);
-  assert.match(rows, /:nth-of-type\(3n \+ 1\)::before\s*\{[^}]*border-radius: 0 75%[^}]*transform: rotate\(-30deg\)/);
-  assert.match(rows, /:nth-of-type\(3n \+ 2\)::after\s*\{[^}]*border-bottom-style: dotted/);
-  assert.match(rows, /:nth-of-type\(3n \+ 2\)::before\s*\{[^}]*border-radius: 50%[^}]*transform: none/);
+  assert.match(rows, /::after\s*\{[^}]*border: 1px solid var\(--row-divider\)[^}]*border-radius: 12px 3px 12px 3px/);
+  assert.match(rows, /::before\s*\{[^}]*left: 22%[^}]*width: clamp\(2\.5rem, 8vw, 6rem\)[^}]*pointer-events: none/);
+  assert.match(rows, /:nth-of-type\(3n \+ 1\)::before\s*\{[^}]*left: 4%[^}]*border-radius: 16px 0 0 4px/);
+  assert.match(rows, /:nth-of-type\(3n \+ 2\)::before\s*\{[^}]*right: 6%[^}]*left: auto[^}]*border-radius: 0 4px 16px 0/);
+  assert.doesNotMatch(rows, /50%|dotted|rotate\(/);
 });
 
 test("account menu has botanical links and contains long account names", () => {
