@@ -43,7 +43,11 @@ The sidebar uses the [Elegant Botanical Green Bookmark](assets/Elegant%20Botanic
 
 Popup menus reuse the botanical bookmark artwork as a cropped leafy texture beneath a dark readability wash, with serif typography, an inset parchment frame, and soft shadows. No filters are applied to menu text or book covers.
 
+The book-actions popup uses a single parchment outer frame and roomy inner spacing. Its Reading status and Ownership rows are borderless until expanded; inline suboptions share the parent texture without a nested frame or deep indentation.
+
 The account trigger shows the saved display name (the signup username), falling back to signup metadata and then the sign-in email when no name is set. Long names/emails are ellipsized within the trigger, with the full value in its tooltip. Account dropdown links use dark botanical surfaces rather than brown fills.
+
+Typography echoes the logo with a Georgia/Times serif stack, warm logo cream (`#F2C88F`) on botanical-green menus and controls, and bronze (`#735032`) headings on light surfaces. The hero uses a bold serif heading with warm cream-gold copy. Green action surfaces are dark enough for the gold text to meet normal-text contrast requirements; body copy remains dark on cream and sand.
 
 Shared primary and secondary actions (buttons and button-style links) use the same parchment inset trim across pages, including marketplace/retailer links, audiobook actions, account forms, membership, cookie consent, and admin actions. Plain text links, cover links, and unselected sidebar navigation remain unframed.
 

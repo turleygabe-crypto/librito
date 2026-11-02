@@ -15,6 +15,9 @@
   --botanical-green: #4b543d;
   --botanical-ink: #303b29;
   --parchment: #e5d4ae;
+  --logo-cream: #f2c88f;
+  --logo-bronze: #735032;
+  --brand-font: Georgia, "Times New Roman", serif;
   --black: var(--warm-sand);
   --panel: var(--cream);
   --muted: var(--sage-ink);
@@ -25,7 +28,7 @@
 
 * { box-sizing: border-box; }
 html, body { min-height: 100%; }
-body { margin: 0; color: #f7f7f7; background: var(--black); font-family: "Trebuchet MS", "Segoe UI", sans-serif; -webkit-tap-highlight-color: transparent; }
+body { margin: 0; color: #f7f7f7; background: var(--black); font-family: var(--brand-font); -webkit-tap-highlight-color: transparent; }
 button, input, textarea { font: inherit; }
 button { cursor: pointer; }
 .hidden { display: none !important; }
@@ -2549,7 +2552,7 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
 body {
   color: var(--ink);
   background: var(--warm-sand);
-  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  font-family: var(--brand-font);
 }
 
 .app-shell {
@@ -7406,7 +7409,20 @@ body.book-actions-open {
   background-image:
     linear-gradient(90deg, #45523a 0%, #45523a 25%, rgba(69, 82, 58, 0.94) 38%, rgba(69, 82, 58, 0.55) 54%, rgba(69, 82, 58, 0) 72%),
     url("/cozy%20banner%20librito.png");
-  color: var(--cream);
+  color: var(--logo-cream);
+}
+
+.home-hero h1 {
+  font-family: var(--brand-font);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.08;
+}
+
+.home-hero p,
+.home-hero .action-btn {
+  color: var(--logo-cream);
+  font-family: var(--brand-font);
 }
 
 .home-hero::before {
@@ -7496,7 +7512,7 @@ body.book-actions-open {
   background-image:
     linear-gradient(rgba(48, 59, 41, 0.3), rgba(48, 59, 41, 0.5)),
     url("/assets/Elegant%20Botanical%20Green%20Bookmark.png");
-  background-size: 100% 100%, 200% auto;
+  background-size: 100% 100%, 240% auto;
   background-position: center, center 40%;
   background-repeat: no-repeat;
   box-shadow: inset 0 0 0 4px var(--botanical-green),
@@ -7519,8 +7535,21 @@ body.book-actions-open {
 }
 
 .book-actions-list {
-  padding: 0.65rem;
-  gap: 0.15rem;
+  padding: 0.75rem 1rem 1rem;
+  gap: 0.25rem;
+}
+
+.book-actions-sheet {
+  box-shadow: 0 12px 30px rgba(30, 38, 25, 0.28);
+}
+
+.book-actions-list .book-status-menu-panel {
+  margin: 0.25rem 0 0.5rem;
+  padding: 0.25rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 :is(.account-menu-panel, .account-navigation, .book-actions-sheet, .book-status-menu-panel, .book-more-menu-panel, .card-add-actions, .edition-language-list, .browse-popover .browse-panel, .disposition-options)
@@ -7614,9 +7643,11 @@ body.book-actions-open {
 .genre-pager-btn.active,
 .genre-sort-tab.active,
 .browse-chip.active {
+  --deep-sage: var(--botanical-green);
   border-color: var(--deep-sage);
   background: var(--deep-sage);
-  color: var(--cream);
+  color: var(--logo-cream);
+  font-family: var(--brand-font);
 }
 
 .action-btn:hover,
@@ -7635,13 +7666,13 @@ body.book-actions-open {
 .book-audiobook-find:hover {
   border-color: var(--sage-ink);
   background: var(--sage-ink);
-  color: var(--cream);
+  color: var(--logo-cream);
 }
 
 .book-detail-content .page-actions > .secondary-btn[aria-pressed="true"],
 .book-detail-content .book-profile-actions > .secondary-btn[aria-pressed="true"] {
   background: var(--sage-ink);
-  color: var(--cream);
+  color: var(--logo-cream);
 }
 
 .book-status-menu > summary::before,
@@ -7726,7 +7757,12 @@ body.book-actions-open {
 }
 
 .card-row-section .section-heading-row h2 {
-  color: var(--ink);
+  color: var(--logo-bronze);
+}
+
+body :is(.page-header h1, .book-detail-title, .account-card h2, .support-content h1, .support-content h2, .dialog-head h3) {
+  font-family: var(--brand-font);
+  color: var(--logo-bronze);
 }
 
 @media (max-width: 480px) {
@@ -7764,6 +7800,41 @@ body .account-menu > summary {
   border: 1px solid var(--parchment);
 }
 
+.card-menu,
+.book-more-menu > summary {
+  font-size: 0;
+  line-height: 0;
+}
+
+.book-more-menu > summary {
+  position: relative;
+}
+
+.card-menu::before,
+.book-more-menu > summary::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 14px;
+  height: 4px;
+  background:
+    radial-gradient(circle, currentColor 1.5px, transparent 2px) left center / 4px 4px,
+    radial-gradient(circle, currentColor 1.5px, transparent 2px) center / 4px 4px,
+    radial-gradient(circle, currentColor 1.5px, transparent 2px) right center / 4px 4px;
+  background-repeat: no-repeat;
+}
+
+body .book-actions-list .book-status-menu > summary {
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+}
+
+body .book-actions-list .book-status-menu[open] > summary {
+  border-color: var(--parchment) !important;
+}
+
 .sidebar .sidebar-brand,
 .sidebar .sidebar-nav,
 .sidebar .sidebar-library-nav {
@@ -7776,13 +7847,13 @@ body .account-menu > summary {
   min-width: 0;
   padding: 0.3rem 0.65rem 0.3rem 0.3rem;
   background: var(--botanical-green);
-  color: var(--parchment);
+  color: var(--logo-cream);
 }
 
 .account-menu .account-avatar {
   flex-shrink: 0;
   background: var(--botanical-ink);
-  color: var(--parchment);
+  color: var(--logo-cream);
 }
 
 .account-menu .account-menu-label {
@@ -7790,7 +7861,7 @@ body .account-menu > summary {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--parchment);
+  color: var(--logo-cream);
 }
 
 .account-menu-panel {
@@ -7800,7 +7871,7 @@ body .account-menu > summary {
 .account-menu-panel .account-menu-link {
   background: rgba(48, 59, 41, 0.65);
   border: 1px solid var(--parchment);
-  color: var(--parchment);
+  color: var(--logo-cream);
   text-align: left;
   line-height: 1.4;
   overflow-wrap: anywhere;
@@ -7818,5 +7889,9 @@ body .account-menu > summary {
 
 :is(.account-menu-panel, .account-navigation, .book-actions-sheet, .book-status-menu-panel, .book-more-menu-panel, .card-add-actions, .edition-language-list, .browse-popover .browse-panel, .disposition-options)
   :is(button, summary, a, p, label, small, h2, h3, .book-actions-icon, .edition-language-group, .shelf-check, .text-btn, .bookmarked-page-field, .currently-reading-bookmark-time) {
-  color: var(--antique-gold);
+  color: var(--logo-cream);
+}
+
+.sidebar :is(.nav-pill, .shelf-item, .shelf-item-copy strong, .shelf-item-copy > span, .shelf-item-count, .sidebar-empty, .sidebar-create-shelf) {
+  color: var(--logo-cream);
 }

@@ -18,6 +18,8 @@ const palette = {
   "botanical-green": "#4b543d",
   "botanical-ink": "#303b29",
   parchment: "#e5d4ae",
+  "logo-cream": "#f2c88f",
+  "logo-bronze": "#735032",
 };
 
 function luminance(hex) {
@@ -40,6 +42,10 @@ test("theme tokens match the asset palette and use accessible text pairs", () =>
     ["cream", "sage-ink"],
     ["parchment", "botanical-green"],
     ["parchment", "botanical-ink"],
+    ["logo-cream", "botanical-green"],
+    ["logo-cream", "sage-ink"],
+    ["logo-bronze", "warm-sand"],
+    ["logo-bronze", "cream"],
   ]) {
     const values = [luminance(palette[foreground]), luminance(palette[background])].sort((a, b) => b - a);
     assert((values[0] + 0.05) / (values[1] + 0.05) >= 4.5, `${foreground} on ${background} must meet WCAG AA`);
@@ -63,7 +69,8 @@ test("menus, buttons, and progress accents share the palette across app surfaces
   for (const selector of [".reading-continue-btn", ".secondary-btn", ".edition-picker-button", ".cc-btn", ".upgrade-cta"]) {
     assert(buttons.includes(selector), `${selector} must share the button palette`);
   }
-  assert.match(buttons, /background: var\(--deep-sage\);[\s\S]*color: var\(--cream\)/);
+  assert.match(buttons, /--deep-sage: var\(--botanical-green\)/);
+  assert.match(buttons, /background: var\(--deep-sage\);[\s\S]*color: var\(--logo-cream\)/);
   assert.match(theme, /\.reading-feature-progress-bar > span\s*\{\s*background: var\(--terracotta\)/);
 });
 
@@ -85,7 +92,7 @@ test("popup menus reuse botanical artwork for texture and an inset parchment fra
   const theme = css.slice(css.indexOf("/* Shared palette"));
   const menus = theme.slice(theme.indexOf(".account-menu-panel,"), theme.indexOf("\n.book-actions-header"));
   assert.match(menus, /background-image:[\s\S]*linear-gradient\([\s\S]*Elegant%20Botanical%20Green%20Bookmark\.png/);
-  assert.match(menus, /background-size: 100% 100%, 200% auto/);
+  assert.match(menus, /background-size: 100% 100%, 240% auto/);
   assert.match(menus, /inset 0 0 0 5px var\(--parchment\)/);
   assert.match(menus, /font-family: Georgia, "Times New Roman", serif/);
 });
@@ -130,4 +137,25 @@ test("account menu has botanical links and contains long account names", () => {
   assert.match(css, /\.account-menu > summary\s*\{[^}]*max-width: min\(15rem, 24vw\)/);
   assert.match(css, /\.account-menu \.account-menu-label\s*\{[^}]*min-width: 0;[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap/);
   assert.match(css, /\.account-menu-panel \.account-menu-link\s*\{[^}]*background: rgba\(48, 59, 41, 0\.65\);[^}]*border: 1px solid var\(--parchment\)/);
+});
+
+test("book action sheet uses a single frame, roomy spacing and unframed inline suboptions", () => {
+  assert.match(css, /\.book-actions-list\s*\{\s*padding: 0\.75rem 1rem 1rem;\s*gap: 0\.25rem/);
+  assert.match(css, /\.book-actions-sheet\s*\{\s*box-shadow: 0 12px 30px rgba\(30, 38, 25, 0\.28\)/);
+  assert.match(css, /\.book-actions-list \.book-status-menu-panel\s*\{\s*margin: 0\.25rem 0 0\.5rem;[^}]*border: 0;[^}]*background: transparent;[^}]*box-shadow: none/);
+  assert.match(css, /body \.book-actions-list \.book-status-menu > summary\s*\{[^}]*border: 1px solid transparent !important;[^}]*box-shadow: none !important/);
+  assert.match(css, /body \.book-actions-list \.book-status-menu\[open\] > summary\s*\{[^}]*border-color: var\(--parchment\) !important/);
+});
+
+test("three-dot controls use centered geometry rather than font baselines", () => {
+  assert.match(css, /\.card-menu,\s*\.book-more-menu > summary\s*\{\s*font-size: 0;\s*line-height: 0/);
+  assert.match(css, /\.card-menu::before,\s*\.book-more-menu > summary::before\s*\{[^}]*width: 14px;[^}]*height: 4px;[^}]*radial-gradient[^}]*background-repeat: no-repeat/);
+});
+
+test("logo-inspired typography uses warm gold on green and readable bronze on light surfaces", () => {
+  assert.match(css, /--brand-font: Georgia, "Times New Roman", serif/);
+  assert.match(css, /body\s*\{[^}]*font-family: var\(--brand-font\)/);
+  assert.match(css, /\.home-hero\s*\{[^}]*color: var\(--logo-cream\)/);
+  assert.match(css, /\.home-hero h1\s*\{[^}]*font-family: var\(--brand-font\);[^}]*font-weight: 700/);
+  assert.match(css, /\.home-hero p,\s*\.home-hero \.action-btn\s*\{[^}]*color: var\(--logo-cream\)/);
 });
