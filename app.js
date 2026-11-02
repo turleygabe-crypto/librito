@@ -9498,6 +9498,9 @@ libraryToggleBtn.addEventListener("click", () => {
 });
 document.getElementById("closeLibraryBtn").addEventListener("click", () => setLibraryDrawerOpen(false));
 sidebarBackdrop.addEventListener("click", () => setLibraryDrawerOpen(false));
+window.addEventListener("resize", () => {
+  if (sidebar.classList.contains("is-open")) setLibraryDrawerOpen(false);
+});
 
 document.querySelectorAll(".nav-pill").forEach((item) => {
   item.addEventListener("click", () => {
