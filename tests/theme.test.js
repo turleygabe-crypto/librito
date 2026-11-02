@@ -72,3 +72,9 @@ test("browser chrome, installed app, support pages, and admin use matching color
   assert.match(admin, /--side: #5e6f4f/);
   assert.match(admin, /--brown: #5e6f4f/);
 });
+
+test("logo-gold outlines cover buttons, top-bar controls, and book menus without framing covers", () => {
+  assert.match(css, /--antique-gold: #d9aa62/);
+  assert.match(css, /body :is\(button, summary, \[role="button"\]\):not\(\.sidebar-backdrop, \.card-open-button, \.reading-feature-cover, \.reading-feature-title, \.table-book-title, \.table-sort\)\s*\{[^}]*border: 1px solid var\(--antique-gold\) !important/);
+  assert.match(css, /\.global-search,\s*\.account-menu > summary,\s*\.account-avatar,[^}]*border-color: var\(--antique-gold\)/);
+});

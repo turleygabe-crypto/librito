@@ -11,7 +11,7 @@
   --deep-clay: #a9553a;
   --text: #302d24;
   --sage-ink: #45523a;
-  --antique-gold: #e4bd8b;
+  --antique-gold: #d9aa62;
   --black: var(--warm-sand);
   --panel: var(--cream);
   --muted: var(--sage-ink);
@@ -3232,7 +3232,7 @@ body {
   z-index: -1;
   inset: 0;
   background: url("/assets/Elegant%20Brown%20Leather%20Bookmark%20with%20Tassel.png") center / 250% 100% no-repeat;
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 819 1920' preserveAspectRatio='none'%3E%3Cpath d='M273 1398V87Q273 62 298 62H519Q544 62 544 87V1398L431 1483Q425 1489 422 1490Q410 1478 397 1490Q392 1490 386 1485Z' fill='none' stroke='black' stroke-width='8'/%3E%3Cpath d='M394 77C370 86 372 117 389 128C400 137 420 137 432 126C448 112 444 87 425 78L424 94C433 106 426 119 410 120C395 120 386 108 395 95Z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 819 1920' preserveAspectRatio='none'%3E%3Cpath d='M273 1398V87Q273 62 298 62H519Q544 62 544 87V1398Q544 1407 535 1414L434 1490Q427 1495 423 1488Q410 1479 399 1488Q394 1494 389 1490L282 1414Q273 1407 273 1398Z' fill='none' stroke='black' stroke-width='12' stroke-linejoin='round'/%3E%3Cpath d='M394 77C370 86 372 117 389 128C400 137 420 137 432 126C448 112 444 87 425 78L424 94C433 106 426 119 410 120C395 120 386 108 395 95Z'/%3E%3C/svg%3E");
   mask-size: 250% 100%;
   mask-position: center;
   mask-repeat: no-repeat;
@@ -7397,7 +7397,7 @@ body.book-actions-open {
 }
 
 .sidebar .nav-pill.library-heading-btn::before {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e4bd8b' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5C9 3 5 3 2 4v15c3-1 7-1 10 1 3-2 7-2 10-1V4c-3-1-7-1-10 1Zm0 0v15'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d9aa62' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5C9 3 5 3 2 4v15c3-1 7-1 10 1 3-2 7-2 10-1V4c-3-1-7-1-10 1Zm0 0v15'/%3E%3C/svg%3E");
 }
 
 .sidebar-content {
@@ -7717,4 +7717,27 @@ body.book-actions-open {
   .row-arrow-next {
     right: 0;
   }
+}
+
+/* Keep shared gold borders consistent through component hover/selected rules. */
+body :is(button, summary, [role="button"]):not(.sidebar-backdrop, .card-open-button, .reading-feature-cover, .reading-feature-title, .table-book-title, .table-sort) {
+  border: 1px solid var(--antique-gold) !important;
+}
+
+.global-search,
+.account-menu > summary,
+.account-avatar,
+.sidebar .sidebar-brand,
+.sidebar .sidebar-nav,
+.sidebar .sidebar-library-nav {
+  border-color: var(--antique-gold);
+}
+
+.account-menu > summary {
+  border-radius: 999px;
+}
+
+:is(.account-menu-panel, .account-navigation, .book-actions-sheet, .book-status-menu-panel, .book-more-menu-panel, .card-add-actions, .edition-language-list, .browse-popover .browse-panel, .disposition-options)
+  :is(button, summary, a, p, label, small, h2, h3, .book-actions-icon, .edition-language-group, .shelf-check, .text-btn, .bookmarked-page-field, .currently-reading-bookmark-time) {
+  color: var(--antique-gold);
 }

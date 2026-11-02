@@ -45,7 +45,7 @@ test("bookmark stitching and top ring retain antique gold without recoloring lea
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   assert.match(html, /class="sidebar-gold-details" aria-hidden="true"/);
-  assert.match(css, /\.sidebar-gold-details\s*\{[^}]*mask-image: url\("data:image\/svg\+xml,[^}]*stroke-width='8'[^}]*mask-size: 250% 100%[^}]*pointer-events: none/);
+  assert.match(css, /\.sidebar-gold-details\s*\{[^}]*mask-image: url\("data:image\/svg\+xml,[^}]*stroke-width='12'[^}]*stroke-linejoin='round'[^}]*mask-size: 250% 100%[^}]*pointer-events: none/);
   assert.match(css, /\.sidebar \.sidebar-shelf-heading h2\s*\{[^}]*color: var\(--antique-gold\)/);
   assert.match(css, /\.sidebar \.status-shelf-remove\s*\{[^}]*color: var\(--antique-gold\)/);
   assert.match(css, /\.sidebar \.shelf-item-count\s*\{[^}]*color: var\(--antique-gold\)/);
