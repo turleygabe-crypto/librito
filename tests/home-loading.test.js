@@ -95,11 +95,11 @@ test("sidebar shelf covers use portrait book proportions", async () => {
   assert.match(css, /\.book-cover-art img\s*\{[^}]*object-fit: cover/);
 });
 
-test("mobile bookmark extends beyond both screen edges with the tassel below the viewport", async () => {
+test("mobile bookmark sits slightly below the top with the tassel below the viewport", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const sidebar = [...css.matchAll(/\.sidebar\s*\{([^}]+)\}/g)].at(-1)[1];
   assert.match(sidebar, /--sidebar-height: calc\(\(100dvh \+ 0\.75rem\) \/ 0\.84\)/);
-  assert.match(sidebar, /top: -0\.75rem/);
+  assert.match(sidebar, /top: 0\.5rem/);
   assert.match(sidebar, /bottom: auto/);
   assert.match(sidebar, /height: var\(--sidebar-height\)/);
   assert.match(sidebar, /padding-top: max\(calc\(5\.5rem \+ env\(safe-area-inset-top\)\), calc\(var\(--sidebar-height\) \* 0\.085\)\)/);
@@ -137,7 +137,7 @@ test("botanical bookmark layer preserves original artwork without filtering navi
   assert.doesNotMatch(html, /sidebar-ornament/);
   assert.match(css, /\.sidebar-content\s*\{[^}]*overflow-y: auto/);
   assert.match(css, /\.sidebar\.is-open\s*\{[^}]*display: flex/);
-  assert.match(css, /--sidebar-height: calc\(100dvh \+ 1\.25rem\);[\s\S]*top: -0\.75rem;[\s\S]*height: var\(--sidebar-height\);[\s\S]*margin: -0\.75rem 0 0;/);
+  assert.match(css, /--sidebar-height: calc\(100dvh \+ 1\.25rem\);[\s\S]*top: 0\.5rem;[\s\S]*height: var\(--sidebar-height\);[\s\S]*margin: 0\.5rem 0 0;/);
 });
 
 test("startup keeps the library pending until account initialization", () => {
