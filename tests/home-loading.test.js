@@ -44,6 +44,7 @@ test("global ISBN scan has a separate quick lookup flow that opens the scanned b
   assert.doesNotMatch(searchForm, /globalSearchLanguage/);
   assert.match(html, /<\/form>\s*<div class="global-language-control">[\s\S]*?id="globalSearchLanguage"/);
   assert.match(css, /\.global-language-control\s*\{[^}]*order: 10;[^}]*flex: 1 1 100%/);
+  assert.match(source, /function buildGlobalSearchLanguageMenu\(\)[\s\S]*?introTitle\.textContent = "Search results language";[\s\S]*?This won't change the site language\./);
   assert.match(html, /id="quickScanOverlay"[\s\S]*?id="quickScanVideo"[\s\S]*?id="quickScanForm"[\s\S]*?id="quickScanIsbnInput"/);
   assert.match(source, /globalIsbnScanBtn\.addEventListener\("click", openQuickScan\)/);
   assert.match(source, /function openQuickScan\(\)[\s\S]*?startCameraScan\(\{\s*video: quickScanVideo,\s*status: quickScanStatus,\s*onBarcode: \(value\) => lookupQuickScanBook\(value\)/);

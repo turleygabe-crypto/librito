@@ -1377,13 +1377,24 @@ function buildGlobalSearchLanguageMenu() {
   trigger.className = "edition-language-trigger";
   trigger.setAttribute("aria-haspopup", "listbox");
   trigger.setAttribute("aria-expanded", "false");
-  trigger.setAttribute("aria-label", "Search language");
+  trigger.setAttribute("aria-label", "Search results language");
+  trigger.title = "Language for search results";
   const triggerText = document.createElement("span");
   trigger.append(triggerText);
   const list = document.createElement("div");
   list.className = "edition-language-list";
   list.setAttribute("role", "listbox");
+  list.setAttribute("aria-label", "Search results language");
   list.hidden = true;
+  const intro = document.createElement("div");
+  intro.className = "global-language-intro";
+  intro.setAttribute("role", "presentation");
+  const introTitle = document.createElement("strong");
+  introTitle.textContent = "Search results language";
+  const introCopy = document.createElement("span");
+  introCopy.textContent = "Filters the books shown in your search results. This won't change the site language.";
+  intro.append(introTitle, introCopy);
+  list.append(intro);
 
   const addGroup = (title, options) => {
     const groupTitle = document.createElement("div");

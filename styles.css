@@ -6313,6 +6313,25 @@ body {
   left: auto;
   right: 0;
   min-width: 13rem;
+  max-width: min(16rem, calc(100vw - 1.5rem));
+}
+
+.global-language-control .global-language-intro {
+  margin: 0;
+  padding: 0.35rem 0.6rem 0.5rem;
+}
+
+.global-language-control .global-language-intro strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.global-language-control .global-language-intro span {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  opacity: 0.85;
 }
 
 .global-language-control .edition-language-option {
@@ -6336,7 +6355,8 @@ body {
 @media (max-width: 600px) {
   .global-language-control .edition-language-list {
     right: auto;
-    left: 0;
+    left: 50%;
+    transform: translateX(-50%);
   }
 }
 
