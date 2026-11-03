@@ -163,7 +163,7 @@ test("home rows share a background and use alternating ornamental dividers", asy
   assert.match(rows, /padding-bottom: 0\.55rem/);
   assert.match(rows, /\.home-rows > \.card-row-section \.section-heading-row\s*\{\s*margin-bottom: calc\(0\.75rem \+ min\(5\.5vw, 3\.25rem\)\)/);
   assert.doesNotMatch(rows, /background: linear-gradient|rgba\(232, 195, 174/);
-  assert.match(rows, /::before\s*\{[^}]*top: 2rem[^}]*left: 0[^}]*width: min\(86%, 48rem\)[^}]*height: min\(5\.5vw, 3\.25rem\)[^}]*margin: 0[^}]*background: url\("\/assets\/divider-botanical-1.png"\) left center \/ 100% auto no-repeat[^}]*pointer-events: none/);
+  assert.match(rows, /::before\s*\{[^}]*top: 2rem[^}]*left: 0[^}]*width: min\(60%, 18rem\)[^}]*height: min\(5\.5vw, 3\.25rem\)[^}]*margin: 0[^}]*background: url\("\/assets\/divider-botanical-1.png"\) left center \/ 100% auto no-repeat[^}]*pointer-events: none/);
   assert.doesNotMatch(rows, /100% 100%/);
   for (let index = 2; index <= 6; index += 1) {
     const selector = index === 6 ? "6n" : `6n + ${index}`;
