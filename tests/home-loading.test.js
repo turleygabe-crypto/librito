@@ -453,18 +453,41 @@ test("book loader renders immediately and rotates covers after bounce iterations
   const functionSource = source.slice(source.indexOf("function createBookLoader("),
     source.indexOf("\nfunction setBookProfileLoadingStatus("));
   runInNewContext(`${functionSource}\nthis.createLoader = createBookLoader;`, context);
-  const loader = context.createLoader({ compact: true });
-  assert.equal(loader.className, "book-loader book-loader-compact");
-  assert.equal(loader.attributes.role, "status");
-  const slot = loader.children[0].children[0];
-  assert.equal(slot.children[0].book, classics[1]);
-  slot.events.animationiteration();
-  assert.equal(slot.children[0].book, classics[0]);
-  assert.equal(slot.children[0].className, "book-loader-art");
+  for (const options of [{}, { compact: true }, { mini: true }]) {
+    const loader = context.createLoader(options);
+    assert.equal(loader.className, `book-loader${options.compact ? " book-loader-compact" : ""}${options.mini ? " book-loader-mini" : ""}`);
+    assert.equal(loader.attributes.role, "status");
+    const slot = loader.children[0].children[0];
+    assert.equal(slot.children[0].book, classics[1]);
+    const firstMessage = loader.children[1].textContent;
+    slot.events.animationiteration();
+    assert.equal(slot.children[0].book, classics[0]);
+    assert.equal(slot.children[0].className, "book-loader-art");
+    if (options.mini) assert.equal(loader.children[1].textContent, firstMessage);
+    else assert.notEqual(loader.children[1].textContent, firstMessage);
+    slot.events.animationiteration();
+    assert.equal(slot.children[0].book, classics[1]);
+    loader.isConnected = false;
+    slot.events.animationiteration();
+    assert.equal(slot.children[0].book, classics[1]);
+  }
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   assert.match(css, /animation: book-loader-bounce 2\.7s linear infinite/);
   assert.match(css, /@keyframes book-loader-bounce\s*\{/);
-  assert.match(css, /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.book-loader-slot \{ animation: none; \}/);
+});
+
+test("loading books keep bouncing and rotating under reduced motion without changing other animations", async () => {
+  const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  const reducedMotionBlocks = [...css.matchAll(/@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\n\}/g)];
+  assert.equal(reducedMotionBlocks.length, 2);
+  const globalRule = reducedMotionBlocks[0][1];
+  assert.match(globalRule, /\*,\s*\*::before,\s*\*::after/);
+  assert.match(globalRule, /animation-duration: 0\.01ms !important/);
+  assert.match(globalRule, /animation-iteration-count: 1 !important/);
+  const loaderRule = reducedMotionBlocks[1][1];
+  assert.match(loaderRule, /\.book-loader-slot\s*\{\s*animation-duration: 2\.7s !important;\s*animation-iteration-count: infinite !important;\s*\}/);
+  assert.doesNotMatch(loaderRule, /animation: none|animation-name:/);
+  assert.match(css, /\.book-loader-mini \.book-loader-slot\s*\{[^}]*animation-name: book-loader-bounce-mini/);
 });
 test("Your Library has a distinct open-book icon instead of the Home icon", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");

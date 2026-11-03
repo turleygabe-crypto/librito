@@ -5959,7 +5959,11 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .book-loader-slot { animation: none; }
+  /* Cover rotation depends on each completed bounce cycle. */
+  .book-loader-slot {
+    animation-duration: 2.7s !important;
+    animation-iteration-count: infinite !important;
+  }
 }
 
 .genre-controls {
