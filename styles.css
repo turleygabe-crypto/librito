@@ -8084,17 +8084,18 @@ body .book-actions-list .book-status-menu[open] > summary {
 }
 
 .home-rows > .card-row-section .section-heading-row {
-  margin-bottom: calc(0.75rem + min(5.5vw, 3.25rem));
+  margin-bottom: 1.45rem;
 }
 
 .home-rows > .card-row-section::before {
   content: "";
   position: absolute;
   z-index: 1;
-  top: 2rem;
+  top: 1.65rem;
   left: 0;
   width: min(60%, 18rem);
-  height: min(5.5vw, 3.25rem);
+  height: auto;
+  aspect-ratio: 15 / 1;
   margin: 0;
   background: url("/assets/divider-botanical-1.png") left center / 100% auto no-repeat;
   pointer-events: none;
