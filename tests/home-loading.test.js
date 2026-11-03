@@ -56,6 +56,7 @@ test("sidebar uses the accessible logo artwork and precaches it", async () => {
   const worker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
   assert.match(worker, /"\/assets\/Librito%20Digital%20Home%20Library%20Logo\.png"/);
   assert.match(sidebar, /id="closeLibraryBtn"[\s\S]*class="sidebar-content"[\s\S]*class="sidebar-nav"[\s\S]*id="shelfList"/);
+  assert.match(sidebar, /id="libraryNavBtn"[^>]*><span>My library<\/span>/);
 });
 
 test("botanical bookmark retains its own border, foliage and tassel without legacy overlays", async () => {
