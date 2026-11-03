@@ -7233,6 +7233,21 @@ function renderProfileRecommendationResults(target, books, emptyMessage) {
   section.append(row);
 }
 
+async function getOpenLibraryWorkEditions(workKey) {
+  const editions = [];
+  let offset = 0;
+  let size = Infinity;
+  while (offset < size) {
+    const payload = await fetchJsonCached(`https://openlibrary.org${workKey}/editions.json?limit=100&offset=${offset}`);
+    const entries = Array.isArray(payload.entries) ? payload.entries : [];
+    editions.push(...entries);
+    if (!entries.length) break;
+    offset += entries.length;
+    size = Number.isFinite(payload.size) ? payload.size : offset;
+  }
+  return editions;
+}
+
 async function getOpenLibraryEditionsForBook(book, language = getDefaultBookLanguage()) {
   let workKeys = [];
   const isbn = normalizeBookIsbn(book.isbn);
@@ -7245,26 +7260,60 @@ async function getOpenLibraryEditionsForBook(book, language = getDefaultBookLang
     }
   }
 
-  if (!workKeys.length) {
+  const author = normalizeBookText(book.author);
+  const matchesAuthor = (work) => !author || (work.author_name || [])
+    .some((name) => normalizeBookText(name) === author);
+  const searchTitle = async (title) => {
     const params = new URLSearchParams({
-      q: `${book.title || ""} ${book.author || ""} ${language === getDefaultBookLanguage() ? `language:${language}` : ""}`.trim(),
+      title,
+      ...(book.author ? { author: book.author } : {}),
       fields: "key,title,author_name",
-      limit: "10",
+      limit: "100",
     });
     const result = await fetchOpenLibrarySearch(params);
-    const works = Array.isArray(result.docs) ? result.docs : [];
-    const normalizedAuthor = (book.author || "").toLowerCase();
-    const matchingWork = works.find((work) =>
-      (work.author_name || []).some((author) => author.toLowerCase() === normalizedAuthor)
-    ) || works[0];
-    if (matchingWork?.key && /^\/works\/[^/]+$/.test(matchingWork.key)) workKeys = [matchingWork.key];
-  }
+    return (result.docs || []).filter((work) =>
+      matchesAuthor(work) && normalizeBookText(work.title) === normalizeBookText(title)
+    );
+  };
+  const titleWorks = book.title ? await searchTitle(book.title) : [];
+  workKeys.push(...titleWorks.map((work) => work.key));
+  workKeys = [...new Set(workKeys.filter((key) => /^\/works\/[^/]+$/.test(key)))];
 
-  const results = await Promise.all(workKeys.map(async (workKey) => {
-    const payload = await fetchJsonCached(`https://openlibrary.org${workKey}/editions.json?limit=100`);
-    return Array.isArray(payload.entries) ? payload.entries : [];
-  }));
-  const choices = results.flat().flatMap((edition) => {
+  const editions = [];
+  const searchedIds = new Set();
+  const searchedTitles = new Set([normalizeBookText(book.title)]);
+  let pendingKeys = workKeys;
+  while (pendingKeys.length) {
+    const batch = (await Promise.all(pendingKeys.map(getOpenLibraryWorkEditions))).flat();
+    editions.push(...batch);
+    const libraryThingIds = [...new Set(batch.flatMap((edition) =>
+      edition.identifiers?.librarything || []
+    ).filter((id) => /^\d+$/.test(id) && !searchedIds.has(String(id))).map(String))];
+    const originalTitles = [...new Set(batch.flatMap((edition) => [
+      edition.translation_of,
+      ...(edition.other_titles || []),
+      ...(edition.title?.includes(" / ") ? edition.title.split(" / ") : []),
+    ]).filter((title) => typeof title === "string" && title.trim()
+      && !searchedTitles.has(normalizeBookText(title))))];
+    libraryThingIds.forEach((id) => searchedIds.add(id));
+    originalTitles.forEach((title) => searchedTitles.add(normalizeBookText(title)));
+    // LibraryThing identifies the work across translations, unlike edition-specific ISBNs.
+    const relatedResults = await Promise.all([
+      ...libraryThingIds.map(async (id) => {
+        const result = await fetchOpenLibrarySearch(new URLSearchParams({
+          q: `id_librarything:${id}`,
+          fields: "key,title,author_name",
+          limit: "100",
+        }));
+        return (result.docs || []).filter(matchesAuthor);
+      }),
+      ...originalTitles.map(searchTitle),
+    ]);
+    pendingKeys = [...new Set(relatedResults.flat().map((work) => work.key))]
+      .filter((key) => /^\/works\/[^/]+$/.test(key) && !workKeys.includes(key));
+    workKeys.push(...pendingKeys);
+  }
+  const choices = editions.flatMap((edition) => {
     const languages = (edition.languages || []).map((entry) => entry.key.split("/").pop());
     if (language !== "all" && !languages.includes(language)) return [];
     const editionLanguage = language === "all" ? languages[0] || "" : language;
