@@ -8084,7 +8084,7 @@ body .book-actions-list .book-status-menu[open] > summary {
 }
 
 .home-rows > .card-row-section .section-heading-row {
-  margin-bottom: 2rem;
+  margin-bottom: calc(0.75rem + min(5.5vw, 3.25rem));
 }
 
 .home-rows > .card-row-section::before {
@@ -8094,9 +8094,9 @@ body .book-actions-list .book-status-menu[open] > summary {
   top: 2rem;
   left: 0;
   width: min(86%, 48rem);
-  height: 20px;
+  height: min(5.5vw, 3.25rem);
   margin: 0;
-  background: url("/assets/divider-botanical-1.png") left center / contain no-repeat;
+  background: url("/assets/divider-botanical-1.png") left center / 100% auto no-repeat;
   pointer-events: none;
 }
 
