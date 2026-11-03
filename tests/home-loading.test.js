@@ -35,15 +35,67 @@ class Element {
   addEventListener(name, handler) { this.events[name] = handler; }
 }
 
-test("global search includes an accessible ISBN scanner that opens the camera flow", async () => {
+test("global ISBN scan has a separate quick lookup flow that opens the scanned book profile", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   const searchForm = html.slice(html.indexOf('<form id="globalSearchForm"'), html.indexOf("</form>", html.indexOf('<form id="globalSearchForm"')));
   assert.match(searchForm, /id="globalIsbnScanBtn"[^>]*aria-label="Scan ISBN barcode"[^>]*title="Scan ISBN barcode"/);
   assert.ok(searchForm.indexOf('id="globalIsbnScanBtn"') < searchForm.indexOf('id="previewBtn"'));
-  assert.match(source, /globalIsbnScanBtn\.addEventListener\("click", \(\) => \{\s*openDialog\(\);\s*if \(state\.session\) startBookLookup\("scan"\);\s*\}\)/);
+  assert.match(html, /id="quickScanOverlay"[\s\S]*?id="quickScanVideo"[\s\S]*?id="quickScanForm"[\s\S]*?id="quickScanIsbnInput"/);
+  assert.match(source, /globalIsbnScanBtn\.addEventListener\("click", openQuickScan\)/);
+  assert.match(source, /function openQuickScan\(\)[\s\S]*?startCameraScan\(\{\s*video: quickScanVideo,\s*status: quickScanStatus,\s*onBarcode: \(value\) => lookupQuickScanBook\(value\)/);
+  assert.match(source, /async function lookupQuickScanBook\(isbn\)[\s\S]*?closeQuickScan\(\);\s*if \(matchingBook\) \{\s*openBookProfile\(matchingBook\)/);
+  assert.match(source, /quickScanForm\.addEventListener\("submit", \(event\) => \{\s*event\.preventDefault\(\);\s*lookupQuickScanBook\(quickScanIsbnInput\.value\)/);
+  assert.match(source, /scanBookOptionBtn\.addEventListener\("click", \(\) => \{\s*startBookLookup\("scan"\);\s*\}\)/);
   assert.match(css, /\.global-search > \.global-isbn-scan\s*\{/);
   assert.match(css, /\.global-search > \.global-isbn-scan \.global-isbn-scan-label\s*\{\s*display: none;/);
+});
+
+test("quick ISBN lookup opens matching library books and metadata-only book profiles", async () => {
+  const normalizeSource = source.slice(source.indexOf("function normalizeIsbn("), source.indexOf("\nasync function fetchBookDataByIsbn("));
+  const lookupSource = source.slice(source.indexOf("async function lookupQuickScanBook("), source.indexOf("\nfunction openShelfDrawer("));
+  const bookData = {
+    title: "Found by ISBN",
+    authors: [{ name: "A. Reader" }],
+    subjects: [{ name: "Fiction" }],
+    cover: { large: "https://example.test/cover.jpg" },
+    publish_date: "2024",
+    number_of_pages: 240,
+  };
+  const createLookup = (books) => {
+    const result = { closed: false, opened: null, status: { textContent: "" } };
+    const context = {
+      state: { books, catalogBooks: [], searchResults: [] },
+      quickScanStatus: result.status,
+      fetchBookDataByIsbn: async () => bookData,
+      closeQuickScan: () => { result.closed = true; },
+      openBookProfile: (book) => { result.opened = book; },
+      console,
+      showToast() {},
+    };
+    runInNewContext(`${normalizeSource}\n${lookupSource}\nthis.lookup = lookupQuickScanBook;`, context);
+    result.lookup = context.lookup;
+    return result;
+  };
+
+  const libraryBook = { id: "library-book", isbn: "978-1-2345-6789-0" };
+  const libraryLookup = createLookup([libraryBook]);
+  await libraryLookup.lookup("9781234567890");
+  assert.equal(libraryLookup.closed, true);
+  assert.equal(libraryLookup.opened, libraryBook);
+
+  const metadataLookup = createLookup([]);
+  await metadataLookup.lookup("9781234567890");
+  assert.equal(metadataLookup.closed, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(metadataLookup.opened)), {
+    title: "Found by ISBN",
+    author: "A. Reader",
+    genre: "Fiction",
+    isbn: "9781234567890",
+    cover_url: "https://example.test/cover.jpg",
+    publish_date: "2024",
+    page_count: 240,
+  });
 });
 
 test("the sidebar uses the transparent bookmark artwork and precaches it", async () => {

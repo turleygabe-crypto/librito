@@ -305,6 +305,27 @@
       </div>
     </div>
 
+    <div id="quickScanOverlay" class="dialog-overlay hidden">
+      <div class="dialog-card quick-scan-card" role="dialog" aria-modal="true" aria-labelledby="quickScanHeading">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow">Quick lookup</p>
+            <h3 id="quickScanHeading">Scan ISBN</h3>
+          </div>
+          <button id="closeQuickScanBtn" class="icon-btn" type="button" aria-label="Close">✕</button>
+        </div>
+        <video id="quickScanVideo" autoplay playsinline muted></video>
+        <form id="quickScanForm" class="quick-scan-form">
+          <label for="quickScanIsbnInput">ISBN</label>
+          <div class="quick-scan-controls">
+            <input id="quickScanIsbnInput" name="isbn" type="text" inputmode="numeric" autocomplete="off" placeholder="Scan or enter an ISBN" />
+            <button type="submit" class="action-btn">Open book</button>
+          </div>
+        </form>
+        <p id="quickScanStatus" class="scan-status" aria-live="polite">Point your camera at a book barcode, or enter its ISBN.</p>
+      </div>
+    </div>
+
     <div id="toast" class="toast hidden" role="status" aria-live="polite">Book added</div>
     <script src="/cookie-consent.js"></script>
     <script type="module" src="/app.js"></script>

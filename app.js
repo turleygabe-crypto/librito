@@ -335,8 +335,15 @@ const shelfForm = document.getElementById("shelfForm");
 const bookProfileOverlay = document.getElementById("bookProfileOverlay");
 const closeBookProfileBtn = document.getElementById("closeBookProfileBtn");
 const bookProfileContent = document.getElementById("bookProfileContent");
+const quickScanOverlay = document.getElementById("quickScanOverlay");
+const closeQuickScanBtn = document.getElementById("closeQuickScanBtn");
+const quickScanVideo = document.getElementById("quickScanVideo");
+const quickScanForm = document.getElementById("quickScanForm");
+const quickScanIsbnInput = document.getElementById("quickScanIsbnInput");
+const quickScanStatus = document.getElementById("quickScanStatus");
 let cameraStream = null;
 let barcodeLoopTimer = null;
+let cameraVideoElement = scannerVideo;
 let recommendationRotationTimer = null;
 let lastRecommendationScrollAt = 0;
 const allGenres = [
@@ -416,6 +423,7 @@ function findBookForRoute(params) {
     cover_url: params.get("cover_url") || "",
     cover_i: params.get("cover_i") || "",
     page_count: Number(params.get("page_count")) || null,
+    publish_date: params.get("publish_date") || "",
   };
 }
 
@@ -1708,6 +1716,7 @@ function openBookProfile(book) {
     cover_url: book.cover_url || "",
     cover_i: book.cover_i || "",
     page_count: book.page_count || book.pages || "",
+    publish_date: book.publish_date || "",
   });
   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 }
@@ -8783,6 +8792,101 @@ function closeDialog() {
   scanStatus.textContent = "Search by title or author.";
   showEntryChoice();
   if (dialogReturnFocus instanceof HTMLElement && dialogReturnFocus.isConnected) dialogReturnFocus.focus();
+}
+
+let quickScanReturnFocus = null;
+
+function openQuickScan() {
+  quickScanReturnFocus = document.activeElement;
+  quickScanIsbnInput.value = "";
+  quickScanStatus.textContent = "Point your camera at a book barcode, or enter its ISBN.";
+  quickScanOverlay.classList.remove("hidden");
+  quickScanIsbnInput.focus();
+  startCameraScan({
+    video: quickScanVideo,
+    status: quickScanStatus,
+    onBarcode: (value) => lookupQuickScanBook(value),
+  });
+}
+
+function closeQuickScan() {
+  stopCameraScan();
+  quickScanOverlay.classList.add("hidden");
+  if (quickScanReturnFocus instanceof HTMLElement && quickScanReturnFocus.isConnected) quickScanReturnFocus.focus();
+  quickScanReturnFocus = null;
+}
+
+function normalizeIsbn(isbn) {
+  return String(isbn || "").replace(/[^0-9Xx]/g, "").slice(0, 13).toUpperCase();
+}
+
+async function fetchBookDataByIsbn(isbn) {
+  let bookData = null;
+  try {
+    const response = await fetch(`/api/scan?isbn=${encodeURIComponent(isbn)}`, { signal: AbortSignal.timeout(10000) });
+    if (response.ok) {
+      const payload = await response.json();
+      bookData = payload.data;
+    }
+  } catch (error) {
+    console.warn("Local API lookup failed, falling back to Open Library", error);
+  }
+
+  if (!bookData) {
+    const response = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(isbn)}&format=json&jscmd=data`, { signal: AbortSignal.timeout(15000) });
+    if (!response.ok) throw new Error("Lookup failed");
+    const payload = await response.json();
+    bookData = payload[`ISBN:${isbn}`] || null;
+  }
+  return bookData;
+}
+
+async function lookupQuickScanBook(isbn) {
+  const normalized = normalizeIsbn(isbn);
+  if (!normalized) {
+    quickScanStatus.textContent = "Enter an ISBN first.";
+    return;
+  }
+
+  quickScanStatus.textContent = `Looking up ISBN ${normalized}…`;
+  try {
+    const bookData = await fetchBookDataByIsbn(normalized);
+    if (!bookData) {
+      quickScanStatus.textContent = "No book found for that ISBN. Check the number and try again.";
+      return;
+    }
+
+    const authors = Array.isArray(bookData.authors)
+      ? bookData.authors.map((author) => author.name).filter(Boolean)
+      : [];
+    const matchingBook = [...state.books, ...state.catalogBooks, ...(state.searchResults || [])].find((book) => {
+      const isbns = Array.isArray(book.isbn) ? book.isbn : [book.isbn];
+      return isbns.some((value) => normalizeIsbn(value) === normalized);
+    });
+
+    closeQuickScan();
+    if (matchingBook) {
+      openBookProfile(matchingBook);
+      return;
+    }
+
+    const subjects = Array.isArray(bookData.subjects)
+      ? bookData.subjects.map((subject) => typeof subject === "string" ? subject : subject.name).filter(Boolean)
+      : [];
+    openBookProfile({
+      title: bookData.title || "Untitled",
+      author: authors.join(", "),
+      genre: subjects[0] || "",
+      isbn: normalized,
+      cover_url: bookData.cover?.large || bookData.cover?.medium || bookData.cover?.small || "",
+      publish_date: bookData.publish_date || "",
+      page_count: bookData.number_of_pages || null,
+    });
+  } catch (error) {
+    console.error(error);
+    quickScanStatus.textContent = "Lookup failed. Check your connection and try again.";
+    showToast("Book lookup failed");
+  }
   dialogReturnFocus = null;
 }
 
@@ -9113,7 +9217,7 @@ function parseBarcodePrice(raw) {
 async function lookupBookByIsbn(isbn, scannedPrice = null) {
   const rawIsbn = String(isbn || "");
   const barcodePrice = scannedPrice ?? parseBarcodePrice(rawIsbn);
-  const normalized = rawIsbn.replace(/[^0-9Xx]/g, "").slice(0, 13).trim();
+  const normalized = normalizeIsbn(rawIsbn);
   if (!normalized) {
     showToast("Enter an ISBN first.");
     return;
@@ -9122,24 +9226,7 @@ async function lookupBookByIsbn(isbn, scannedPrice = null) {
   scanStatus.parentElement.querySelector(".retailer-fallback")?.remove();
   setBookProfileLoadingStatus(scanStatus, `ISBN ${normalized} captured. Looking up your book…`, true);
   try {
-    let bookData = null;
-
-    try {
-      const response = await fetch(`/api/scan?isbn=${encodeURIComponent(normalized)}`, { signal: AbortSignal.timeout(10000) });
-      if (response.ok) {
-        const payload = await response.json();
-        bookData = payload.data;
-      }
-    } catch (error) {
-      console.warn("Local API lookup failed, falling back to Open Library", error);
-    }
-
-    if (!bookData) {
-      const openLibraryResponse = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(normalized)}&format=json&jscmd=data`, { signal: AbortSignal.timeout(15000) });
-      if (!openLibraryResponse.ok) throw new Error("Lookup failed");
-      const openLibraryPayload = await openLibraryResponse.json();
-      bookData = openLibraryPayload[`ISBN:${normalized}`] || null;
-    }
+    const bookData = await fetchBookDataByIsbn(normalized);
 
     if (!bookData) {
       scanStatus.textContent = "No metadata found for that ISBN. You can enter the details manually.";
@@ -9169,29 +9256,37 @@ async function lookupBookByIsbn(isbn, scannedPrice = null) {
   }
 }
 
-async function startCameraScan() {
+async function startCameraScan({
+  video = scannerVideo,
+  status = scanStatus,
+  onBarcode = (value) => {
+    isbnInput.value = value;
+    return lookupBookByIsbn(value);
+  },
+} = {}) {
+  stopCameraScan();
+  cameraVideoElement = video;
   if (!navigator.mediaDevices?.getUserMedia) {
-    scanStatus.textContent = "Camera access is not available in this browser. Enter the ISBN manually.";
+    status.textContent = "Camera access is not available in this browser. Enter the ISBN manually.";
     return;
   }
 
   try {
     cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-    scannerVideo.srcObject = cameraStream;
-    scannerVideo.style.display = "block";
-    scanStatus.textContent = "Scanning… point the camera at the barcode.";
+    video.srcObject = cameraStream;
+    video.style.display = "block";
+    status.textContent = "Scanning… point the camera at the barcode.";
 
     if ("BarcodeDetector" in window) {
       const detector = new window.BarcodeDetector({ formats: ["ean_13", "ean_8", "code_128", "qr_code"] });
       const runDetection = async () => {
         if (!cameraStream) return;
         try {
-          const barcodes = await detector.detect(scannerVideo);
+          const barcodes = await detector.detect(video);
           if (barcodes.length) {
             const value = barcodes[0].rawValue;
-            isbnInput.value = value;
             stopCameraScan();
-            await lookupBookByIsbn(value);
+            await onBarcode(value);
             return;
           }
         } catch (error) {
@@ -9203,20 +9298,19 @@ async function startCameraScan() {
     } else {
       const { BrowserMultiFormatReader } = await import("https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm");
       const reader = new BrowserMultiFormatReader();
-      scanStatus.textContent = "Scanning… point the camera at the barcode.";
-      reader.decodeFromVideoElement(scannerVideo, async (result) => {
+      status.textContent = "Scanning… point the camera at the barcode.";
+      reader.decodeFromVideoElement(video, async (result) => {
         if (!result || !cameraStream) return;
         const value = result.getText();
-        isbnInput.value = value;
         reader.reset();
         stopCameraScan();
-        await lookupBookByIsbn(value);
+        await onBarcode(value);
       });
     }
   } catch (error) {
     console.error(error);
     stopCameraScan();
-    scanStatus.textContent = error?.name === "NotAllowedError" || error?.name === "SecurityError"
+    status.textContent = error?.name === "NotAllowedError" || error?.name === "SecurityError"
       ? "Camera access was denied or blocked. Allow camera access on a secure page, or enter the ISBN manually."
       : "Could not start the barcode scanner. Check camera availability and your connection, or enter the ISBN manually.";
   }
@@ -9231,8 +9325,9 @@ function stopCameraScan() {
     cameraStream.getTracks().forEach((track) => track.stop());
     cameraStream = null;
   }
-  scannerVideo.style.display = "none";
-  scannerVideo.srcObject = null;
+  cameraVideoElement.style.display = "none";
+  cameraVideoElement.srcObject = null;
+  cameraVideoElement = scannerVideo;
 }
 
 function initializeSupabase() {
@@ -9630,10 +9725,7 @@ globalSearchForm.addEventListener("submit", async (event) => {
   await runNaturalSearch(query, { language: globalSearchLanguage.value });
 });
 
-globalIsbnScanBtn.addEventListener("click", () => {
-  openDialog();
-  if (state.session) startBookLookup("scan");
-});
+globalIsbnScanBtn.addEventListener("click", openQuickScan);
 
 setupTextInputDismissal();
 
@@ -9701,6 +9793,7 @@ document.addEventListener("keydown", (event) => {
     else if (editionDialogOverlay && !editionDialogOverlay.classList.contains("hidden")) closeBookEditionDialog();
     else if (!shelfDrawerOverlay.classList.contains("hidden")) closeShelfDrawer();
     else if (!authOverlay.classList.contains("hidden")) closeAuthModal();
+    else if (!quickScanOverlay.classList.contains("hidden")) closeQuickScan();
     else if (!dialogOverlay.classList.contains("hidden")) closeDialog();
     else if (!bookProfileOverlay.classList.contains("hidden")) closeBookProfile();
     else if (document.body.classList.contains("library-drawer-open")) setLibraryDrawerOpen(false);
@@ -9824,6 +9917,11 @@ isbnInput.addEventListener("keydown", (event) => {
 
 lookupIsbnBtn.addEventListener("click", () => {
   lookupBookByIsbn(isbnInput.value || "");
+});
+
+quickScanForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  lookupQuickScanBook(quickScanIsbnInput.value);
 });
 
 shelfForm.addEventListener("submit", async (event) => {
@@ -10004,6 +10102,12 @@ authOverlay.addEventListener("click", (event) => {
 closeDialogBtn.addEventListener("click", () => {
   stopCameraScan();
   closeDialog();
+});
+
+closeQuickScanBtn.addEventListener("click", closeQuickScan);
+
+quickScanOverlay.addEventListener("click", (event) => {
+  if (event.target === quickScanOverlay) closeQuickScan();
 });
 
 dialogOverlay.addEventListener("click", (event) => {
