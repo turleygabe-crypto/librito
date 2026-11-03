@@ -4614,9 +4614,22 @@ body {
 
 .edition-picker[data-status="loading"] .edition-picker-status {
   display: flex;
-  min-height: 4.7rem;
+  min-height: 8rem;
   align-items: center;
   justify-content: center;
+}
+
+.edition-picker[data-status="loading"] .book-loader-mini .book-loader-stage {
+  height: 6.5rem;
+  padding-top: 0.8rem;
+}
+
+.edition-picker[data-status="loading"] .book-loader-mini .book-loader-slot {
+  width: 4rem;
+}
+
+.edition-picker[data-status="loading"] .book-loader-mini .book-loader-message {
+  font-size: 1rem;
 }
 
 .edition-language-finder {
