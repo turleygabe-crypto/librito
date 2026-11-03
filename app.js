@@ -282,6 +282,7 @@ const dialogOverlay = document.getElementById("dialogOverlay");
 const closeDialogBtn = document.getElementById("closeDialogBtn");
 const bookEntryChoice = document.getElementById("bookEntryChoice");
 const scanBookOptionBtn = document.getElementById("scanBookOptionBtn");
+const scanOwnedBookOptionBtn = document.getElementById("scanOwnedBookOptionBtn");
 const lookupBookOptionBtn = document.getElementById("lookupBookOptionBtn");
 const manualBookOptionBtn = document.getElementById("manualBookOptionBtn");
 const bookLookupFlow = document.getElementById("bookLookupFlow");
@@ -350,6 +351,7 @@ let selectedBook = null;
 let titleSearchResults = [];
 let selectedTitleResult = null;
 let bookEntryMode = "";
+let scanAsOwned = false;
 let dialogReturnFocus = null;
 let shelfReturnFocus = null;
 let pendingShelfBook = null;
@@ -8692,6 +8694,7 @@ function openDialog() {
 
 function showEntryChoice() {
   bookEntryMode = "";
+  scanAsOwned = false;
   updateEntryModeSwitch("");
   bookEntryChoice.classList.remove("hidden");
   bookLookupFlow.classList.add("hidden");
@@ -9722,6 +9725,11 @@ scanBookOptionBtn.addEventListener("click", () => {
   startBookLookup("scan");
 });
 
+scanOwnedBookOptionBtn.addEventListener("click", () => {
+  scanAsOwned = true;
+  startBookLookup("scan");
+});
+
 lookupBookOptionBtn.addEventListener("click", () => {
   startBookLookup();
 });
@@ -10022,6 +10030,7 @@ bookForm.addEventListener("submit", async (event) => {
     id: crypto.randomUUID(),
     title: formData.get("title").toString().trim(),
     author: formData.get("author").toString().trim(),
+    ownership_status: scanAsOwned ? "owned" : null,
     cost: Number(formData.get("cost") || 0),
     added: formData.get("added").toString().trim(),
     notes: formData.get("notes").toString().trim(),

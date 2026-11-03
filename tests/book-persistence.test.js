@@ -73,6 +73,14 @@ test("manual book saves write status fields to books and custom memberships to b
   });
 });
 
+test("owned scan choice saves the scanned book with Owned status", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  assert.match(html, /id="scanOwnedBookOptionBtn"[^>]*>[\s\S]*?<strong>Scan owned Book<\/strong>/);
+  assert.match(source, /scanOwnedBookOptionBtn\.addEventListener\("click", \(\) => \{\s*scanAsOwned = true;\s*startBookLookup\("scan"\);\s*\}\)/);
+  assert.match(source, /function showEntryChoice\(\) \{\s*bookEntryMode = "";\s*scanAsOwned = false;/);
+  assert.match(source, /ownership_status: scanAsOwned \? "owned" : null/);
+});
+
 test("wishlist-only records stay separate from library books and persist independently", async () => {
   const saved = new Map();
   const state = {
