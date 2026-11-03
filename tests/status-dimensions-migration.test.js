@@ -138,6 +138,18 @@ test("status dimensions migration maps legacy data, is idempotent, and rolls bac
     1
   );
 
+  const wishlistMigration = await read("../supabase/migrations/20261103100000_wishlist_items.sql");
+  await db.exec(wishlistMigration);
+  await db.exec(wishlistMigration);
+  const { rows: wishlistItems } = await db.query(
+    "select title from public.wishlist_items where user_id = $1 order by title",
+    [user]
+  );
+  assert.deepEqual(wishlistItems.map((item) => item.title), ["Loved Book", "New Book", "Quiet Book"]);
+  assert.equal((await db.query("select count(*)::int as count from public.books where ownership_status = 'wishlist'")).rows[0].count, 3);
+  await db.exec(await read("../supabase/rollbacks/20261103100000_wishlist_items_down.sql"));
+  assert.equal((await db.query("select count(*)::int as count from information_schema.tables where table_schema = 'public' and table_name = 'wishlist_items'")).rows[0].count, 0);
+
   // Only stable keys are accepted.
   await assert.rejects(
     db.exec(`update public.books set reading_status = 'Read' where id = '${ids.completed}'`),

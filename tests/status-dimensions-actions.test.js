@@ -25,6 +25,7 @@ function harness(initialBooks = []) {
   const context = {
     state,
     t: translate,
+    getLibraryBooks: () => state.books.filter((book) => book.ownership_status !== "wishlist"),
     crypto: { randomUUID: () => `new-book-${state.books.length + 1}` },
     storageKey: "books",
     localStorage: { setItem: (key, value) => values.set(key, JSON.parse(value)) },

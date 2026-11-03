@@ -8,6 +8,12 @@ const saveFunction = source.slice(
   source.indexOf("async function saveBookToSupabase("),
   source.indexOf("\nglobalSearchForm.addEventListener(")
 );
+const wishlistHelpers = [
+  source.slice(source.indexOf("function getLibraryBooks("), source.indexOf("\nfunction saveBooks(")),
+  source.slice(source.indexOf("function normalizeBookRecord("), source.indexOf("\nfunction bookIdentityKey(")),
+  source.slice(source.indexOf("function getBookKey("), source.indexOf("\nfunction buildSuggestedShelves(")),
+  source.slice(source.indexOf("async function toggleBookWishlist("), source.indexOf("\nfunction getMissingBooksColumn(")),
+].join("\n");
 
 test("manual book saves write status fields to books and custom memberships to book_shelves", async () => {
   const writes = [];
@@ -65,4 +71,43 @@ test("manual book saves write status fields to books and custom memberships to b
     table: "book_shelves",
     payload: [{ book_id: "book-id", shelf_id: "shelf-id", user_id: "reader-id" }],
   });
+});
+
+test("wishlist-only records stay separate from library books and persist independently", async () => {
+  const saved = new Map();
+  const state = {
+    books: [
+      { title: "Library Book", author: "Reader", isbn: "111" },
+      { title: "Older Wish", author: "Reader", isbn: "222", ownership_status: "wishlist" },
+    ],
+    wishlistBooks: [{ title: "Older Wish", author: "Reader", isbn: "222", book_key: "222" }],
+  };
+  const context = {
+    state,
+    wishlistStorageKey: "librito-wishlist-v1",
+    localStorage: {
+      getItem: (key) => saved.get(key) || null,
+      setItem: (key, value) => saved.set(key, value),
+    },
+    readBookMeta: () => ({}),
+    applyBookMeta() {},
+    updateBookFields: async () => true,
+    render() {},
+    showToast() {},
+    console: { error() {}, warn() {} },
+  };
+  runInNewContext(`${wishlistHelpers}\nthis.getLibraryBooks = getLibraryBooks; this.getWishlistBooks = getWishlistBooks; this.toggleBookWishlist = toggleBookWishlist;`, context);
+
+  assert.deepEqual(JSON.parse(JSON.stringify(context.getLibraryBooks().map((book) => book.title))), ["Library Book"]);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.getWishlistBooks().map((book) => book.title))), ["Older Wish"]);
+  const book = { title: "Future Purchase", author: "Reader", isbn: "333", cover_url: "/cover.jpg" };
+  await context.toggleBookWishlist(book);
+  assert.deepEqual(JSON.parse(JSON.stringify(state.wishlistBooks.map((item) => item.title))), ["Future Purchase", "Older Wish"]);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.getLibraryBooks().map((item) => item.title))), ["Library Book"]);
+  assert.equal(JSON.parse(saved.get("librito-wishlist-v1")).length, 2);
+  assert.equal(saved.has("librito-library-v1"), false);
+
+  await context.toggleBookWishlist(book);
+  assert.deepEqual(JSON.parse(JSON.stringify(state.wishlistBooks.map((item) => item.title))), ["Older Wish"]);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.getLibraryBooks().map((item) => item.title))), ["Library Book"]);
 });

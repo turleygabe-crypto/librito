@@ -2650,7 +2650,8 @@ body {
 }
 
 .sidebar .sidebar-nav,
-.sidebar .sidebar-library-nav {
+.sidebar .sidebar-library-nav,
+.sidebar .sidebar-wishlist-nav {
   border-bottom-color: rgba(245, 221, 201, 0.12);
 }
 
@@ -2702,6 +2703,20 @@ body {
   margin-top: 0.35rem;
   padding-bottom: 0.75rem;
   border-bottom: 1px solid rgba(245, 221, 201, 0.12);
+}
+
+.sidebar-wishlist-nav {
+  display: grid;
+  padding: 0.45rem 0.5rem 0.65rem;
+  border-bottom: 1px solid rgba(245, 221, 201, 0.12);
+}
+
+.sidebar-wishlist-nav .nav-pill {
+  padding: 0.55rem 0.5rem;
+}
+
+.sidebar-wishlist-nav .nav-pill::before {
+  content: "♡";
 }
 
 .sidebar-library-nav .nav-pill {

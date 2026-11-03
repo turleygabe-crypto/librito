@@ -195,6 +195,7 @@ async function galleryHarness({ loadError = false, empty = false } = {}) {
   const state = { session: { user: { id: user } }, supabase: {}, books: [{ id: book }], view: "book" };
   const context = {
     state, t: translate,
+    getLibraryBooks: () => state.books.filter((item) => item.ownership_status !== "wishlist"),
     document: {
       body: new Element(),
       createElement: (tag) => new Element(tag), createTextNode: (text) => text,

@@ -43,6 +43,7 @@ const statusFunctions = source.slice(source.indexOf("function createReadingStatu
 
 function createCard(book, {
   ownedBooks = [], shelfNames = [], currentShelf = "", view = "browse",
+  wishlisted = false,
   width = 390, height = 844,
 } = {}) {
   const state = {
@@ -82,6 +83,7 @@ function createCard(book, {
     getReadingStatusLabel: (status) => context.READING_STATUS_LABELS[status] || "",
     getOwnershipStatusLabel: (status) => context.OWNERSHIP_STATUS_LABELS[status] || "",
     getLibraryBooks: () => ownedBooks,
+    isBookWishlisted: () => wishlisted,
     getBookKey: (entry) => entry.key,
     getAnyShelfNames: () => shelfNames,
     getCustomShelves: () => state.shelves.filter((shelf) => !shelf.is_wishlist),
@@ -89,7 +91,7 @@ function createCard(book, {
     wireCardPopover: () => assert.fail("Sheet statuses must not become detached popovers"),
   };
   for (const name of [
-    "navigateTo", "promptAddToShelf", "toggleBookFavorite", "removeAnyBookFromShelf",
+    "navigateTo", "promptAddToShelf", "toggleBookFavorite", "toggleBookWishlist", "removeAnyBookFromShelf",
     "openBookProfile", "removeBookFromLibrary", "shareBook", "setReadingStatus", "setOwnershipStatus",
   ]) {
     context[name] = (...args) => {
@@ -130,12 +132,16 @@ test("book cards have only one top-right action trigger, opening a sheet with bo
   assert.equal(header.children[1].children[1].textContent, book.author);
   assert.equal(sheet.attributes["aria-labelledby"], header.children[1].children[0].id);
   assert.deepEqual(actions.filter((action) => action.tagName === "button").map(actionLabel),
-    ["Add Favorite", "Add to a shelf", "Share", "Book Page", "Purchase"]);
+    ["Add Favorite", "Add to Wish list", "Add to a shelf", "Share", "Book Page", "Purchase"]);
   assert.equal(actions.filter((action) => action.tagName === "details").length, 2);
   const favorite = findAction(actions, "Add Favorite");
   assert.equal(favorite.attributes["aria-pressed"], "false");
   favorite.events.click();
   assert.deepEqual(calls, [["toggleBookFavorite", book]]);
+  const wishList = findAction(actions, "Add to Wish list");
+  assert.equal(wishList.attributes["aria-pressed"], "false");
+  wishList.events.click();
+  assert.deepEqual(calls.at(-1), ["toggleBookWishlist", book]);
 });
 
 test("saved book cards show current favorite/status values and dispatch all existing actions", () => {
@@ -146,7 +152,7 @@ test("saved book cards show current favorite/status values and dispatch all exis
   const harness = createCard(book, { ownedBooks: [book] });
   const { sheet, actions } = harness.open();
   assert.deepEqual(actions.filter((action) => action.tagName === "button").map(actionLabel),
-    ["Remove Favorite", "Add to a shelf", "Share", "Book Page", "Remove from library"]);
+    ["Remove Favorite", "Add to Wish list", "Add to a shelf", "Share", "Book Page", "Remove from library"]);
   assert.equal(findAction(actions, "Remove Favorite").attributes["aria-pressed"], "true");
   const statuses = actions.filter((action) => action.tagName === "details");
   assert.equal(statuses[0].children[0].textContent, "Currently Reading");
@@ -154,6 +160,7 @@ test("saved book cards show current favorite/status values and dispatch all exis
   sheet.close();
   for (const [label, name] of [
     ["Remove Favorite", "toggleBookFavorite"],
+    ["Add to Wish list", "toggleBookWishlist"],
     ["Add to a shelf", "promptAddToShelf"],
     ["Share", "shareBook"],
     ["Book Page", "openBookProfile"],
@@ -162,6 +169,15 @@ test("saved book cards show current favorite/status values and dispatch all exis
     findAction(harness.open().actions, label).events.click();
     assert.deepEqual(harness.calls.at(-1), [name, book]);
   }
+});
+
+test("wishlisted book cards expose a pressed remove action", () => {
+  const book = { key: "book-wishlist", title: "A Book", author: "An Author" };
+  const harness = createCard(book, { wishlisted: true });
+  const remove = findAction(harness.open().actions, "Remove from Wish list");
+  assert.equal(remove.attributes["aria-pressed"], "true");
+  remove.events.click();
+  assert.deepEqual(harness.calls, [["toggleBookWishlist", book]]);
 });
 
 test("reading and ownership choices, including clearing statuses, close the sheet and use existing persistence actions", () => {

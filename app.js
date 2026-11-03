@@ -9,6 +9,7 @@ import { escapeCsvCell } from "./lib/csv.js";
 import { getBookRetailers, loadMarketplaceBookListings } from "./lib/book-purchases.js";
 
 const storageKey = "librito-library-v1";
+const wishlistStorageKey = "librito-wishlist-v1";
 const shelvesStorageKey = "librito-shelves-v1";
 const statusShelvesStorageKey = "librito-status-shelves-v1";
 const legacyShelfItemsStorageKey = "librito-shelf-items-v1";
@@ -213,7 +214,7 @@ function checkShelfLimit(name) {
 
 function checkReadingLimit(book) {
   const tier = getAccountTier();
-  const reading = state.books.filter((item) => item.reading_status === "reading" && item !== book).length;
+  const reading = getLibraryBooks().filter((item) => item.reading_status === "reading" && item !== book).length;
   if (reading < tier.maxReading) return true;
   showToast(t("status.reading_limit", {
     tier: tier.name,
@@ -226,7 +227,7 @@ function checkReadingLimit(book) {
 
 function checkBookLimit() {
   const tier = getAccountTier();
-  if (state.books.length < tier.maxBooks) return true;
+  if (getLibraryBooks().length < tier.maxBooks) return true;
   showToast(`${tier.name} accounts have reached the library limit. Visit Membership plans to review available features.`);
   navigateTo("upgrade");
   return false;
@@ -234,6 +235,7 @@ function checkBookLimit() {
 
 const state = {
   books: [],
+  wishlistBooks: [],
   shelves: [],
   statusShelfKeys: [],
   session: null,
@@ -434,6 +436,9 @@ function restoreRouteFromLocation() {
     case "/library":
       showLibraryPage(params.get("filter") || "");
       break;
+    case "/wishlist":
+      showWishlistPage();
+      break;
     case "/shelf":
       showShelfPage(params.get("name") || "");
       break;
@@ -498,6 +503,18 @@ function loadBooks() {
     console.warn("Could not read saved library", error);
   }
   return defaultBooks.map(normalizeLocalBook);
+}
+
+function loadLocalWishlist() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(wishlistStorageKey) || "[]");
+    return Array.isArray(saved)
+      ? saved.map((book) => ({ ...normalizeBookRecord(book), ...book, book_key: book.book_key || getBookKey(book) }))
+      : [];
+  } catch (error) {
+    console.warn("Could not read your wish list", error);
+    return [];
+  }
 }
 
 function normalizeLocalBook(book) {
@@ -658,10 +675,29 @@ function migrateLegacyLocalShelfData(shelves) {
 
 function getLibraryBooks() {
   const meta = readBookMeta();
-  return state.books.map((book) => {
+  return state.books.filter((book) => book.ownership_status !== "wishlist").map((book) => {
     applyBookMeta(book, meta[getBookKey(book)]);
     return book;
   });
+}
+
+function getWishlistBooks() {
+  const books = [...state.wishlistBooks, ...state.books.filter((book) => book.ownership_status === "wishlist")];
+  const unique = new Map();
+  books.forEach((book) => {
+    const bookKey = book.book_key || getBookKey(book);
+    if (bookKey && !unique.has(bookKey)) unique.set(bookKey, { ...book, book_key: bookKey });
+  });
+  return [...unique.values()];
+}
+
+function isBookWishlisted(book) {
+  const bookKey = getBookKey(book);
+  return getWishlistBooks().some((item) => item.book_key === bookKey);
+}
+
+function saveWishlistBooks() {
+  if (!state.session) localStorage.setItem(wishlistStorageKey, JSON.stringify(state.wishlistBooks));
 }
 
 function saveBooks() {
@@ -676,6 +712,63 @@ async function toggleBookFavorite(book) {
   if (!current) return;
   if (existing && !await updateBookFields(current, { is_favorite: nextFavorite })) return;
   render();
+}
+
+async function toggleBookWishlist(book) {
+  const bookKey = getBookKey(book);
+  const existing = getWishlistBooks().find((item) => item.book_key === bookKey);
+  const legacyBook = state.books.find((item) => item.ownership_status === "wishlist" && getBookKey(item) === bookKey);
+  if (state.session && !state.supabase) {
+    showToast("Your account connection is unavailable. The wish list was not changed; try again.");
+    return;
+  }
+
+  if (existing) {
+    if (state.supabase && state.session) {
+      const { error } = await state.supabase.from("wishlist_items")
+        .delete()
+        .eq("user_id", state.session.user.id)
+        .eq("book_key", bookKey);
+      if (error) {
+        console.error(error);
+        showToast("Could not update your wish list. Run the latest Supabase migration first.");
+        return;
+      }
+      if (legacyBook && !await updateBookFields(legacyBook, { ownership_status: null, owned_format: null })) return;
+    } else if (legacyBook) {
+      legacyBook.ownership_status = null;
+      legacyBook.owned_format = null;
+      localStorage.setItem(storageKey, JSON.stringify(state.books));
+    }
+    state.wishlistBooks = state.wishlistBooks.filter((item) => (item.book_key || getBookKey(item)) !== bookKey);
+    saveWishlistBooks();
+    render();
+    showToast("Removed from your wish list");
+    return;
+  }
+
+  const item = {
+    ...normalizeBookRecord(book),
+    book_key: bookKey,
+    added_at: new Date().toISOString(),
+  };
+  if (state.supabase && state.session) {
+    const { data, error } = await state.supabase.from("wishlist_items")
+      .upsert({ ...item, user_id: state.session.user.id }, { onConflict: "user_id,book_key" })
+      .select("*")
+      .single();
+    if (error || !data) {
+      console.error(error || new Error("Supabase did not confirm the wish list entry."));
+      showToast("Could not add this book to your wish list. Run the latest Supabase migration first.");
+      return;
+    }
+    state.wishlistBooks = [data, ...state.wishlistBooks.filter((entry) => (entry.book_key || getBookKey(entry)) !== bookKey)];
+  } else {
+    state.wishlistBooks = [item, ...state.wishlistBooks];
+    saveWishlistBooks();
+  }
+  render();
+  showToast("Added to your wish list");
 }
 
 function getMissingBooksColumn(error) {
@@ -1385,6 +1478,8 @@ function renderShelves() {
   const libraryBooks = getLibraryBooks();
   const libraryCount = document.getElementById("libraryCount");
   if (libraryCount) libraryCount.textContent = String(libraryBooks.length);
+  const wishlistCount = document.getElementById("wishlistCount");
+  if (wishlistCount) wishlistCount.textContent = String(getWishlistBooks().length);
   const filters = getLibraryFilterOptions(libraryBooks);
   const shelvesToRender = getCustomShelves().map((shelf) => ({
     ...shelf,
@@ -2318,9 +2413,10 @@ function bookIdentityKey(book) {
 }
 
 function findOwnedBook(book) {
-  if (book.id && state.books.some((item) => item.id === book.id)) return state.books.find((item) => item.id === book.id);
+  const libraryBooks = getLibraryBooks();
+  if (book.id && libraryBooks.some((item) => item.id === book.id)) return libraryBooks.find((item) => item.id === book.id);
   const key = bookIdentityKey(book);
-  return state.books.find((item) => getBookKey(item) === key);
+  return libraryBooks.find((item) => getBookKey(item) === key);
 }
 
 function getAnyShelfNames(book) {
@@ -2519,6 +2615,13 @@ function openBookCardActions(book, trigger, event) {
     () => toggleBookFavorite(book),
   );
   favorite.setAttribute("aria-pressed", String(isFavorite));
+  const isWishlisted = isBookWishlisted(book);
+  const wishList = addAction(
+    isWishlisted ? "Remove from Wish list" : "Add to Wish list",
+    isWishlisted ? "♥" : "♡",
+    () => toggleBookWishlist(book),
+  );
+  wishList.setAttribute("aria-pressed", String(isWishlisted));
   actions.append(
     createReadingStatusMenu(book, ownedBook, { compact: true, inline: true, onSelect: close }),
     createOwnershipStatusMenu(book, ownedBook, { inline: true, onSelect: close }),
@@ -3660,6 +3763,21 @@ function showShelfPage(shelfName) {
   page.append(books.length ? createShelfBrowser(books) : createBookTable(books));
 }
 
+function showWishlistPage() {
+  updateActiveNavigation("Wish list");
+  const page = showPage("wishlist");
+  const books = getWishlistBooks();
+  page.append(createPageHeader("Your collections", "Wish list", "Books you’re interested in buying."));
+  if (books.length) {
+    page.append(createShelfBrowser(books, "wishlist"));
+  } else {
+    const empty = document.createElement("p");
+    empty.className = "row-empty-state";
+    empty.textContent = "Your wish list is empty.";
+    page.append(empty);
+  }
+}
+
 const shelfSortOptions = [
   ["added", "Recently added"],
   ["title", "Title: A to Z"],
@@ -4359,7 +4477,14 @@ function renderBookPage(book) {
   like.textContent = isFavorite ? "♥ Favorite" : "♡ Favorite";
   like.setAttribute("aria-pressed", String(isFavorite));
   like.addEventListener("click", () => toggleBookFavorite(book));
-  actions.append(like);
+  const wishList = document.createElement("button");
+  wishList.type = "button";
+  wishList.className = "secondary-btn";
+  const isWishlisted = isBookWishlisted(book);
+  wishList.textContent = isWishlisted ? "♥ On Wish list" : "♡ Add to Wish list";
+  wishList.setAttribute("aria-pressed", String(isWishlisted));
+  wishList.addEventListener("click", () => toggleBookWishlist(book));
+  actions.append(like, wishList);
   actions.append(createBookShelfMenu(book), moreMenu);
   content.append(actions, metadata, statusControls);
   if (isLibraryBook) {
@@ -4649,7 +4774,7 @@ function createPrivateBookPhotoGallery(book, displayBook = book) {
     dialog.showModal();
   });
   const active = () => state.session?.user.id === userId
-    && state.books.some((item) => item.id === book.id)
+    && getLibraryBooks().some((item) => item.id === book.id)
     && state.view === "book"
     && section.isConnected;
   const select = (index) => {
@@ -5301,7 +5426,7 @@ function updateBookReadingProgress(book, catalogPageCount = null) {
   const readingActions = page.querySelector(".reading-actions");
   if (!readingActions) return;
   const progress = readingActions.querySelector(".book-reading-progress");
-  const ownedBook = state.books.find((item) => getBookKey(item) === getBookKey(book));
+  const ownedBook = findOwnedBook(book);
   const pageCount = Number(catalogPageCount || ownedBook?.page_count || ownedBook?.pages
     || book.page_count || book.pages);
   if (!ownedBook || ownedBook.reading_status !== "reading"
@@ -5491,7 +5616,7 @@ function createOwnershipStatusMenu(book, ownedBook, { compact = false, inline = 
   summary.setAttribute("aria-label", `Ownership status: ${getOwnershipStatusLabel(currentStatus) || "not set"}`);
   const panel = document.createElement("div");
   panel.className = "book-status-menu-panel";
-  Object.entries(OWNERSHIP_STATUS_LABELS).forEach(([status, label]) => {
+  Object.entries(OWNERSHIP_STATUS_LABELS).filter(([status]) => status !== "wishlist").forEach(([status, label]) => {
     const option = document.createElement("button");
     option.type = "button";
     option.textContent = label;
@@ -6264,7 +6389,7 @@ function openBookEditionDetails(book, details, section, volumes, returnFocus) {
         cover_url: getBookEditionCoverUrl(book, details, "L"),
         page_count: details.page_count,
       };
-      const ownedBook = state.books.find((item) =>
+      const ownedBook = getLibraryBooks().find((item) =>
         (book.id && item.id === book.id) || getBookKey(item) === getBookKey(book)
       );
       const progressOwner = ownedBook || book;
@@ -8542,6 +8667,7 @@ function render() {
   else if (state.view === "shelf") showShelfPage(state.currentShelf);
   else if (state.view === "shelves") showShelvesPage();
   else if (state.view === "library") showLibraryPage(state.library.filter);
+  else if (state.view === "wishlist") showWishlistPage();
   else if (state.view === "suggested-shelf") restoreRouteFromLocation();
   else if (state.view === "search") showSearchPage(state.searchQuery);
   else if (state.view === "stats") showStatsPage();
@@ -9135,6 +9261,7 @@ async function initializeSupabaseOnce() {
         state.loading = true;
         state.loadError = "";
         state.books = [];
+        state.wishlistBooks = [];
         state.shelves = [];
         state.statusShelfKeys = [];
         render();
@@ -9144,6 +9271,7 @@ async function initializeSupabaseOnce() {
         state.loading = false;
         state.loadError = "";
         state.books = loadBooks();
+        state.wishlistBooks = loadLocalWishlist();
         state.shelves = loadLocalShelves();
         state.statusShelfKeys = loadLocalStatusShelfKeys();
         render();
@@ -9153,6 +9281,7 @@ async function initializeSupabaseOnce() {
     if (!session) {
       state.loading = false;
       state.books = loadBooks();
+      state.wishlistBooks = loadLocalWishlist();
       state.shelves = loadLocalShelves();
       state.statusShelfKeys = loadLocalStatusShelfKeys();
       render();
@@ -9163,6 +9292,7 @@ async function initializeSupabaseOnce() {
     }
 
     state.books = [];
+    state.wishlistBooks = [];
     state.shelves = [];
     state.statusShelfKeys = [];
     state.loading = true;
@@ -9174,6 +9304,7 @@ async function initializeSupabaseOnce() {
     state.loading = false;
     state.loadError = "";
     state.books = loadBooks();
+    state.wishlistBooks = loadLocalWishlist();
     state.shelves = loadLocalShelves();
     state.statusShelfKeys = loadLocalStatusShelfKeys();
     render();
@@ -9375,6 +9506,17 @@ async function loadFromSupabase() {
     if (book && joinedShelf?.name && !book.shelves.includes(joinedShelf.name)) book.shelves.push(joinedShelf.name);
   });
   state.books = books;
+  const { data: wishlistItems, error: wishlistError } = await state.supabase
+    .from("wishlist_items")
+    .select("*")
+    .order("added_at", { ascending: false });
+  if (wishlistError) {
+    console.error(wishlistError);
+    state.wishlistBooks = [];
+    showToast("Could not load your wish list. Run the latest Supabase migration first.");
+  } else {
+    state.wishlistBooks = (wishlistItems || []).map((item) => ({ ...item, book_key: item.book_key || getBookKey(item) }));
+  }
   state.loading = false;
   state.loadError = "";
   render();
@@ -9494,6 +9636,11 @@ document.getElementById("topHomeBtn").addEventListener("click", () => {
 document.getElementById("libraryNavBtn").addEventListener("click", () => {
   if (window.matchMedia("(max-width: 899px)").matches) setLibraryDrawerOpen(false);
   navigateTo("library", {});
+});
+
+document.getElementById("wishlistNavBtn").addEventListener("click", () => {
+  if (window.matchMedia("(max-width: 899px)").matches) setLibraryDrawerOpen(false);
+  navigateTo("wishlist");
 });
 
 document.getElementById("sidebarAddBookBtn").addEventListener("click", () => {
@@ -9701,6 +9848,7 @@ authButton.addEventListener("click", async () => {
     state.session = null;
     state.profile = null;
     state.books = loadBooks();
+    state.wishlistBooks = loadLocalWishlist();
     state.shelves = loadLocalShelves();
     render();
     updateAuthButton();

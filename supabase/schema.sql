@@ -256,3 +256,4 @@ alter table public.profiles enable row level security;
 -- Reading/ownership status dimensions, favorites, and retirement of the built-in
 -- Wishlist shelf and shelf_items: see migrations/20261029150000_status_dimensions.sql
 -- (rollback in rollbacks/20261029150000_status_dimensions_down.sql).
+-- Standalone wish-list entries: see migrations/20261103100000_wishlist_items.sql.

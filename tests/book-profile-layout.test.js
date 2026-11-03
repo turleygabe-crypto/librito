@@ -47,6 +47,8 @@ function renderProfile(ownedBook, signedIn = false) {
     createBookReadingProgress: () => new Element("book-reading-progress"),
     setBookBookmark: (book) => calls.push(["bookmark", book]),
     toggleBookFavorite: (book) => calls.push(["favorite", book]),
+    isBookWishlisted: () => false,
+    toggleBookWishlist: (book) => calls.push(["wishlist", book]),
     navigateTo() {},
     createBookEditionPicker: () => new Element("edition-picker"),
     createPrivateBookPhotoGallery: () => new Element("book-cover-gallery"),
@@ -77,9 +79,10 @@ test("profile places actions above metadata and statuses without the duplicate s
   assert.equal(metadata.children.length, 4);
   assert.equal(statuses.children.length, 2);
   assert.deepEqual(actions.children.map((child) => child.className),
-    ["secondary-btn", "book-shelf-menu", "book-more-menu"]);
+    ["secondary-btn", "secondary-btn", "book-shelf-menu", "book-more-menu"]);
   actions.children[0].events.click();
-  assert.deepEqual(calls, [["favorite", book]]);
+  actions.children[1].events.click();
+  assert.deepEqual(calls, [["favorite", book], ["wishlist", book]]);
   assert.deepEqual(page.children[2].children.map((child) => child.className),
     ["edition-picker", "book-profile-recommendation book-purchase-section", "book-audiobook-panel", "book-profile-recommendations"]);
 });

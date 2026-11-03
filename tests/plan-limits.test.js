@@ -17,6 +17,7 @@ test("plan UI keeps the current-read limit and marks marketplace access as comin
   const notices = [];
   const actions = {
     state, normalizePlan, PLAN_LIMITS,
+    getLibraryBooks: () => state.books.filter((book) => book.ownership_status !== "wishlist"),
     t: (_key, values) => `${values.tier} accounts can have up to ${values.max} books in ${values.status}`,
     getReadingStatusLabel: (status) => status,
     getCustomShelves: () => Array.from({ length: 100 }, () => ({})),

@@ -57,6 +57,8 @@ test("sidebar uses the accessible logo artwork and precaches it", async () => {
   assert.match(worker, /"\/assets\/Librito%20Digital%20Home%20Library%20Logo\.png"/);
   assert.match(sidebar, /id="closeLibraryBtn"[\s\S]*class="sidebar-content"[\s\S]*class="sidebar-nav"[\s\S]*id="shelfList"/);
   assert.match(sidebar, /id="libraryNavBtn"[^>]*><span>My library<\/span>/);
+  assert.match(sidebar, /<nav class="sidebar-wishlist-nav"[^>]*>[\s\S]*id="wishlistNavBtn"[\s\S]*<span>Wish list<\/span>/);
+  assert.ok(sidebar.indexOf('class="sidebar-wishlist-nav"') < sidebar.indexOf('class="sidebar-library"'));
 });
 
 test("botanical bookmark retains its own border, foliage and tassel without legacy overlays", async () => {
