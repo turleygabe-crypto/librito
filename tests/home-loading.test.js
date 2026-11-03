@@ -47,6 +47,10 @@ test("global ISBN scan has a separate quick lookup flow that opens the scanned b
   assert.match(source, /function buildGlobalSearchLanguageMenu\(\)[\s\S]*?introTitle\.textContent = "Search results language";[\s\S]*?This won't change the site language\./);
   assert.match(html, /id="quickScanOverlay"[\s\S]*?id="quickScanVideo"[\s\S]*?id="quickScanForm"[\s\S]*?id="quickScanIsbnInput"/);
   assert.match(source, /globalIsbnScanBtn\.addEventListener\("click", openQuickScan\)/);
+  const openQuickScanSource = source.slice(source.indexOf("function openQuickScan()"), source.indexOf("\nfunction closeQuickScan("));
+  assert.doesNotMatch(openQuickScanSource, /quickScanIsbnInput\.focus\(/);
+  assert.match(openQuickScanSource, /querySelector\("\.quick-scan-card"\)\.focus\(/);
+  assert.match(html, /class="dialog-card quick-scan-card"[^>]*tabindex="-1"/);
   assert.match(source, /function openQuickScan\(\)[\s\S]*?startCameraScan\(\{\s*video: quickScanVideo,\s*status: quickScanStatus,\s*onBarcode: \(value\) => lookupQuickScanBook\(value\)/);
   assert.match(source, /async function lookupQuickScanBook\(isbn\)[\s\S]*?setQuickScanLoading\(true, normalized\);[\s\S]*?openBookProfile\(book\);\s*await waitForBookProfileReady\(\);\s*if \(isCurrent\(\)\) closeQuickScan\(\);[\s\S]*?if \(matchingBook\) \{\s*await openProfile\(matchingBook\)/);
   assert.match(source, /function setQuickScanLoading\([\s\S]*?createBookLoader\(/);

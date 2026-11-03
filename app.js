@@ -8851,7 +8851,8 @@ function openQuickScan() {
   quickScanIsbnInput.value = "";
   quickScanStatus.textContent = "Point your camera at a book barcode, or enter its ISBN.";
   quickScanOverlay.classList.remove("hidden");
-  quickScanIsbnInput.focus();
+  // Focus the dialog, not the ISBN field, so mobile keyboards stay closed; the camera is the primary input.
+  quickScanOverlay.querySelector(".quick-scan-card").focus({ preventScroll: true });
   startCameraScan({
     video: quickScanVideo,
     status: quickScanStatus,
