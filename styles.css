@@ -218,6 +218,9 @@ button.account-menu-link { width: 100%; border: 0; background: transparent; text
 .quick-scan-controls { display: flex; gap: 0.55rem; }
 .quick-scan-controls input { min-width: 0; flex: 1; padding: 0.78rem 0.9rem; border: 1px solid rgba(139,94,60,.18); border-radius: 0.75rem; background: #fff; color: var(--ink); }
 .quick-scan-controls .action-btn { white-space: nowrap; }
+.quick-scan-card.is-loading #quickScanVideo, .quick-scan-card.is-loading .quick-scan-form { display: none !important; }
+.quick-scan-loading { display: grid; justify-items: center; gap: 0.4rem; padding: 1rem 0 0.5rem; text-align: center; }
+.quick-scan-loading-copy { margin: 0; color: var(--muted); font-size: 0.85rem; }
 .lookup-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.65rem; max-height: 54vh; overflow-y: auto; padding: 0.1rem; }
 .lookup-result { min-width: 0; display: grid; grid-template-rows: auto 1fr; gap: 0.5rem; padding: 0.55rem; border: 1px solid rgba(139,94,60,.18); border-radius: 0.7rem; background: #fff; color: var(--ink); text-align: left; }
 .lookup-result[aria-pressed="true"] { border-color: #7a4a2d; box-shadow: 0 0 0 2px rgba(122,74,45,.2); }
@@ -6275,37 +6278,44 @@ body {
   );
 }
 
-.global-search .global-language-menu {
+.global-language-control {
+  position: relative;
+  display: flex;
   flex: 0 0 auto;
-  order: 1;
+  align-items: center;
+  min-width: 0;
 }
 
-.global-search .edition-language-trigger {
+.global-language-control .global-language-menu {
+  flex: 0 0 auto;
+}
+
+.global-language-control .edition-language-trigger {
   order: 0;
   display: flex;
   width: auto;
   height: auto;
   min-width: 0;
-  min-height: 2.1rem;
-  max-width: 20rem;
-  padding: 0.25rem 0.75rem;
+  min-height: 2.6rem;
+  max-width: 14rem;
+  padding: 0.3rem 0.9rem;
   border-radius: 999px;
   font-size: 0.85rem;
   line-height: 1.2;
 }
 
-.global-search .edition-language-trigger span {
+.global-language-control .edition-language-trigger span {
   white-space: normal;
   overflow-wrap: anywhere;
 }
 
-.global-search .edition-language-list {
+.global-language-control .edition-language-list {
   left: auto;
   right: 0;
   min-width: 13rem;
 }
 
-.global-search .edition-language-option {
+.global-language-control .edition-language-option {
   display: block;
   width: 100%;
   height: auto;
@@ -6314,18 +6324,19 @@ body {
   text-align: left;
 }
 
-.global-search .edition-language-option:hover {
+.global-language-control .edition-language-option:hover {
   background: #f3e4d4;
 }
 
-.global-search .edition-language-option[aria-selected="true"] {
+.global-language-control .edition-language-option[aria-selected="true"] {
   background: #b64d2c;
   color: #fffaf3;
 }
 
 @media (max-width: 600px) {
-  .global-search .edition-language-trigger {
-    max-width: none;
+  .global-language-control .edition-language-list {
+    right: auto;
+    left: 0;
   }
 }
 
@@ -6389,17 +6400,25 @@ body {
     text-overflow: ellipsis;
   }
 
-  .global-search .edition-language-trigger {
-    max-width: none;
-    padding: 0.25rem 0.55rem;
-  }
-
-  .global-search {
-    flex-wrap: wrap;
-  }
-
   .global-search input {
-    flex: 1 1 calc(100% - 5.5rem);
+    flex: 1 1 auto;
+  }
+
+  .spotify-topbar {
+    flex-wrap: wrap;
+    row-gap: 0.4rem;
+  }
+
+  .global-language-control {
+    order: 10;
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+
+  .global-language-control .edition-language-trigger {
+    min-height: 2rem;
+    padding: 0.2rem 0.75rem;
+    font-size: 0.8rem;
   }
 
   .global-search > button {
@@ -6416,15 +6435,6 @@ body {
 
   .global-search > .global-isbn-scan .global-isbn-scan-label {
     display: none;
-  }
-
-  .global-search .global-language-menu {
-    flex: 1 1 100%;
-    min-width: 0;
-  }
-
-  .global-search .edition-language-trigger {
-    width: 100%;
   }
 
   .page-view h1 {
@@ -7696,7 +7706,7 @@ body.book-actions-open {
 .card-add-actions button,
 .card-add-actions .shelf-create-option,
 .edition-language-option,
-.global-search .edition-language-option,
+.global-language-control .edition-language-option,
 .disposition-option {
   background: transparent;
   color: var(--cream);
@@ -7717,8 +7727,8 @@ body.book-actions-open {
 .card-add-actions .is-on-shelf,
 .edition-language-option:hover,
 .edition-language-option[aria-selected="true"],
-.global-search .edition-language-option:hover,
-.global-search .edition-language-option[aria-selected="true"] {
+.global-language-control .edition-language-option:hover,
+.global-language-control .edition-language-option[aria-selected="true"] {
   background: var(--sage-ink);
   color: var(--cream);
 }
@@ -7764,7 +7774,7 @@ body.book-actions-open {
 .book-status-menu > summary.currently-reading-button,
 .edition-picker-button,
 .edition-language-trigger,
-.global-search .edition-language-trigger,
+.global-language-control .edition-language-trigger,
 .audiobook-sample-button,
 .book-audiobook-find,
 .upgrade-cta:not(.is-current),

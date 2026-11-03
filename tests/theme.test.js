@@ -221,7 +221,7 @@ test("logo-inspired typography uses warm gold on green and readable bronze on li
 });
 
 test("language label wraps rather than truncating and English cursive is self-hosted", async () => {
-  const span = css.match(/\.global-search \.edition-language-trigger span\s*\{([^}]+)\}/)[1];
+  const span = css.match(/\.global-language-control \.edition-language-trigger span\s*\{([^}]+)\}/)[1];
   assert.match(span, /white-space: normal/);
   assert.doesNotMatch(span, /ellipsis|overflow: hidden/);
   assert.match(css, /\.home-hero\.hero-english h1\s*\{[^}]*font-family: "Librito Script", cursive/);

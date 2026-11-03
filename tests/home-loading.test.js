@@ -41,10 +41,16 @@ test("global ISBN scan has a separate quick lookup flow that opens the scanned b
   const searchForm = html.slice(html.indexOf('<form id="globalSearchForm"'), html.indexOf("</form>", html.indexOf('<form id="globalSearchForm"')));
   assert.match(searchForm, /id="globalIsbnScanBtn"[^>]*aria-label="Scan ISBN barcode"[^>]*title="Scan ISBN barcode"/);
   assert.ok(searchForm.indexOf('id="globalIsbnScanBtn"') < searchForm.indexOf('id="previewBtn"'));
+  assert.doesNotMatch(searchForm, /globalSearchLanguage/);
+  assert.match(html, /<\/form>\s*<div class="global-language-control">[\s\S]*?id="globalSearchLanguage"/);
+  assert.match(css, /\.global-language-control\s*\{[^}]*order: 10;[^}]*flex: 1 1 100%/);
   assert.match(html, /id="quickScanOverlay"[\s\S]*?id="quickScanVideo"[\s\S]*?id="quickScanForm"[\s\S]*?id="quickScanIsbnInput"/);
   assert.match(source, /globalIsbnScanBtn\.addEventListener\("click", openQuickScan\)/);
   assert.match(source, /function openQuickScan\(\)[\s\S]*?startCameraScan\(\{\s*video: quickScanVideo,\s*status: quickScanStatus,\s*onBarcode: \(value\) => lookupQuickScanBook\(value\)/);
-  assert.match(source, /async function lookupQuickScanBook\(isbn\)[\s\S]*?closeQuickScan\(\);\s*if \(matchingBook\) \{\s*openBookProfile\(matchingBook\)/);
+  assert.match(source, /async function lookupQuickScanBook\(isbn\)[\s\S]*?setQuickScanLoading\(true, normalized\);[\s\S]*?openBookProfile\(book\);\s*await waitForBookProfileReady\(\);\s*if \(isCurrent\(\)\) closeQuickScan\(\);[\s\S]*?if \(matchingBook\) \{\s*await openProfile\(matchingBook\)/);
+  assert.match(source, /function setQuickScanLoading\([\s\S]*?createBookLoader\(/);
+  assert.match(css, /\.quick-scan-card\.is-loading #quickScanVideo, \.quick-scan-card\.is-loading \.quick-scan-form \{ display: none !important; \}/);
+  assert.match(css, /@media \(max-width: 700px\)[\s\S]*?\.global-language-control \{\s*order: 10;\s*flex: 1 1 100%;\s*justify-content: center;/);
   assert.match(source, /quickScanForm\.addEventListener\("submit", \(event\) => \{\s*event\.preventDefault\(\);\s*lookupQuickScanBook\(quickScanIsbnInput\.value\)/);
   assert.match(source, /scanBookOptionBtn\.addEventListener\("click", \(\) => \{\s*startBookLookup\("scan"\);\s*\}\)/);
   assert.match(css, /\.global-search > \.global-isbn-scan\s*\{/);
@@ -62,12 +68,18 @@ test("quick ISBN lookup opens matching library books and metadata-only book prof
     publish_date: "2024",
     number_of_pages: 240,
   };
-  const createLookup = (books) => {
-    const result = { closed: false, opened: null, status: { textContent: "" } };
+  const createLookup = (books, data = bookData) => {
+    const result = { closed: false, opened: null, loading: [], status: { textContent: "" } };
     const context = {
       state: { books, catalogBooks: [], searchResults: [] },
       quickScanStatus: result.status,
-      fetchBookDataByIsbn: async () => bookData,
+      quickScanLookupId: 0,
+      quickScanReturnFocus: null,
+      HTMLElement: class {},
+      fetchBookDataByIsbn: async () => data,
+      stopCameraScan() {},
+      setQuickScanLoading: (isLoading) => { result.loading.push(isLoading); },
+      waitForBookProfileReady: async () => { result.waited = true; },
       closeQuickScan: () => { result.closed = true; },
       openBookProfile: (book) => { result.opened = book; },
       console,
@@ -83,6 +95,14 @@ test("quick ISBN lookup opens matching library books and metadata-only book prof
   await libraryLookup.lookup("9781234567890");
   assert.equal(libraryLookup.closed, true);
   assert.equal(libraryLookup.opened, libraryBook);
+  assert.deepEqual(libraryLookup.loading, [true]);
+  assert.equal(libraryLookup.waited, true);
+
+  const missingLookup = createLookup([], null);
+  await missingLookup.lookup("9781234567890");
+  assert.deepEqual(missingLookup.loading, [true, false]);
+  assert.equal(missingLookup.opened, null);
+  assert.match(missingLookup.status.textContent, /No book found/);
 
   const metadataLookup = createLookup([]);
   await metadataLookup.lookup("9781234567890");

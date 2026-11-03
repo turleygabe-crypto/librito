@@ -8795,8 +8795,47 @@ function closeDialog() {
 }
 
 let quickScanReturnFocus = null;
+let quickScanLookupId = 0;
+
+function setQuickScanLoading(isLoading, isbn = "") {
+  const card = quickScanOverlay.querySelector(".quick-scan-card");
+  card.classList.toggle("is-loading", isLoading);
+  card.setAttribute("aria-busy", String(isLoading));
+  quickScanOverlay.querySelector(".quick-scan-loading")?.remove();
+  if (!isLoading) return;
+  const loading = document.createElement("div");
+  loading.className = "quick-scan-loading";
+  const loader = createBookLoader({ message: `Opening ISBN ${isbn}…` });
+  const copy = document.createElement("p");
+  copy.className = "quick-scan-loading-copy";
+  copy.textContent = `ISBN ${isbn} scanned. Opening the book profile…`;
+  loading.append(loader, copy);
+  quickScanStatus.before(loading);
+}
+
+// Keep the loader up until the profile page and its cover have rendered.
+function waitForBookProfileReady(minimumMs = 900, maximumMs = 2500) {
+  const minimum = new Promise((resolve) => window.setTimeout(resolve, minimumMs));
+  const coverLoaded = new Promise((resolve) => {
+    const deadline = window.setTimeout(resolve, maximumMs);
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      const image = document.querySelector("#pageView .book-detail-layout img");
+      if (!image || image.complete) {
+        window.clearTimeout(deadline);
+        resolve();
+        return;
+      }
+      const done = () => { window.clearTimeout(deadline); resolve(); };
+      image.addEventListener("load", done, { once: true });
+      image.addEventListener("error", done, { once: true });
+    }));
+  });
+  return Promise.all([minimum, coverLoaded]);
+}
 
 function openQuickScan() {
+  quickScanLookupId += 1;
+  setQuickScanLoading(false);
   quickScanReturnFocus = document.activeElement;
   quickScanIsbnInput.value = "";
   quickScanStatus.textContent = "Point your camera at a book barcode, or enter its ISBN.";
@@ -8810,7 +8849,9 @@ function openQuickScan() {
 }
 
 function closeQuickScan() {
+  quickScanLookupId += 1;
   stopCameraScan();
+  setQuickScanLoading(false);
   quickScanOverlay.classList.add("hidden");
   if (quickScanReturnFocus instanceof HTMLElement && quickScanReturnFocus.isConnected) quickScanReturnFocus.focus();
   quickScanReturnFocus = null;
@@ -8848,10 +8889,23 @@ async function lookupQuickScanBook(isbn) {
     return;
   }
 
-  quickScanStatus.textContent = `Looking up ISBN ${normalized}…`;
+  const lookupId = ++quickScanLookupId;
+  const isCurrent = () => lookupId === quickScanLookupId;
+  stopCameraScan();
+  quickScanStatus.textContent = "";
+  setQuickScanLoading(true, normalized);
+  const openProfile = async (book) => {
+    if (!isCurrent()) return;
+    if (quickScanReturnFocus instanceof HTMLElement && quickScanReturnFocus.isConnected) quickScanReturnFocus.focus();
+    openBookProfile(book);
+    await waitForBookProfileReady();
+    if (isCurrent()) closeQuickScan();
+  };
   try {
     const bookData = await fetchBookDataByIsbn(normalized);
+    if (!isCurrent()) return;
     if (!bookData) {
+      setQuickScanLoading(false);
       quickScanStatus.textContent = "No book found for that ISBN. Check the number and try again.";
       return;
     }
@@ -8864,16 +8918,15 @@ async function lookupQuickScanBook(isbn) {
       return isbns.some((value) => normalizeIsbn(value) === normalized);
     });
 
-    closeQuickScan();
     if (matchingBook) {
-      openBookProfile(matchingBook);
+      await openProfile(matchingBook);
       return;
     }
 
     const subjects = Array.isArray(bookData.subjects)
       ? bookData.subjects.map((subject) => typeof subject === "string" ? subject : subject.name).filter(Boolean)
       : [];
-    openBookProfile({
+    await openProfile({
       title: bookData.title || "Untitled",
       author: authors.join(", "),
       genre: subjects[0] || "",
@@ -8884,6 +8937,8 @@ async function lookupQuickScanBook(isbn) {
     });
   } catch (error) {
     console.error(error);
+    if (!isCurrent()) return;
+    setQuickScanLoading(false);
     quickScanStatus.textContent = "Lookup failed. Check your connection and try again.";
     showToast("Book lookup failed");
   }
