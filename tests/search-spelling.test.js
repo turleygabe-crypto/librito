@@ -9,6 +9,8 @@ const normalizationSource = source.slice(source.indexOf("function normalizeBookT
 const searchSource = source.slice(source.indexOf("function parseNaturalSearch("), source.indexOf("function showStatsPage("));
 const lookupSource = source.slice(source.indexOf("async function lookupBooksByTitleOrAuthor("), source.indexOf("// Book barcodes"));
 const editionSource = source.slice(source.indexOf("function getEmbeddedOpenLibraryEdition("), source.indexOf("async function getMatchingOpenLibraryEdition("));
+const catalogMapSource = source.slice(source.indexOf("async function mapCatalogItems("), source.indexOf("\nfunction normalizeCatalogText("));
+const catalogGroupSource = source.slice(source.indexOf("function groupCatalogSearchBooks("), source.indexOf("\nfunction showSearchPage("));
 const coelho = {
   key: "/works/OL796465W",
   title: "O Alquimista",
@@ -33,13 +35,16 @@ function createContext(overrides = {}) {
     getOpenLibraryLanguageName: (language) => language,
     OPEN_LIBRARY_EDITION_FIELDS: "editions",
     showSearchPage(query) { context.state.view = "search"; context.state.searchQuery = query; },
-    getBestEditionsByLanguage: async () => [{
-      title: "The Alchemist", language: "eng", isbn_13: ["9780061122415"], number_of_pages: 180,
-    }],
+    getOpenLibrarySearchBook: async (work, language) => {
+      const edition = context.getEmbeddedOpenLibraryEdition(work, language);
+      return edition ? {
+        ...work, ...edition, work_keys: [work.key], languages: edition.language, edition_count: 1,
+      } : null;
+    },
     fetchGoogleCatalogBooks: async () => { throw new Error("Unexpected Google fallback"); },
     ...overrides,
   };
-  runInNewContext(`${spellingSource}\n${normalizationSource}\n${editionSource}\n${searchSource}`, context);
+  runInNewContext(`${spellingSource}\n${normalizationSource}\n${editionSource}\n${catalogMapSource}\n${catalogGroupSource}\n${searchSource}`, context);
   return context;
 }
 
@@ -229,4 +234,82 @@ test("add-book author lookup uses the same correction and identifies closest spe
   assert.equal(context.titleSearchResults.length, 1);
   assert.equal(context.titleSearchResults[0].author_name[0], "Paulo Coelho");
   assert.match(context.scanStatus.textContent, /closest spelling matches/);
+});
+
+function createMultilingualSearchContext() {
+  const works = [
+    { key: "/works/OL1W", title: "Los cuatro acuerdos", author_name: ["Don Miguel Ruiz"] },
+    { key: "/works/OL2W", title: "The Four Agreements", author_name: ["Don Miguel Ruiz"] },
+    { key: "/works/OL3W", title: "四つの約束", author_name: ["Don Miguel Ruiz"] },
+  ];
+  const requests = [];
+  const context = createContext({
+    lookupTitleInput: { value: works[0].title },
+    lookupAuthorInput: { value: "" },
+    lookupLanguage: { value: "default" },
+    getDefaultBookLanguage: () => "eng",
+    normalizeBookIsbn: (value) => value || "",
+    scanStatus: { textContent: "" },
+    titleSearchResults: [],
+    titleLookupResults: { replaceChildren() {} },
+    renderSelectedBookConfirmation() {},
+    renderTitleSearchResults() {},
+    fetchOpenLibrarySearch: async (params) => {
+      requests.push(params);
+      if (params.has("title")) return { docs: works.filter((work) => work.title === params.get("title")) };
+      return { docs: params.get("q")?.startsWith("id_librarything:") ? works : works.slice(0, 2) };
+    },
+    fetchJsonCached: async (url) => {
+      const index = works.findIndex((work) => url.includes(`${work.key}/`));
+      assert.ok(index >= 0, `Unexpected catalog request: ${url}`);
+      return { size: 1, entries: [{
+        key: `/books/OL${index + 1}M`, title: works[index].title,
+        languages: [{ key: `/languages/${["spa", "eng", "jpn"][index]}` }],
+        identifiers: { librarything: ["3221"] },
+        isbn_13: [`978000000000${index + 1}`],
+      }] };
+    },
+  });
+  const resolverSource = source.slice(source.indexOf("async function getOpenLibraryWorkEditions("), source.indexOf("\nfunction showSearchPage("));
+  runInNewContext(`${resolverSource}\n${lookupSource}`, context);
+  return { context, requests };
+}
+
+test("Discover resolves a Spanish query to English before filtering and groups translated work records", async () => {
+  const { context, requests } = createMultilingualSearchContext();
+  await context.runNaturalSearch("Los cuatro acuerdos", { updateHistory: false, language: "eng" });
+  assert.equal(context.state.searchResults.length, 1);
+  assert.equal(context.state.searchResults[0].title, "The Four Agreements");
+  assert.equal(context.state.searchResults[0].edition_count, 3);
+  assert.deepEqual(Array.from(context.state.searchResults[0].languages).sort(), ["eng", "jpn", "spa"]);
+  assert.ok(requests.every((params) => !params.get("q")?.includes("language:")));
+});
+
+test("Discover all-language search presents one book with all editions instead of one card per language", async () => {
+  const { context } = createMultilingualSearchContext();
+  await context.runNaturalSearch("Los cuatro acuerdos", { updateHistory: false, language: "all" });
+  assert.equal(context.state.searchResults.length, 1);
+  assert.equal(context.state.searchResults[0].edition_count, 3);
+  assert.equal(context.state.searchResults[0].languages.length, 3);
+});
+
+test("add-book lookup keeps the browser-language default but resolves translated queries first", async () => {
+  const { context, requests } = createMultilingualSearchContext();
+  await context.lookupBooksByTitleOrAuthor();
+  assert.equal(context.titleSearchResults.length, 1);
+  assert.equal(context.titleSearchResults[0].title, "The Four Agreements");
+  assert.equal(context.titleSearchResults[0].edition_count, 3);
+  assert.ok(requests.every((params) => !params.get("q")?.includes("language:")));
+  assert.match(context.scanStatus.textContent, /1 matching books/);
+});
+
+test("Discover resolves matching editions for works beyond the previous eight-work cap", async () => {
+  const context = createContext({
+    fetchOpenLibrarySearch: async () => ({ docs: Array.from({ length: 12 }, (_, index) => ({
+      ...coelho, key: `/works/OL${index}W`, title: `Book ${index}`,
+      editions: { docs: [{ title: `Book ${index}`, language: ["eng"], isbn: [`isbn${index}`] }] },
+    })) }),
+  });
+  await context.runNaturalSearch("paulo coelho", { updateHistory: false, language: "all" });
+  assert.equal(context.state.searchResults.length, 12);
 });
