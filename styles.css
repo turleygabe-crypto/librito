@@ -8072,21 +8072,24 @@ body .book-actions-list .book-status-menu[open] > summary {
 
 .home-rows > .card-row-section {
   position: relative;
-  padding-bottom: 2rem;
+  padding-bottom: 0.55rem;
   border-bottom: 0;
   background: transparent;
+}
+
+.home-rows > .card-row-section .section-heading-row {
+  margin-bottom: 2rem;
 }
 
 .home-rows > .card-row-section::before {
   content: "";
   position: absolute;
   z-index: 1;
-  right: 0;
-  bottom: 0;
+  top: 2rem;
   left: 0;
   width: min(86%, 48rem);
   height: 20px;
-  margin-inline: auto;
+  margin: 0;
   background: url("/assets/divider-botanical-1.png") center / contain no-repeat;
   pointer-events: none;
 }
