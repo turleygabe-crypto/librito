@@ -35,6 +35,17 @@ class Element {
   addEventListener(name, handler) { this.events[name] = handler; }
 }
 
+test("global search includes an accessible ISBN scanner that opens the camera flow", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  const searchForm = html.slice(html.indexOf('<form id="globalSearchForm"'), html.indexOf("</form>", html.indexOf('<form id="globalSearchForm"')));
+  assert.match(searchForm, /id="globalIsbnScanBtn"[^>]*aria-label="Scan ISBN barcode"[^>]*title="Scan ISBN barcode"/);
+  assert.ok(searchForm.indexOf('id="globalIsbnScanBtn"') < searchForm.indexOf('id="previewBtn"'));
+  assert.match(source, /globalIsbnScanBtn\.addEventListener\("click", \(\) => \{\s*openDialog\(\);\s*if \(state\.session\) startBookLookup\("scan"\);\s*\}\)/);
+  assert.match(css, /\.global-search > \.global-isbn-scan\s*\{/);
+  assert.match(css, /\.global-search > \.global-isbn-scan \.global-isbn-scan-label\s*\{\s*display: none;/);
+});
+
 test("the sidebar uses the transparent bookmark artwork and precaches it", async () => {
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   assert.match(css, /url\("\/assets\/Elegant%20Botanical%20Green%20Bookmark\.png"\)/);

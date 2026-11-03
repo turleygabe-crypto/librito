@@ -327,6 +327,7 @@ const closeShelfDrawerBtn = document.getElementById("closeShelfDrawerBtn");
 const globalSearchForm = document.getElementById("globalSearchForm");
 const globalSearchInput = document.getElementById("globalSearchInput");
 const globalSearchLanguage = document.getElementById("globalSearchLanguage");
+const globalIsbnScanBtn = document.getElementById("globalIsbnScanBtn");
 const sidebar = document.getElementById("sidebar");
 const libraryToggleBtn = document.getElementById("libraryToggleBtn");
 const sidebarBackdrop = document.getElementById("sidebarBackdrop");
@@ -9627,6 +9628,11 @@ globalSearchForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const query = globalSearchInput.value.trim();
   await runNaturalSearch(query, { language: globalSearchLanguage.value });
+});
+
+globalIsbnScanBtn.addEventListener("click", () => {
+  openDialog();
+  if (state.session) startBookLookup("scan");
 });
 
 setupTextInputDismissal();
