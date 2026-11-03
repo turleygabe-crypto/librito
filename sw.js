@@ -1,7 +1,7 @@
-const CACHE_NAME = "librito-cache-v95";
+const CACHE_NAME = "librito-cache-v96";
 const IMAGE_CACHE = "librito-covers-v1";
 const IMAGE_CACHE_LIMIT = 400;
-const ASSETS = ["/", "/index.html", "/styles.css", "/app.js", "/lib/book-photos.js", "/lib/book-purchases.js", "/lib/marketplace-photos.js", "/lib/image-validation.js", "/translations.js", "/cookie-consent.js", "/manifest.webmanifest", "/assets/DancingScript.ttf", "/assets/Elegant%20Botanical%20Green%20Bookmark.png", "/assets/Librito%20Digital%20Home%20Library%20Logo.png", "/assets/Ornate%20Golden%20X%20Medallion.png", ...Array.from({ length: 6 }, (_, index) => `/assets/divider-botanical-${index + 1}.png`)];
+const ASSETS = ["/", "/index.html", "/styles.css", "/app.js", "/lib/book-photos.js", "/lib/book-purchases.js", "/lib/marketplace-photos.js", "/lib/image-validation.js", "/translations.js", "/cookie-consent.js", "/manifest.webmanifest", "/assets/DancingScript.ttf", "/assets/CormorantGaramond-Semibold.ttf", "/assets/Elegant%20Botanical%20Green%20Bookmark.png", "/assets/Librito%20Digital%20Home%20Library%20Logo.png", "/assets/Ornate%20Golden%20X%20Medallion.png", ...Array.from({ length: 6 }, (_, index) => `/assets/divider-botanical-${index + 1}.png`)];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));

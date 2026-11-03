@@ -157,17 +157,17 @@ test("dropdown surfaces follow their trigger color even when portaled to the bod
 
 test("home rows share a background and use alternating ornamental dividers", async () => {
   const rows = css.slice(css.lastIndexOf("\n.home-rows > .card-row-section {"));
-  assert.match(rows, /\.home-rows > \.card-row-section::before/);
+  assert.match(rows, /\.home-rows > \.card-row-section \.section-heading-row::before/);
   assert.doesNotMatch(rows, /(?<!\.home-rows > )\.card-row-section(?::|\s*\{)/);
   assert.match(rows, /background: transparent/);
   assert.match(rows, /padding-bottom: 0\.55rem/);
-  assert.match(rows, /\.home-rows > \.card-row-section \.section-heading-row\s*\{\s*margin-bottom: 1\.45rem/);
+  assert.match(rows, /\.home-rows > \.card-row-section \.section-heading-row\s*\{\s*position: relative;\s*padding-bottom: 1\.45rem;\s*margin-bottom: 0\.2rem/);
   assert.doesNotMatch(rows, /background: linear-gradient|rgba\(232, 195, 174/);
-  assert.match(rows, /::before\s*\{[^}]*top: 1\.65rem[^}]*left: 0[^}]*width: min\(60%, 18rem\)[^}]*height: auto[^}]*aspect-ratio: 15 \/ 1[^}]*margin: 0[^}]*background: url\("\/assets\/divider-botanical-1.png"\) left center \/ 100% auto no-repeat[^}]*pointer-events: none/);
+  assert.match(rows, /::before\s*\{[^}]*bottom: 0\.2rem[^}]*left: 0[^}]*width: min\(60%, 18rem\)[^}]*height: auto[^}]*aspect-ratio: 15 \/ 1[^}]*margin: 0[^}]*background: url\("\/assets\/divider-botanical-1.png"\) left center \/ 100% auto no-repeat[^}]*pointer-events: none/);
   assert.doesNotMatch(rows, /100% 100%/);
   for (let index = 2; index <= 6; index += 1) {
     const selector = index === 6 ? "6n" : `6n + ${index}`;
-    const rule = rows.slice(rows.indexOf(`.home-rows > .card-row-section:nth-of-type(${selector})::before`)).split("}")[0];
+    const rule = rows.slice(rows.indexOf(`.home-rows > .card-row-section:nth-of-type(${selector}) .section-heading-row::before`)).split("}")[0];
     assert(rule.includes(`background-image: url("/assets/divider-botanical-${index}.png")`));
   }
   assert.doesNotMatch(rows, /::after|mask:|filter:|divider-collection-|\.svg|repeat-x/);
@@ -178,6 +178,19 @@ test("home rows share a background and use alternating ornamental dividers", asy
     assert.equal(png.subarray(1, 4).toString(), "PNG");
     assert.equal(png.readUInt32BE(16), 2172);
   }
+});
+
+test("home category headings use self-hosted Cormorant Garamond with a two-point increase", async () => {
+  assert.match(css, /@font-face\s*\{[^}]*font-family: "Cormorant Garamond";[^}]*CormorantGaramond-Semibold\.ttf[^}]*font-weight: 600;[^}]*font-display: swap/);
+  const rows = css.slice(css.lastIndexOf("\n.home-rows > .card-row-section {"));
+  assert.match(rows, /\.section-heading-row h2\s*\{[^}]*font-family: "Cormorant Garamond", Georgia, serif;[^}]*font-size: calc\(1\.2rem \+ 2pt\);[^}]*font-weight: 600;[^}]*line-height: 1\.2/);
+  assert.match(rows, /@media \(max-width: 480px\)[^}]*font-size: calc\(1rem \+ 2pt\)/);
+  const worker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
+  assert.match(worker, /"\/assets\/CormorantGaramond-Semibold\.ttf"/);
+  const font = await readFile(new URL("../assets/CormorantGaramond-Semibold.ttf", import.meta.url));
+  assert.equal(font.readUInt32BE(0), 0x00010000);
+  const license = await readFile(new URL("../assets/CormorantGaramond-OFL.txt", import.meta.url), "utf8");
+  assert.match(license, /SIL OPEN FONT LICENSE Version 1\.1/);
 });
 
 test("account menu has botanical links and contains long account names", () => {

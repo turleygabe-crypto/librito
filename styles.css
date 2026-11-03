@@ -6,6 +6,14 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "Cormorant Garamond";
+  src: url("/assets/CormorantGaramond-Semibold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
 :root {
   color-scheme: light;
   --warm-sand: #f3e6d8;
@@ -8084,14 +8092,23 @@ body .book-actions-list .book-status-menu[open] > summary {
 }
 
 .home-rows > .card-row-section .section-heading-row {
-  margin-bottom: 1.45rem;
+  position: relative;
+  padding-bottom: 1.45rem;
+  margin-bottom: 0.2rem;
 }
 
-.home-rows > .card-row-section::before {
+.home-rows > .card-row-section .section-heading-row h2 {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: calc(1.2rem + 2pt);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.home-rows > .card-row-section .section-heading-row::before {
   content: "";
   position: absolute;
   z-index: 1;
-  top: 1.65rem;
+  bottom: 0.2rem;
   left: 0;
   width: min(60%, 18rem);
   height: auto;
@@ -8101,26 +8118,32 @@ body .book-actions-list .book-status-menu[open] > summary {
   pointer-events: none;
 }
 
-.home-rows > .card-row-section:nth-of-type(6n + 2)::before {
+.home-rows > .card-row-section:nth-of-type(6n + 2) .section-heading-row::before {
   background-image: url("/assets/divider-botanical-2.png");
 }
 
-.home-rows > .card-row-section:nth-of-type(6n + 3)::before {
+.home-rows > .card-row-section:nth-of-type(6n + 3) .section-heading-row::before {
   background-image: url("/assets/divider-botanical-3.png");
 }
 
-.home-rows > .card-row-section:nth-of-type(6n + 4)::before {
+.home-rows > .card-row-section:nth-of-type(6n + 4) .section-heading-row::before {
   background-image: url("/assets/divider-botanical-4.png");
 }
 
-.home-rows > .card-row-section:nth-of-type(6n + 5)::before {
+.home-rows > .card-row-section:nth-of-type(6n + 5) .section-heading-row::before {
   background-image: url("/assets/divider-botanical-5.png");
 }
 
-.home-rows > .card-row-section:nth-of-type(6n)::before {
+.home-rows > .card-row-section:nth-of-type(6n) .section-heading-row::before {
   background-image: url("/assets/divider-botanical-6.png");
 }
 
 .home-rows > .card-row-section:nth-of-type(3n) .section-heading-row h2 {
   color: var(--accent-plum);
+}
+
+@media (max-width: 480px) {
+  .home-rows > .card-row-section .section-heading-row h2 {
+    font-size: calc(1rem + 2pt);
+  }
 }
