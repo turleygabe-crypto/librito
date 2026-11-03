@@ -518,3 +518,31 @@ test("Your Library has a distinct open-book icon instead of the Home icon", asyn
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
   assert.match(css, /\.library-heading-btn::before\s*\{[^}]*background: url\("data:image\/svg\+xml/);
 });
+
+test("text fields never auto-focus on touch devices so the keyboard stays closed", () => {
+  const helper = source.slice(source.indexOf("function focusField("), source.indexOf("\nfunction createBookLoader("));
+  const run = (coarse, dialog) => {
+    const calls = [];
+    const field = {
+      focus: () => calls.push("field"),
+      closest: () => dialog,
+    };
+    const context = { window: { matchMedia: () => ({ matches: coarse }) } };
+    runInNewContext(`${helper}\nthis.focusField = focusField;`, context);
+    context.focusField(field);
+    return calls;
+  };
+  const dialogCalls = [];
+  const dialog = {
+    attrs: {},
+    hasAttribute(name) { return name in this.attrs; },
+    setAttribute(name, value) { this.attrs[name] = value; },
+    focus: () => dialogCalls.push("dialog"),
+  };
+  assert.deepEqual(run(false, dialog), ["field"]);
+  assert.deepEqual(run(true, dialog), []);
+  assert.deepEqual(dialogCalls, ["dialog"]);
+  assert.equal(dialog.attrs.tabindex, "-1");
+  assert.doesNotMatch(source, /(authForm\.elements\.email|newShelfInput|lookupTitleInput|bookForm\.elements\.title|costInput|inputNode)\.focus\(/);
+  assert.doesNotMatch(source, /autofocus/);
+});

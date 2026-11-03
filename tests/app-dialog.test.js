@@ -107,6 +107,7 @@ test("account deletion uses typed in-app confirmation, prevents identity changes
     const context = {
       document: { body, activeElement: new Element(), createElement: () => new Element() },
       HTMLElement: Element, console: { error() {} }, localStorage: storage, sessionStorage,
+      focusField: (field) => field.focus(),
       state: { session: { user: { id: "reader" } }, profile: {}, supabase: {
         auth: { signOut: async (options) => { assert.equal(options.scope, "local"); signedOut = true; return {}; } },
       } },

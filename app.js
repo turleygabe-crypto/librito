@@ -6283,7 +6283,8 @@ function showAppDialog({
   inputNode.setAttribute("aria-label", input?.label || input?.placeholder || "Your response");
   appDialogReturnFocus = document.activeElement;
   overlay.classList.remove("hidden");
-  (input ? inputNode : confirm).focus();
+  if (input) focusField(inputNode);
+  else confirm.focus();
   return new Promise((resolve) => {
     appDialogResolver = resolve;
   });
@@ -7015,6 +7016,19 @@ function preloadLoaderCovers() {
   });
 }
 preloadLoaderCovers();
+
+// On touch devices, focusing a text field opens the on-screen keyboard, so focus its dialog instead.
+function focusField(field) {
+  if (!field) return;
+  if (!window.matchMedia("(pointer: coarse)").matches) {
+    field.focus();
+    return;
+  }
+  const container = field.closest("[role='dialog']");
+  if (!container) return;
+  if (!container.hasAttribute("tabindex")) container.setAttribute("tabindex", "-1");
+  container.focus({ preventScroll: true });
+}
 
 function createBookLoader({ message = "Loading…", compact = false, mini = false } = {}) {
   const loader = document.createElement("div");
@@ -8749,7 +8763,7 @@ function startBookLookup(tab = "search") {
   setLookupTab(tab);
   updateEntryModeSwitch(tab);
   if (tab === "scan") startCameraScan();
-  else lookupTitleInput.focus();
+  else focusField(lookupTitleInput);
 }
 
 function setLookupTab(tab) {
@@ -8778,7 +8792,7 @@ function startManualEntry() {
   bookDetailsPanel.classList.remove("hidden");
   bookDetailsBackBtn.textContent = "Choose another method";
   updateEntryModeSwitch("manual");
-  bookForm.elements.title.focus();
+  focusField(bookForm.elements.title);
 }
 
 function showBookDetails() {
@@ -8786,7 +8800,7 @@ function showBookDetails() {
   bookLookupFlow.classList.add("hidden");
   bookDetailsPanel.classList.remove("hidden");
   bookDetailsBackBtn.textContent = bookEntryMode === "lookup" ? "Back to book lookup" : "Choose another method";
-  bookForm.elements.title.focus();
+  focusField(bookForm.elements.title);
 }
 
 function closeDialog() {
@@ -8967,7 +8981,7 @@ function openShelfDrawer(book = null) {
   }
   shelfReturnFocus = document.activeElement;
   shelfDrawerOverlay.classList.remove("hidden");
-  newShelfInput.focus();
+  focusField(newShelfInput);
 }
 
 function closeShelfDrawer() {
@@ -8983,7 +8997,7 @@ function openAuthModal() {
   authReturnFocus = document.activeElement;
   setAuthMode("signin");
   authOverlay.classList.remove("hidden");
-  authForm.elements.email.focus();
+  focusField(authForm.elements.email);
 }
 
 function closeAuthModal() {
@@ -9059,7 +9073,7 @@ function applyScannedPrice(price) {
   } else {
     costInput.value = "";
     hint.textContent = "No price found on the barcode. Enter what you paid for this book.";
-    costInput.focus();
+    focusField(costInput);
   }
   hint.classList.remove("hidden");
 }
@@ -10070,7 +10084,7 @@ googleAuthBtn.addEventListener("click", async () => {
 
 forgotPasswordBtn.addEventListener("click", () => {
   setAuthMode("reset");
-  authForm.elements.email.focus();
+  focusField(authForm.elements.email);
 });
 
 authForm.addEventListener("submit", async (event) => {
