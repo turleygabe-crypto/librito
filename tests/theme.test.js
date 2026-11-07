@@ -221,10 +221,7 @@ test("logo-inspired typography uses warm gold on green and readable bronze on li
   assert.match(css, /\.home-hero p,\s*\.home-hero \.action-btn\s*\{[^}]*color: var\(--logo-cream\)/);
 });
 
-test("language label wraps rather than truncating and English cursive is self-hosted", async () => {
-  const span = css.match(/\.global-language-control \.edition-language-trigger span\s*\{([^}]+)\}/)[1];
-  assert.match(span, /white-space: normal/);
-  assert.doesNotMatch(span, /ellipsis|overflow: hidden/);
+test("English cursive is self-hosted", async () => {
   assert.match(css, /\.home-hero\.hero-english h1\s*\{[^}]*font-family: "Librito Script", cursive/);
   assert.match(css, /@font-face\s*\{[^}]*DancingScript\.ttf/);
   const worker = await readFile(new URL("../sw.js", import.meta.url), "utf8");

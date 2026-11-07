@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "python3 -m http.server 3000",
+    "build:language-detector": "esbuild node_modules/tinyld/dist/tinyld.normal.node.mjs --bundle --platform=browser --format=esm --minify --banner:js='/*! tinyld - Copyright (c) 2021 Komodo. MIT license: /assets/tinyld-LICENSE.txt */' --outfile=lib/language-detector.js",
     "test": "node --test"
   },
   "dependencies": {
@@ -12,6 +13,8 @@
     "stripe": "^23.0.0"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.3.0"
+    "@electric-sql/pglite": "^0.3.0",
+    "esbuild": "^0.25.0",
+    "tinyld": "^1.3.4"
   }
 }

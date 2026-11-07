@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 import { test } from "node:test";
+import { detectSearchLanguage, rankSearchLanguages } from "../lib/search-language.js";
 
 const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
 const spellingSource = source.slice(source.indexOf("function editDistance("), source.indexOf("async function fetchBookProfileVolumes("));
@@ -24,13 +25,14 @@ function createContext(overrides = {}) {
     URLSearchParams,
     console,
     state: { searchQuery: "", searchResults: [], view: "search" },
-    globalSearchLanguage: { value: "all" },
+    openLibraryLanguages: [["eng", "English"], ["spa", "Spanish"], ["por", "Portuguese"], ["jpn", "Japanese"]],
+    detectSearchLanguage,
+    rankSearchLanguages,
     discoveryBooks: [],
     allGenres: [],
     getLibraryBooks: () => [],
     getBookKey: (book) => `${book.title}|${book.author}`,
     isSameBookWork: (a, b) => a.title === b.title && a.author === b.author,
-    syncGlobalSearchLanguageMenu() {},
     resolveSearchLanguage: (language) => language === "all" ? "" : language,
     getOpenLibraryLanguageName: (language) => language,
     OPEN_LIBRARY_EDITION_FIELDS: "editions",
@@ -179,8 +181,8 @@ test("a slower previous search cannot overwrite a newer search's results or load
       return { docs: [coelho] };
     },
   });
-  const old = context.runNaturalSearch("old query", { updateHistory: false });
-  await context.runNaturalSearch("paulo coelho", { updateHistory: false });
+  const old = context.runNaturalSearch("old query", { updateHistory: false, language: "all" });
+  await context.runNaturalSearch("paulo coelho", { updateHistory: false, language: "all" });
   const results = context.state.searchResults;
   resolveOld({ docs: [coelho] });
   await old;
@@ -291,6 +293,69 @@ test("Discover all-language search presents one book with all editions instead o
   assert.equal(context.state.searchResults.length, 1);
   assert.equal(context.state.searchResults[0].edition_count, 3);
   assert.equal(context.state.searchResults[0].languages.length, 3);
+});
+
+test("automatic search selects Spanish editions while explicit filters can override detection", async () => {
+  const { context } = createMultilingualSearchContext();
+  await context.runNaturalSearch("Los cuatro acuerdos", { updateHistory: false });
+  assert.equal(context.state.searchLanguage, "spa");
+  assert.equal(context.state.searchFilters.lang, "");
+  assert.equal(context.state.searchResults[0].title, "Los cuatro acuerdos");
+  await context.runNaturalSearch("Los cuatro acuerdos", { updateHistory: false, language: "eng" });
+  assert.equal(context.state.searchLanguage, "eng");
+  assert.equal(context.state.searchFilters.lang, "eng");
+  assert.equal(context.state.searchResults[0].title, "The Four Agreements");
+  await context.runNaturalSearch("Los cuatro acuerdos", { updateHistory: false, language: "all" });
+  assert.equal(context.state.searchLanguage, "all");
+  assert.equal(context.state.searchResults[0].title, "Los cuatro acuerdos");
+});
+
+test("explicit language filters exclude local editions in another language without resetting other controls", async () => {
+  const { context } = createMultilingualSearchContext();
+  context.getLibraryBooks = () => [{
+    title: "Los cuatro acuerdos", author: "Don Miguel Ruiz", language: "eng", languages: ["eng", "spa"],
+  }];
+  context.state.searchQuery = "Los cuatro acuerdos";
+  context.state.searchSort = "rating";
+  context.state.searchFilters = { year: "2020" };
+  await context.runNaturalSearch("Los cuatro acuerdos", { updateHistory: false, language: "spa" });
+  assert.equal(context.state.searchResults.length, 1);
+  assert.equal(context.state.searchResults[0].language, "spa");
+  assert.equal(context.state.searchSort, "rating");
+  assert.equal(context.state.searchFilters.year, "2020");
+});
+
+test("ambiguous author searches stay multilingual and detection races cannot overwrite new searches", async () => {
+  let finishDetection;
+  const context = createContext({
+    detectSearchLanguage: (query) => query === "old query"
+      ? new Promise((resolve) => { finishDetection = resolve; })
+      : detectSearchLanguage(query),
+    fetchOpenLibrarySearch: async () => ({ docs: [coelho] }),
+  });
+  const old = context.runNaturalSearch("old query", { updateHistory: false });
+  await context.runNaturalSearch("paulo coelho", { updateHistory: false });
+  assert.equal(context.state.searchLanguage, "all");
+  finishDetection({ language: "spa", preferredLanguage: "spa" });
+  await old;
+  assert.equal(context.state.searchQuery, "paulo coelho");
+  assert.equal(context.state.searchLanguage, "all");
+  assert.equal(context.state.searchLoading, false);
+  assert.equal(context.state.searchResults.length, 1);
+});
+
+test("failed language detection is visible and falls back to multilingual results", async () => {
+  const errors = [];
+  const context = createContext({
+    detectSearchLanguage: async () => { throw new Error("Detector unavailable"); },
+    console: { ...console, error: (...args) => errors.push(args) },
+    fetchOpenLibrarySearch: async () => ({ docs: [coelho] }),
+  });
+  await context.runNaturalSearch("paulo coelho", { updateHistory: false });
+  assert.equal(context.state.searchLanguage, "all");
+  assert.match(context.state.searchMessage, /Language detection is unavailable/);
+  assert.equal(errors.length, 1);
+  assert.equal(context.state.searchLoading, false);
 });
 
 test("add-book lookup keeps the browser-language default but resolves translated queries first", async () => {

@@ -7,6 +7,7 @@ import { MEMBERSHIP_PRICING } from "./lib/membership-pricing.js?v=2";
 import { renderMarketplacePage } from "./lib/marketplace-ui.js";
 import { escapeCsvCell } from "./lib/csv.js";
 import { getBookRetailers, loadMarketplaceBookListings } from "./lib/book-purchases.js";
+import { browserLanguageCodes, detectSearchLanguage, rankSearchLanguages } from "./lib/search-language.js";
 
 const storageKey = "librito-library-v1";
 const wishlistStorageKey = "librito-wishlist-v1";
@@ -48,37 +49,6 @@ const openLibraryLanguages = [
   ["ukr", "Ukrainian"],
   ["vie", "Vietnamese"],
 ];
-const browserLanguageCodes = {
-  ar: "ara",
-  bn: "ben",
-  cs: "cze",
-  da: "dan",
-  de: "ger",
-  en: "eng",
-  es: "spa",
-  fi: "fin",
-  fr: "fre",
-  el: "gre",
-  hi: "hin",
-  he: "heb",
-  hu: "hun",
-  id: "ind",
-  it: "ita",
-  ja: "jpn",
-  ko: "kor",
-  nl: "dut",
-  no: "nor",
-  pl: "pol",
-  pt: "por",
-  ro: "rum",
-  ru: "rus",
-  sv: "swe",
-  th: "tha",
-  tr: "tur",
-  uk: "ukr",
-  vi: "vie",
-  zh: "chi",
-};
 const defaultBooks = [
   {
     id: crypto.randomUUID(),
@@ -247,7 +217,8 @@ const state = {
   currentBook: null,
   searchQuery: "",
   searchResults: null,
-  searchLanguage: "default",
+  searchLanguage: "auto",
+  searchPreferredLanguage: "",
   searchPage: 1,
   searchSort: "",
   searchFilters: {},
@@ -326,7 +297,6 @@ const shelfDrawerOverlay = document.getElementById("shelfDrawerOverlay");
 const closeShelfDrawerBtn = document.getElementById("closeShelfDrawerBtn");
 const globalSearchForm = document.getElementById("globalSearchForm");
 const globalSearchInput = document.getElementById("globalSearchInput");
-const globalSearchLanguage = document.getElementById("globalSearchLanguage");
 const globalIsbnScanBtn = document.getElementById("globalIsbnScanBtn");
 const sidebar = document.getElementById("sidebar");
 const libraryToggleBtn = document.getElementById("libraryToggleBtn");
@@ -470,7 +440,7 @@ function restoreRouteFromLocation() {
     case "/search":
       runNaturalSearch(params.get("q") || "", {
         updateHistory: false,
-        language: params.get("lang") || "default",
+        language: params.get("lang") || "auto",
       });
       break;
     case "/stats":
@@ -1367,102 +1337,11 @@ function fillLanguageSelect(select, allLabel = "All languages") {
 
 function initializeBookLanguageOptions() {
   fillLanguageSelect(lookupLanguage, "Any language");
-  fillLanguageSelect(globalSearchLanguage);
-  buildGlobalSearchLanguageMenu();
-}
-
-let syncGlobalSearchLanguageMenu = () => {};
-
-// Replaces the native select UI with the same menu used by the edition language finder.
-function buildGlobalSearchLanguageMenu() {
-  const menu = document.createElement("div");
-  menu.className = "edition-language-menu global-language-menu";
-  const trigger = document.createElement("button");
-  trigger.type = "button";
-  trigger.className = "edition-language-trigger";
-  trigger.setAttribute("aria-haspopup", "listbox");
-  trigger.setAttribute("aria-expanded", "false");
-  trigger.setAttribute("aria-label", "Search results language");
-  trigger.title = "Language for search results";
-  const triggerText = document.createElement("span");
-  trigger.append(triggerText);
-  const list = document.createElement("div");
-  list.className = "edition-language-list";
-  list.setAttribute("role", "listbox");
-  list.setAttribute("aria-label", "Search results language");
-  list.hidden = true;
-  const intro = document.createElement("div");
-  intro.className = "global-language-intro";
-  intro.setAttribute("role", "presentation");
-  const introTitle = document.createElement("strong");
-  introTitle.textContent = "Search results language";
-  const introCopy = document.createElement("span");
-  introCopy.textContent = "Filters the books shown in your search results. This won't change the site language.";
-  intro.append(introTitle, introCopy);
-  list.append(intro);
-
-  const addGroup = (title, options) => {
-    const groupTitle = document.createElement("div");
-    groupTitle.className = "edition-language-group";
-    groupTitle.textContent = title;
-    list.append(groupTitle);
-    options.forEach((source) => {
-      const option = document.createElement("button");
-      option.type = "button";
-      option.className = "edition-language-option";
-      option.setAttribute("role", "option");
-      option.dataset.value = source.value;
-      option.textContent = source.textContent;
-      list.append(option);
-    });
-  };
-  const sourceOptions = [...globalSearchLanguage.options];
-  addGroup("Any language", sourceOptions.filter((o) => o.value === "all"));
-  addGroup("Your language", sourceOptions.filter((o) => o.value === "default"));
-  addGroup("Specific language", sourceOptions.filter((o) => o.value !== "all" && o.value !== "default"));
-
-  syncGlobalSearchLanguageMenu = () => {
-    const selected = globalSearchLanguage.selectedOptions[0];
-    triggerText.textContent = selected ? selected.textContent : "Language";
-    list.querySelectorAll(".edition-language-option").forEach((option) => {
-      option.setAttribute("aria-selected", String(option.dataset.value === globalSearchLanguage.value));
-    });
-  };
-  const setOpen = (open) => {
-    list.hidden = !open;
-    trigger.setAttribute("aria-expanded", String(open));
-    if (open) list.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
-  };
-  trigger.addEventListener("click", () => setOpen(list.hidden));
-  list.addEventListener("click", (event) => {
-    const option = event.target.closest(".edition-language-option");
-    if (!option) return;
-    globalSearchLanguage.value = option.dataset.value;
-    globalSearchLanguage.dispatchEvent(new Event("change"));
-    setOpen(false);
-    trigger.focus();
-  });
-  menu.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !list.hidden) {
-      setOpen(false);
-      trigger.focus();
-    }
-  });
-  document.addEventListener("pointerdown", (event) => {
-    if (!menu.contains(event.target)) setOpen(false);
-  });
-  globalSearchLanguage.addEventListener("change", syncGlobalSearchLanguageMenu);
-
-  globalSearchLanguage.hidden = true;
-  globalSearchLanguage.tabIndex = -1;
-  menu.append(trigger, list);
-  globalSearchLanguage.after(menu);
-  syncGlobalSearchLanguageMenu();
 }
 
 // Returns "" when searching every language.
 function resolveSearchLanguage(value) {
-  if (value === "all") return "";
+  if (value === "all" || value === "auto") return "";
   return !value || value === "default" ? getDefaultBookLanguage() : value;
 }
 
@@ -3322,7 +3201,7 @@ function applyBrowseControls(books, sort, filters) {
 const browseUi = { scope: "", open: "" };
 
 // Sort and filter pills that open one floating panel at a time.
-function createBrowseControls({ scope, sort, filters, languages = false, sortOptions = browseSortOptions, onChange }) {
+function createBrowseControls({ scope, sort, filters, languages = false, automaticLanguage = false, sortOptions = browseSortOptions, onChange }) {
   if (browseUi.scope !== scope) Object.assign(browseUi, { scope, open: "" });
   const bar = document.createElement("section");
   bar.className = "browse-bar browse-popover";
@@ -3385,7 +3264,11 @@ function createBrowseControls({ scope, sort, filters, languages = false, sortOpt
     groups.unshift({
       key: "lang",
       label: "Language",
-      options: [...openLibraryLanguages.map(([code, name]) => [code, name]), ["all", "Any language"]],
+      options: [
+        ...(automaticLanguage ? [["", "Automatic (query language)"]] : []),
+        ...openLibraryLanguages.map(([code, name]) => [code, name]),
+        ["all", "Any language"],
+      ],
     });
   }
   groups.forEach((group) => {
@@ -7005,9 +6888,11 @@ function createSearchHeader(query) {
   const language = document.createElement("p");
   language.className = "search-language-note";
   const selectedLanguage = resolveSearchLanguage(state.searchLanguage);
-  language.textContent = selectedLanguage
+  language.textContent = state.searchLanguage === "auto" && state.searchLoading
+    ? "Detecting query language…"
+    : selectedLanguage
     ? `Showing ${getOpenLibraryLanguageName(selectedLanguage)} editions`
-    : "Showing editions in all languages, grouped by language";
+    : "Showing all languages, ordered by relevance";
   header.append(crumbs, heading, language);
   return header;
 }
@@ -7444,16 +7329,18 @@ async function getOpenLibraryEditionsForBook(book, language = getDefaultBookLang
   );
 }
 
-async function getOpenLibrarySearchBook(work, selectedLanguage) {
+async function getOpenLibrarySearchBook(work, selectedLanguage, query = "", preferred = "") {
   const { editions, workKeys } = await resolveOpenLibraryBookEditions({
     ...work,
     author: work.author_name?.[0] || "",
   });
   const matching = editions.filter((edition) => !selectedLanguage
     || (edition.languages || []).some((language) => language.key === `/languages/${selectedLanguage}`));
-  const preferredLanguage = selectedLanguage || getDefaultBookLanguage();
+  const preferredLanguage = selectedLanguage || preferred || getDefaultBookLanguage();
+  const queryTitle = normalizeBookText(query);
   const score = (edition) => Number((edition.languages || [])
     .some((language) => language.key === `/languages/${preferredLanguage}`)) * 4
+    + Number(Boolean(queryTitle) && normalizeBookText(edition.title || "") === queryTitle) * 8
     + Number((edition.covers || []).some((id) => Number.isInteger(id) && id > 0)) * 2
     + Number(Boolean(edition.isbn_13?.length || edition.isbn_10?.length));
   matching.sort((first, second) => score(second) - score(first));
@@ -7521,6 +7408,25 @@ function showSearchPage(query = "") {
     return;
   }
 
+  const controls = createBrowseControls({
+    scope: "search",
+    sort: state.searchSort,
+    filters: state.searchFilters,
+    languages: true,
+    automaticLanguage: true,
+    onChange: ({ sort, filters }) => {
+      const languageChanged = (state.searchFilters.lang || "") !== (filters.lang || "");
+      state.searchSort = sort;
+      state.searchFilters = filters;
+      state.searchPage = 1;
+      if (languageChanged) {
+        runNaturalSearch(state.searchQuery, { language: filters.lang || "auto" });
+      } else {
+        showSearchPage(state.searchQuery);
+      }
+    },
+  });
+  page.append(controls);
   const matches = state.searchResults || findLocalSearchMatches(query);
   if (state.searchMessage) {
     const message = document.createElement("p");
@@ -7558,17 +7464,6 @@ function showSearchPage(query = "") {
   } else if (matches.length) {
     summary.textContent = "No books match these filters. Books missing year, page, or rating data are hidden when filtering by them.";
   }
-  const controls = createBrowseControls({
-    scope: "search",
-    sort: state.searchSort,
-    filters: state.searchFilters,
-    onChange: ({ sort, filters }) => {
-      state.searchSort = sort;
-      state.searchFilters = filters;
-      state.searchPage = 1;
-      rerender();
-    },
-  });
   const barOptions = {
     page: currentPage,
     totalPages,
@@ -7584,11 +7479,9 @@ function showSearchPage(query = "") {
       rerender();
     },
   };
-  books.append(summary, createPagingBar({ ...barOptions, leading: controls }));
+  books.append(summary, createPagingBar(barOptions));
 
-  const bookGroups = state.searchLanguage === "all"
-    ? groupByLanguage(pageMatches, (book) => book.language)
-    : [["Books", pageMatches]];
+  const bookGroups = [["Books", pageMatches]];
   bookGroups.forEach(([label, group]) => {
     if (bookGroups.length > 1) {
       const heading = document.createElement("h2");
@@ -7691,8 +7584,11 @@ function findLocalSearchMatches(query) {
 
 let naturalSearchRequestId = 0;
 
-async function runNaturalSearch(query, { updateHistory = true, language = globalSearchLanguage.value } = {}) {
-  const languageValue = language && language !== "default" ? language : "";
+async function runNaturalSearch(query, { updateHistory = true, language = "auto" } = {}) {
+  const validLanguage = ["auto", "all", "default", ...openLibraryLanguages.map(([code]) => code)].includes(language)
+    ? language : "auto";
+  if (validLanguage !== language) console.warn("Unsupported search language; detecting query language instead.", language);
+  const languageValue = validLanguage === "auto" ? "" : validLanguage;
   if (updateHistory) {
     navigateTo("search", { q: query.trim(), lang: languageValue });
     return;
@@ -7700,18 +7596,15 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
   const requestId = ++naturalSearchRequestId;
   const isCurrentSearch = () => requestId === naturalSearchRequestId
     && state.view === "search" && state.searchQuery === query.trim();
-  globalSearchLanguage.value = languageValue || "default";
-  if (globalSearchLanguage.value !== (languageValue || "default")) globalSearchLanguage.value = "default";
-  syncGlobalSearchLanguageMenu();
-  state.searchLanguage = globalSearchLanguage.value;
-  const selectedLanguage = resolveSearchLanguage(state.searchLanguage);
-  const languageName = selectedLanguage ? getOpenLibraryLanguageName(selectedLanguage) : "any language";
   if (state.searchQuery !== query.trim()) {
     state.searchPage = 1;
     state.searchSort = "";
     state.searchFilters = {};
   }
   state.searchQuery = query.trim();
+  state.searchFilters = { ...state.searchFilters, lang: languageValue === "default" ? getDefaultBookLanguage() : languageValue };
+  state.searchLanguage = validLanguage;
+  state.searchPreferredLanguage = "";
   state.searchMessage = "";
   state.searchLoading = false;
   state.searchResults = findLocalSearchMatches(state.searchQuery);
@@ -7727,6 +7620,27 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
     || "";
   state.searchLoading = true;
   showSearchPage(state.searchQuery);
+  let detectionMessage = "";
+  if (validLanguage === "auto") {
+    try {
+      const detected = await detectSearchLanguage(state.searchQuery);
+      if (!isCurrentSearch()) return;
+      state.searchLanguage = detected.language || "all";
+      state.searchPreferredLanguage = detected.preferredLanguage;
+    } catch (error) {
+      console.error("Could not detect search language", error);
+      if (!isCurrentSearch()) return;
+      state.searchLanguage = "all";
+      detectionMessage = "Language detection is unavailable; searching all languages.";
+    }
+  }
+  const selectedLanguage = resolveSearchLanguage(state.searchLanguage);
+  const preferredLanguage = state.searchPreferredLanguage;
+  const languageName = selectedLanguage ? getOpenLibraryLanguageName(selectedLanguage) : "any language";
+  if (selectedLanguage) {
+    state.searchResults = state.searchResults.filter((book) => book.language === selectedLanguage
+      || (Array.isArray(book.language) && book.language.includes(selectedLanguage)));
+  }
   const searchTerms = [...new Set(parsed.queryTerms)];
   let searchMessage = "";
   try {
@@ -7757,6 +7671,7 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
       catalogFailed = true;
       console.warn("Open Library search failed; trying Google Books.", error);
     }
+    if (!isCurrentSearch()) return;
     let externalBooks = [];
     let editionLookupFailures = 0;
     if (searchGenre) {
@@ -7782,7 +7697,7 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
       const editionResults = await mapCatalogItems(works, async (work) => {
         try {
           if (!work.key) return null;
-          const edition = await getOpenLibrarySearchBook(work, selectedLanguage);
+          const edition = await getOpenLibrarySearchBook(work, selectedLanguage, query.trim(), preferredLanguage);
           if (!edition) return null;
           const pages = edition.number_of_pages || work.number_of_pages_median;
           return {
@@ -7827,11 +7742,12 @@ async function runNaturalSearch(query, { updateHistory = true, language = global
       }
     }
     if (!isCurrentSearch()) return;
-    state.searchMessage = searchMessage;
+    state.searchMessage = [detectionMessage, searchMessage].filter(Boolean).join(" ");
     state.searchResults = [...state.searchResults, ...externalBooks]
       .filter((book, index, all) =>
         all.findIndex((candidate) =>
           isSameBookWork(candidate, book) && (candidate.language || "") === (book.language || "")) === index);
+    if (!selectedLanguage) state.searchResults = rankSearchLanguages(state.searchResults, query, preferredLanguage);
     if (editionLookupFailures) {
       state.searchMessage = `Some matching ${languageName} editions could not be checked; showing verified editions only.`;
     }
@@ -9974,7 +9890,7 @@ function setupTextInputDismissal() {
 globalSearchForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const query = globalSearchInput.value.trim();
-  await runNaturalSearch(query, { language: globalSearchLanguage.value });
+  await runNaturalSearch(query);
 });
 
 globalIsbnScanBtn.addEventListener("click", openQuickScan);

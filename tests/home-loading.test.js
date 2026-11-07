@@ -43,10 +43,8 @@ test("global ISBN scan has a separate quick lookup flow that opens the scanned b
   const searchForm = html.slice(html.indexOf('<form id="globalSearchForm"'), html.indexOf("</form>", html.indexOf('<form id="globalSearchForm"')));
   assert.match(searchCluster, /id="globalIsbnScanBtn"[^>]*aria-label="Scan ISBN barcode"[^>]*title="Scan ISBN barcode"/);
   assert.ok(searchCluster.indexOf('id="globalIsbnScanBtn"') < searchCluster.indexOf('id="globalSearchForm"'));
-  assert.doesNotMatch(searchForm, /globalSearchLanguage/);
-  assert.match(html, /<\/form>\s*<\/div>\s*<div class="global-language-control">[\s\S]*?id="globalSearchLanguage"/);
-  assert.match(css, /\.global-language-control\s*\{[^}]*order: 10;[^}]*flex: 1 1 100%/);
-  assert.match(source, /function buildGlobalSearchLanguageMenu\(\)[\s\S]*?introTitle\.textContent = "Search results language";[\s\S]*?This won't change the site language\./);
+  assert.doesNotMatch(html, /globalSearchLanguage|global-language-control/);
+  assert.doesNotMatch(source, /globalSearchLanguage|buildGlobalSearchLanguageMenu/);
   assert.match(html, /id="quickScanOverlay"[\s\S]*?id="quickScanVideo"[\s\S]*?id="quickScanForm"[\s\S]*?id="quickScanIsbnInput"/);
   assert.match(source, /globalIsbnScanBtn\.addEventListener\("click", openQuickScan\)/);
   const openQuickScanSource = source.slice(source.indexOf("function openQuickScan()"), source.indexOf("\nfunction closeQuickScan("));
@@ -57,19 +55,15 @@ test("global ISBN scan has a separate quick lookup flow that opens the scanned b
   assert.match(source, /async function lookupQuickScanBook\(isbn\)[\s\S]*?setQuickScanLoading\(true, normalized\);[\s\S]*?openBookProfile\(book\);\s*await waitForBookProfileReady\(\);\s*if \(isCurrent\(\)\) closeQuickScan\(\);[\s\S]*?if \(matchingBook\) \{\s*await openProfile\(matchingBook\)/);
   assert.match(source, /function setQuickScanLoading\([\s\S]*?createBookLoader\(/);
   assert.match(css, /\.quick-scan-card\.is-loading #quickScanVideo, \.quick-scan-card\.is-loading \.quick-scan-form \{ display: none !important; \}/);
-  assert.match(css, /@media \(max-width: 700px\)[\s\S]*?\.global-language-control \{\s*order: 10;\s*flex: 1 1 100%;\s*justify-content: center;/);
   assert.match(source, /quickScanForm\.addEventListener\("submit", \(event\) => \{\s*event\.preventDefault\(\);\s*lookupQuickScanBook\(quickScanIsbnInput\.value\)/);
   assert.match(source, /scanBookOptionBtn\.addEventListener\("click", \(\) => \{\s*startBookLookup\("scan"\);\s*\}\)/);
   assert.match(css, /\.global-search-cluster > \.global-isbn-scan\s*\{/);
-  assert.match(css, /grid-template-areas:\s*"menu brand scan account"\s*"search search search search"\s*"language language language language"/);
+  assert.match(css, /grid-template-areas:\s*"menu brand scan account"\s*"search search search search";/);
   assert.match(css, /\.spotify-topbar\s*\{[^}]*padding: 0\.65rem 0 0;[^}]*border: 0;[^}]*border-radius: 0;[^}]*background: transparent;[^}]*box-shadow: none;/);
-  assert.match(css, /\.global-language-control \.edition-language-trigger::before\s*\{\s*content: "Search language:";/);
   assert.match(css, /\.spotify-topbar > \.library-toggle-btn::before\s*\{[^}]*position: absolute;[^}]*top: 50%;[^}]*left: 50%;[^}]*display: block;[^}]*height: 0\.875rem;[^}]*transform: translate\(-50%, -50%\);[^}]*currentColor 0 2px,[^}]*currentColor 6px 8px,[^}]*currentColor 12px 14px/);
   assert.match(css, /\.spotify-topbar > \.library-toggle-btn\s*\{[^}]*box-shadow: 0 2px 4px[^}]*inset 0 1px 0/);
   assert.match(css, /\.global-search-cluster \.global-search\s*\{[^}]*background-image: linear-gradient\(180deg/);
-  assert.match(css, /\.global-language-control \.edition-language-trigger\s*\{[^}]*box-shadow: 0 2px 5px/);
   assert.match(desktopSearchRules, /\.topbar-brand,\s*\.global-search-cluster > \.global-isbn-scan\s*\{\s*display: none;/);
-  assert.match(desktopSearchRules, /\.global-language-control \.edition-language-trigger::before\s*\{\s*margin-right: 0\.35rem;\s*content: "Search language:";/);
 });
 
 test("quick ISBN lookup opens matching library books and metadata-only book profiles", async () => {
