@@ -8064,6 +8064,13 @@ body .book-actions-list .book-status-menu[open] > summary {
   overflow-wrap: anywhere;
 }
 
+.account-menu-panel .account-menu-identity {
+  margin-bottom: 0.5rem;
+  padding-bottom: 0;
+  border-bottom: 0;
+  font-weight: 700;
+}
+
 :is(.account-menu-panel, .account-navigation, .book-actions-sheet, .book-status-menu-panel, .book-more-menu-panel, .card-add-actions, .edition-language-list, .browse-popover .browse-panel, .disposition-options)
   :is(button, summary, a, p, label, small, h2, h3, .book-actions-icon, .edition-language-group, .shelf-check, .text-btn, .bookmarked-page-field, .currently-reading-bookmark-time) {
   color: var(--logo-cream);
@@ -8265,16 +8272,22 @@ body .book-actions-list .book-status-menu[open] > summary {
     border: 1px solid var(--parchment);
     border-radius: 0.9rem;
     background: var(--botanical-green);
+    background-image: linear-gradient(155deg, rgba(255, 250, 242, 0.12), transparent 58%, rgba(32, 42, 27, 0.14));
     color: var(--logo-cream);
     font-size: 0;
+    box-shadow: 0 2px 4px rgba(48, 59, 41, 0.24), inset 0 1px 0 rgba(255, 250, 242, 0.2) !important;
   }
 
   .spotify-topbar > .library-toggle-btn::before {
-    width: 0.9rem;
-    height: 2px;
-    border-radius: 2px;
-    background: currentColor;
-    box-shadow: 0 6px currentColor;
+    width: 1rem;
+    height: 0.875rem;
+    background-image: linear-gradient(
+      currentColor 0 2px,
+      transparent 2px 6px,
+      currentColor 6px 8px,
+      transparent 8px 12px,
+      currentColor 12px 14px
+    );
     content: "";
   }
 
@@ -8304,6 +8317,8 @@ body .book-actions-list .book-status-menu[open] > summary {
     height: 2.85rem;
     padding: 0 0.8rem;
     font-size: 0.88rem;
+    background-image: linear-gradient(155deg, rgba(255, 250, 242, 0.14), transparent 62%, rgba(32, 42, 27, 0.16));
+    box-shadow: 0 2px 4px rgba(48, 59, 41, 0.23), inset 0 1px 0 rgba(255, 250, 242, 0.18);
   }
 
   .global-search-cluster .global-search {
@@ -8315,7 +8330,8 @@ body .book-actions-list .book-status-menu[open] > summary {
     border: 1px solid var(--blush-adobe);
     border-radius: 999px;
     background: var(--cream);
-    box-shadow: inset 0 1px 2px rgba(74, 46, 28, 0.06);
+    background-image: linear-gradient(180deg, #fffdf9 0%, var(--cream) 100%);
+    box-shadow: 0 3px 8px rgba(95, 69, 49, 0.1), inset 0 1px 2px rgba(74, 46, 28, 0.06);
   }
 
   .global-search-cluster .global-search input {
@@ -8356,6 +8372,8 @@ body .book-actions-list .book-status-menu[open] > summary {
     padding: 0;
     border: 1px solid var(--parchment);
     background: var(--botanical-green);
+    background-image: linear-gradient(155deg, rgba(255, 250, 242, 0.14), transparent 58%, rgba(32, 42, 27, 0.16));
+    box-shadow: 0 2px 4px rgba(48, 59, 41, 0.23), inset 0 1px 0 rgba(255, 250, 242, 0.18) !important;
   }
 
   .account-menu-label {
@@ -8400,6 +8418,8 @@ body .book-actions-list .book-status-menu[open] > summary {
     border-radius: 999px;
     font-size: 0.95rem;
     white-space: nowrap;
+    background-image: linear-gradient(155deg, rgba(255, 250, 242, 0.14), transparent 65%, rgba(32, 42, 27, 0.16));
+    box-shadow: 0 2px 5px rgba(48, 59, 41, 0.22), inset 0 1px 0 rgba(255, 250, 242, 0.18) !important;
   }
 
   .global-language-control .edition-language-trigger::before {

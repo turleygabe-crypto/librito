@@ -28,18 +28,24 @@ test("account trigger prefers the saved display name and falls back to email", (
     ["   ", " ", "reader@example.test", "reader@example.test"],
     [null, null, null, "Account"],
   ]) {
-    const label = {}, avatar = {};
+    const label = {}, avatar = {}, identity = {};
     const context = {
       state: { session: { user: { email, user_metadata: { full_name: metadata } } }, profile: { full_name: profile } },
       authButton: {}, sidebarAuthCopy: {}, getAccountTier: () => ({ name: "Free" }), updateAdminLink() {},
-      document: { getElementById: () => null, querySelector: (selector) => selector === ".account-menu-label" ? label : avatar },
+      document: {
+        getElementById: (id) => id === "accountMenuIdentity" ? identity : null,
+        querySelector: (selector) => selector === ".account-menu-label" ? label : avatar,
+      },
     };
     runInNewContext(`${update}\nupdateAuthButton();`, context);
+    assert.equal(identity.textContent, expected);
+    assert.equal(identity.hidden, false);
     assert.equal(label.textContent, expected);
     assert.equal(label.title, expected);
     assert.equal(avatar.textContent, expected[0].toUpperCase());
     context.state.session = null;
     runInNewContext("updateAuthButton();", context);
+    assert.equal(identity.hidden, true);
     assert.equal(label.textContent, "Account");
   }
 });

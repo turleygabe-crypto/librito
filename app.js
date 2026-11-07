@@ -1314,6 +1314,11 @@ function updateAuthButton() {
     ? state.profile?.full_name?.trim() || state.session.user.user_metadata?.full_name?.trim()
       || state.session.user.email || "Account"
     : "Account";
+  const accountIdentity = document.getElementById("accountMenuIdentity");
+  if (accountIdentity) {
+    accountIdentity.textContent = accountName;
+    accountIdentity.hidden = !state.session;
+  }
   const accountLabel = document.querySelector(".account-menu-label");
   accountLabel.textContent = accountName;
   accountLabel.title = accountName;
