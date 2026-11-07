@@ -1742,15 +1742,8 @@ function createHomeHero() {
   title.textContent = "Your next favorite book is waiting.";
   const description = document.createElement("p");
   description.textContent = "Track your library, discover new reads, and keep your love for books close.";
-  const action = document.createElement("button");
-  action.className = "action-btn";
-  action.type = "button";
-  action.textContent = "Explore recommendations";
-  action.addEventListener("click", () => {
-    document.querySelector('[data-recommendation-section="true"]')?.scrollIntoView({ behavior: "smooth" });
-  });
 
-  copy.append(title, description, action);
+  copy.append(title, description);
   hero.append(copy);
   return hero;
 }

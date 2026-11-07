@@ -18,8 +18,12 @@ test("home hero uses cursive only for English browser languages", () => {
         return el;
       } },
     };
-    runInNewContext(`${heroSource}\ncreateHomeHero();`, context);
+    const hero = runInNewContext(`${heroSource}\ncreateHomeHero();`, context);
     assert.equal(cursive, expected, language);
+    assert.equal(hero.children[0].children.length, 2);
+    assert.equal(hero.children[0].children[0].textContent, "Your next favorite book is waiting.");
+    assert.equal(hero.children[0].children[1].textContent, "Track your library, discover new reads, and keep your love for books close.");
+    assert.doesNotMatch(heroSource, /Explore recommendations|createElement\("button"\)/);
   }
 });
 
