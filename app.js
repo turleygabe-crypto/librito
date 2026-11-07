@@ -7,7 +7,9 @@ import { MEMBERSHIP_PRICING } from "./lib/membership-pricing.js?v=2";
 import { renderMarketplacePage } from "./lib/marketplace-ui.js";
 import { escapeCsvCell } from "./lib/csv.js";
 import { getBookRetailers, loadMarketplaceBookListings } from "./lib/book-purchases.js";
-import { browserLanguageCodes, detectSearchLanguage, rankSearchLanguages } from "./lib/search-language.js";
+import {
+  browserLanguageCodes, detectSearchLanguage, loadLanguageDetector, rankSearchLanguages,
+} from "./lib/search-language.js";
 
 const storageKey = "librito-library-v1";
 const wishlistStorageKey = "librito-wishlist-v1";
@@ -6888,7 +6890,7 @@ function createSearchHeader(query) {
   const language = document.createElement("p");
   language.className = "search-language-note";
   const selectedLanguage = resolveSearchLanguage(state.searchLanguage);
-  language.textContent = state.searchLanguage === "auto" && state.searchLoading
+  language.textContent = state.searchDetectingLanguage
     ? "Detecting query language…"
     : selectedLanguage
     ? `Showing ${getOpenLibraryLanguageName(selectedLanguage)} editions`
@@ -7436,6 +7438,12 @@ function showSearchPage(query = "") {
   }
   if (state.searchLoading) {
     page.append(createSearchLoading());
+  } else if (state.searchRefining) {
+    const refining = document.createElement("p");
+    refining.className = "search-message search-refining";
+    refining.setAttribute("role", "status");
+    refining.textContent = "Checking more editions and translations…";
+    page.append(refining);
   }
   const terms = normalizeSearchText(query).toLowerCase().split(/\s+/).filter(Boolean);
   const shelves = state.shelves.filter((shelf) => terms.every((term) => shelf.name.toLowerCase().includes(term)));
@@ -7583,6 +7591,7 @@ function findLocalSearchMatches(query) {
 }
 
 let naturalSearchRequestId = 0;
+const SEARCH_REFINE_BUDGET_MS = 8000;
 
 async function runNaturalSearch(query, { updateHistory = true, language = "auto" } = {}) {
   const validLanguage = ["auto", "all", "default", ...openLibraryLanguages.map(([code]) => code)].includes(language)
@@ -7607,6 +7616,8 @@ async function runNaturalSearch(query, { updateHistory = true, language = "auto"
   state.searchPreferredLanguage = "";
   state.searchMessage = "";
   state.searchLoading = false;
+  state.searchRefining = false;
+  state.searchDetectingLanguage = false;
   state.searchResults = findLocalSearchMatches(state.searchQuery);
   if (!state.searchQuery) {
     showSearchPage("");
@@ -7619,6 +7630,8 @@ async function runNaturalSearch(query, { updateHistory = true, language = "auto"
       .find((genre) => genre?.toLowerCase() === state.searchQuery.toLowerCase())
     || "";
   state.searchLoading = true;
+  state.searchRefining = false;
+  state.searchDetectingLanguage = validLanguage === "auto";
   showSearchPage(state.searchQuery);
   let detectionMessage = "";
   if (validLanguage === "auto") {
@@ -7632,7 +7645,10 @@ async function runNaturalSearch(query, { updateHistory = true, language = "auto"
       if (!isCurrentSearch()) return;
       state.searchLanguage = "all";
       detectionMessage = "Language detection is unavailable; searching all languages.";
+    } finally {
+      if (requestId === naturalSearchRequestId) state.searchDetectingLanguage = false;
     }
+    showSearchPage(state.searchQuery);
   }
   const selectedLanguage = resolveSearchLanguage(state.searchLanguage);
   const preferredLanguage = state.searchPreferredLanguage;
@@ -7643,6 +7659,14 @@ async function runNaturalSearch(query, { updateHistory = true, language = "auto"
   }
   const searchTerms = [...new Set(parsed.queryTerms)];
   let searchMessage = "";
+  const localResults = state.searchResults;
+  const mergeResults = (books) => {
+    const merged = [...localResults, ...books]
+      .filter((book, index, all) =>
+        all.findIndex((candidate) =>
+          isSameBookWork(candidate, book) && (candidate.language || "") === (book.language || "")) === index);
+    return selectedLanguage ? merged : rankSearchLanguages(merged, query, preferredLanguage);
+  };
   try {
     const catalogQuery = searchGenre
       ? `subject:${JSON.stringify(searchGenre)}`
@@ -7651,7 +7675,7 @@ async function runNaturalSearch(query, { updateHistory = true, language = "auto"
     const fetchWorks = async (searchOffset) => {
       const params = new URLSearchParams({
         q: searchGenre && selectedLanguage ? `${catalogQuery} language:${selectedLanguage}` : catalogQuery,
-        fields: `key,title,author_name,author_key,isbn,cover_i,subject,language,number_of_pages_median,first_publish_year,ratings_average,readinglog_count,${OPEN_LIBRARY_EDITION_FIELDS}`,
+        fields: `key,title,author_name,author_key,isbn,cover_i,subject,language,edition_count,number_of_pages_median,first_publish_year,ratings_average,readinglog_count,${OPEN_LIBRARY_EDITION_FIELDS}`,
         limit: "100",
         offset: String(searchOffset),
       });
@@ -7694,39 +7718,75 @@ async function runNaturalSearch(query, { updateHistory = true, language = "auto"
         return !parsed.pageLimit || (book.pages && book.pages <= parsed.pageLimit) ? [book] : [];
       });
     } else {
+      const withinPageLimit = (book) => book && (!parsed.pageLimit || (book.pages && book.pages <= parsed.pageLimit));
+      const toSearchBook = (work, edition) => {
+        const pages = edition.number_of_pages || work.number_of_pages_median;
+        return {
+          title: edition.title || work.title || "Untitled",
+          author: work.author_name?.[0] || "Unknown author",
+          author_name: work.author_name || [],
+          work_keys: edition.work_keys,
+          edition_count: edition.edition_count,
+          languages: edition.languages,
+          isbn: edition.isbn[0] || "",
+          isbnList: edition.isbn,
+          cover_i: edition.cover_i,
+          subjects: work.subject || [],
+          genre: work.subject?.[0] || "",
+          language: selectedLanguage || edition.language[0] || "",
+          pages,
+          page_count: pages,
+          first_publish_year: work.first_publish_year,
+          ratings_average: work.ratings_average,
+          popularity: work.readinglog_count,
+        };
+      };
+      // Open Library embeds each work's best query match, so results can appear before every translation is resolved.
+      const quickBooks = new Map(works.map((work) => {
+        const edition = work.key && getEmbeddedOpenLibraryEdition(work, selectedLanguage);
+        return [work, edition ? toSearchBook(work, {
+          ...edition,
+          work_keys: [work.key],
+          languages: edition.language,
+          edition_count: work.edition_count || 1,
+        }) : null];
+      }));
+      const quickResults = groupCatalogSearchBooks([...quickBooks.values()].filter(withinPageLimit));
+      if (quickResults.length) {
+        state.searchMessage = [detectionMessage, searchMessage].filter(Boolean).join(" ");
+        state.searchResults = mergeResults(quickResults);
+        state.searchLoading = false;
+        state.searchRefining = true;
+        showSearchPage(state.searchQuery);
+      }
+      const refineTimeout = Symbol("refine timeout");
+      let refineTimedOut = false;
+      let refineTimer;
+      const refineDeadline = new Promise((resolve) => {
+        refineTimer = setTimeout(() => {
+          refineTimedOut = true;
+          resolve(refineTimeout);
+        }, SEARCH_REFINE_BUDGET_MS);
+      });
       const editionResults = await mapCatalogItems(works, async (work) => {
+        if (refineTimedOut || !isCurrentSearch()) return quickBooks.get(work);
         try {
           if (!work.key) return null;
-          const edition = await getOpenLibrarySearchBook(work, selectedLanguage, query.trim(), preferredLanguage);
-          if (!edition) return null;
-          const pages = edition.number_of_pages || work.number_of_pages_median;
-          return {
-            title: edition.title || work.title || "Untitled",
-            author: work.author_name?.[0] || "Unknown author",
-            author_name: work.author_name || [],
-            work_keys: edition.work_keys,
-            edition_count: edition.edition_count,
-            languages: edition.languages,
-            isbn: edition.isbn[0] || "",
-            isbnList: edition.isbn,
-            cover_i: edition.cover_i,
-            subjects: work.subject || [],
-            genre: work.subject?.[0] || "",
-            language: selectedLanguage || edition.language[0] || "",
-            pages,
-            page_count: pages,
-            first_publish_year: work.first_publish_year,
-            ratings_average: work.ratings_average,
-            popularity: work.readinglog_count,
-          };
+          const edition = await Promise.race([
+            getOpenLibrarySearchBook(work, selectedLanguage, query.trim(), preferredLanguage),
+            refineDeadline,
+          ]);
+          if (edition === refineTimeout) return quickBooks.get(work);
+          return edition ? toSearchBook(work, edition) : null;
         } catch (error) {
           editionLookupFailures += 1;
           console.error("Could not resolve search editions", error);
           return null;
         }
       });
-      externalBooks = groupCatalogSearchBooks(editionResults.filter((book) =>
-        book && (!parsed.pageLimit || (book.pages && book.pages <= parsed.pageLimit))));
+      clearTimeout(refineTimer);
+      if (!isCurrentSearch()) return;
+      externalBooks = groupCatalogSearchBooks(editionResults.filter(withinPageLimit));
     }
     if (!externalBooks.length) {
       try {
@@ -7743,11 +7803,7 @@ async function runNaturalSearch(query, { updateHistory = true, language = "auto"
     }
     if (!isCurrentSearch()) return;
     state.searchMessage = [detectionMessage, searchMessage].filter(Boolean).join(" ");
-    state.searchResults = [...state.searchResults, ...externalBooks]
-      .filter((book, index, all) =>
-        all.findIndex((candidate) =>
-          isSameBookWork(candidate, book) && (candidate.language || "") === (book.language || "")) === index);
-    if (!selectedLanguage) state.searchResults = rankSearchLanguages(state.searchResults, query, preferredLanguage);
+    state.searchResults = mergeResults(externalBooks);
     if (editionLookupFailures) {
       state.searchMessage = `Some matching ${languageName} editions could not be checked; showing verified editions only.`;
     }
@@ -7765,7 +7821,10 @@ async function runNaturalSearch(query, { updateHistory = true, language = "auto"
       ? "Showing local matches; book-catalog search is temporarily unavailable."
       : "Book-catalog search is temporarily unavailable. Try a title, author, or genre in your library.";
   } finally {
-    if (isCurrentSearch()) state.searchLoading = false;
+    if (isCurrentSearch()) {
+      state.searchLoading = false;
+      state.searchRefining = false;
+    }
   }
   if (isCurrentSearch()) showSearchPage(state.searchQuery);
 }
@@ -9892,6 +9951,10 @@ globalSearchForm.addEventListener("submit", async (event) => {
   const query = globalSearchInput.value.trim();
   await runNaturalSearch(query);
 });
+
+globalSearchInput.addEventListener("focus", () => {
+  loadLanguageDetector().catch((error) => console.warn("Could not preload language detection", error));
+}, { once: true });
 
 globalIsbnScanBtn.addEventListener("click", openQuickScan);
 

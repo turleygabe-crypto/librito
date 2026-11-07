@@ -76,3 +76,11 @@ test("automatic routes do not persist a previous manual language choice and lega
   assert.match(worker, /"\/lib\/search-language\.js"/);
   assert.match(worker, /"\/lib\/language-detector\.js"/);
 });
+
+test("language detection cannot keep a search waiting past its timeout", async () => {
+  const { detectSearchLanguage: detectFresh } = await import(`../lib/search-language.js?timeout=${Date.now()}`);
+  const started = Date.now();
+  const result = await detectFresh("El alquimista", { timeout: 0 }).then(() => "detected", (error) => error.message);
+  assert.ok(Date.now() - started < 1000);
+  assert.ok(["detected", "Language detection timed out."].includes(result));
+});

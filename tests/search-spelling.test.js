@@ -23,6 +23,8 @@ const coelho = {
 function createContext(overrides = {}) {
   const context = {
     URLSearchParams,
+    setTimeout,
+    clearTimeout,
     console,
     state: { searchQuery: "", searchResults: [], view: "search" },
     openLibraryLanguages: [["eng", "English"], ["spa", "Spanish"], ["por", "Portuguese"], ["jpn", "Japanese"]],
@@ -377,4 +379,44 @@ test("Discover resolves matching editions for works beyond the previous eight-wo
   });
   await context.runNaturalSearch("paulo coelho", { updateHistory: false, language: "all" });
   assert.equal(context.state.searchResults.length, 12);
+});
+
+test("slow translation lookups show embedded catalog editions first and stop at the refinement budget", async () => {
+  const renders = [];
+  const context = createContext({
+    detectSearchLanguage: async () => ({ language: "", preferredLanguage: "spa" }),
+    fetchOpenLibrarySearch: async () => ({ docs: [{
+      ...coelho, title: "El alquimista", edition_count: 141,
+      editions: { docs: [{ title: "El alquimista", language: ["spa"], isbn: ["9788408044072"] }] },
+    }] }),
+    getOpenLibrarySearchBook: () => new Promise(() => {}),
+    setTimeout: (callback, delay) => delay >= 5000
+      ? setTimeout(() => {
+        renders.push("budget elapsed");
+        callback();
+      }, 0)
+      : setTimeout(callback, delay),
+  });
+  context.showSearchPage = (query) => {
+    context.state.view = "search";
+    context.state.searchQuery = query;
+    renders.push({
+      detecting: context.state.searchDetectingLanguage,
+      loading: context.state.searchLoading,
+      refining: context.state.searchRefining,
+      titles: context.state.searchResults.map((book) => book.title),
+    });
+  };
+  await context.runNaturalSearch("El alquimista", { updateHistory: false });
+  const quick = renders.findIndex((render) => render.refining);
+  assert.ok(quick >= 0);
+  assert.ok(quick < renders.indexOf("budget elapsed"));
+  assert.deepEqual({ ...renders[quick], titles: [...renders[quick].titles] },
+    { detecting: false, loading: false, refining: true, titles: ["El alquimista"] });
+  assert.equal(renders[0].detecting, true);
+  assert.equal(context.state.searchLoading, false);
+  assert.equal(context.state.searchRefining, false);
+  assert.equal(context.state.searchDetectingLanguage, false);
+  assert.equal(context.state.searchResults[0].title, "El alquimista");
+  assert.equal(context.state.searchResults[0].edition_count, 141);
 });
