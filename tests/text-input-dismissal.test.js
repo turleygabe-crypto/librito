@@ -53,6 +53,15 @@ test("touch Search and Done keys dismiss input keyboards without preventing the 
   }
 });
 
+test("Search key in a form keeps focus so the browser submits, then submit dismisses the keyboard", () => {
+  const ui = setup();
+  ui.active.form = {};
+  ui.fire("keydown", { key: "Enter", preventDefault() { assert.fail("Search must still run"); } });
+  assert.equal(ui.blurCount(), 0);
+  ui.fire("submit", { target: { contains: (element) => element === ui.active } });
+  assert.equal(ui.blurCount(), 1);
+});
+
 test("Enter preserves multiline editing and Next-key field navigation", () => {
   for (const options of [{ tag: "textarea" }, { hint: "next" }, { hint: "" }]) {
     const ui = setup(options);

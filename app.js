@@ -9935,8 +9935,9 @@ function setupTextInputDismissal() {
     const active = document.activeElement;
     if (!active?.matches(textFieldSelector)) return;
     if (event.type === "submit" && event.target.contains(active)) active.blur();
+    // Blurring during Enter cancels implicit form submission on mobile; form fields are dismissed on submit instead.
     if (event.type === "keydown" && event.key === "Enter" && !event.isComposing
-      && event.target === active && active.matches("input")
+      && event.target === active && active.matches("input") && !active.form
       && ["search", "done"].includes(active.enterKeyHint)) active.blur();
     if (event.type === "pointerdown" && event.target instanceof Element
       && !event.target.closest('input, textarea, select, label, [contenteditable]:not([contenteditable="false"])')) active.blur();
