@@ -38,11 +38,12 @@ class Element {
 test("global ISBN scan has a separate quick lookup flow that opens the scanned book profile", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  const searchCluster = html.slice(html.indexOf('<div class="global-search-cluster">'), html.indexOf("</div>", html.indexOf('<div class="global-search-cluster">')));
   const searchForm = html.slice(html.indexOf('<form id="globalSearchForm"'), html.indexOf("</form>", html.indexOf('<form id="globalSearchForm"')));
-  assert.match(searchForm, /id="globalIsbnScanBtn"[^>]*aria-label="Scan ISBN barcode"[^>]*title="Scan ISBN barcode"/);
-  assert.ok(searchForm.indexOf('id="globalIsbnScanBtn"') < searchForm.indexOf('id="previewBtn"'));
+  assert.match(searchCluster, /id="globalIsbnScanBtn"[^>]*aria-label="Scan ISBN barcode"[^>]*title="Scan ISBN barcode"/);
+  assert.ok(searchCluster.indexOf('id="globalIsbnScanBtn"') < searchCluster.indexOf('id="globalSearchForm"'));
   assert.doesNotMatch(searchForm, /globalSearchLanguage/);
-  assert.match(html, /<\/form>\s*<div class="global-language-control">[\s\S]*?id="globalSearchLanguage"/);
+  assert.match(html, /<\/form>\s*<\/div>\s*<div class="global-language-control">[\s\S]*?id="globalSearchLanguage"/);
   assert.match(css, /\.global-language-control\s*\{[^}]*order: 10;[^}]*flex: 1 1 100%/);
   assert.match(source, /function buildGlobalSearchLanguageMenu\(\)[\s\S]*?introTitle\.textContent = "Search results language";[\s\S]*?This won't change the site language\./);
   assert.match(html, /id="quickScanOverlay"[\s\S]*?id="quickScanVideo"[\s\S]*?id="quickScanForm"[\s\S]*?id="quickScanIsbnInput"/);
@@ -58,8 +59,8 @@ test("global ISBN scan has a separate quick lookup flow that opens the scanned b
   assert.match(css, /@media \(max-width: 700px\)[\s\S]*?\.global-language-control \{\s*order: 10;\s*flex: 1 1 100%;\s*justify-content: center;/);
   assert.match(source, /quickScanForm\.addEventListener\("submit", \(event\) => \{\s*event\.preventDefault\(\);\s*lookupQuickScanBook\(quickScanIsbnInput\.value\)/);
   assert.match(source, /scanBookOptionBtn\.addEventListener\("click", \(\) => \{\s*startBookLookup\("scan"\);\s*\}\)/);
-  assert.match(css, /\.global-search > \.global-isbn-scan\s*\{/);
-  assert.match(css, /\.global-search > \.global-isbn-scan \.global-isbn-scan-label\s*\{\s*display: none;/);
+  assert.match(css, /\.global-search-cluster > \.global-isbn-scan\s*\{/);
+  assert.match(css, /grid-template-areas:\s*"menu brand scan account"\s*"search search search search"\s*"language language language language"/);
 });
 
 test("quick ISBN lookup opens matching library books and metadata-only book profiles", async () => {
