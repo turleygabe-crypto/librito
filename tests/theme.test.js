@@ -115,7 +115,7 @@ test("hero banner has matching outer and inset parchment trim without blocking i
   assert.match(css, /\.home-hero::before\s*\{[^}]*position: absolute;[^}]*inset: 5px;[^}]*border: 1px solid var\(--parchment\);[^}]*border-radius:[^}]*pointer-events: none/);
 });
 
-test("three-dot buttons and the pictured language, account, and book controls keep thin trim", () => {
+test("interactive controls have shaded surfaces and raised shadows while navigation and menu items stay flat", () => {
   const rule = css.slice(css.indexOf("body :is(.card-menu, .card-action"));
   const controls = rule.slice(0, rule.indexOf("\n}"));
   for (const selector of [
@@ -126,14 +126,22 @@ test("three-dot buttons and the pictured language, account, and book controls ke
     ".upgrade-cta:not(.is-current)", ".search-empty-back", ".audiobook-sample-button", ".book-audiobook-find",
   ]) assert(controls.includes(selector), `${selector} must have persistent trim`);
   assert.match(controls, /border: 1px solid var\(--parchment\) !important/);
-  assert.match(controls, /box-shadow: none !important/);
+  const modernControls = css.slice(css.indexOf("/* Modern shared button treatment. */"));
+  assert.match(modernControls, /background-image: linear-gradient\(155deg, rgba\(255, 250, 242, 0\.16\)/);
+  assert.match(modernControls, /box-shadow: 0 2px 5px rgba\(48, 59, 41, 0\.2\)/);
+  assert.match(modernControls, /:is\(:hover, :focus-visible, :active, \[aria-expanded="true"\]\)/);
+  for (const selector of [".nav-pill", ".book-actions-option", ".book-status-menu-panel button", ".text-btn"]) {
+    assert(modernControls.includes(selector), `${selector} must retain its flat treatment`);
+  }
   assert.doesNotMatch(controls, /\.nav-pill|\.shelf-item/);
   assert.match(css, /\.account-avatar\s*\{\s*border: 1px solid var\(--parchment\)/);
 });
 
 test("admin action buttons share the parchment inset trim", async () => {
   const admin = await readFile(new URL("../admin.css", import.meta.url), "utf8");
-  assert.match(admin, /body \.btn\s*\{[^}]*border: 1px solid #e5d4ae !important;[^}]*box-shadow: inset 0 0 0 2px #303b29, inset 0 0 0 3px #e5d4ae/);
+  assert.match(admin, /body \.btn\s*\{[^}]*border: 1px solid #e5d4ae !important;[^}]*box-shadow: 0 2px 5px rgba\(48, 59, 41, \.22\), inset 0 0 0 2px #303b29, inset 0 0 0 3px #e5d4ae/);
+  assert.match(admin, /body \.btn\s*\{[^}]*background-image: linear-gradient\(155deg, rgba\(255, 250, 242, \.16\)/);
+  assert.match(admin, /body \.btn\s*\{[^}]*box-shadow: 0 2px 5px rgba\(48, 59, 41, \.22\)/);
 });
 
 test("shared controls swap olive and bronze on interaction rather than striping options", () => {

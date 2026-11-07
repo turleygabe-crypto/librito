@@ -66,11 +66,27 @@ body .btn {
   background: #4b543d;
   color: #f2c88f;
   border: 1px solid #e5d4ae !important;
-  box-shadow: inset 0 0 0 2px #303b29, inset 0 0 0 3px #e5d4ae;
+  background-image: linear-gradient(155deg, rgba(255, 250, 242, .16), transparent 58%, rgba(32, 42, 27, .16));
+  box-shadow: 0 2px 5px rgba(48, 59, 41, .22), inset 0 0 0 2px #303b29, inset 0 0 0 3px #e5d4ae;
+  transition: background-color 160ms ease, background-image 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 body .btn.ghost { background: #735032; }
 body .btn:hover, body .btn:active { background: #735032; }
 body .btn.ghost:hover, body .btn.ghost:active { background: #4b543d; }
+body .btn:is(:hover, :focus-visible) {
+  background-image: linear-gradient(155deg, rgba(255, 250, 242, .2), transparent 58%, rgba(32, 42, 27, .18));
+  box-shadow: 0 4px 9px rgba(48, 59, 41, .28), inset 0 0 0 2px #303b29, inset 0 0 0 3px #e5d4ae;
+  transform: translateY(-1px);
+}
+body .btn:active {
+  box-shadow: 0 1px 2px rgba(48, 59, 41, .2), inset 0 0 0 2px #303b29, inset 0 0 0 3px #e5d4ae;
+  transform: translateY(1px);
+}
+body .btn:disabled {
+  cursor: not-allowed;
+  box-shadow: inset 0 0 0 2px #303b29, inset 0 0 0 3px #e5d4ae;
+  transform: none;
+}
 .side button, .side a { color: #d9aa62; }
 @media (max-width: 760px) {
   .shell { grid-template-columns: 1fr; }

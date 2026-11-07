@@ -8300,3 +8300,90 @@ body :is(.card-menu, .book-more-menu > summary) {
 body :is(.card-menu, .book-more-menu > summary):is(:hover, :focus-visible, :active, [aria-expanded="true"]) {
   box-shadow: 0 4px 9px rgba(48, 59, 41, 0.3), inset 0 1px 0 rgba(255, 250, 242, 0.2) !important;
 }
+
+/* Modern shared button treatment. */
+body :is(button, summary, [role="button"]):where(:not(
+  .sidebar-backdrop,
+  .card-open-button,
+  .reading-feature-cover,
+  .reading-feature-title,
+  .table-book-title,
+  .table-sort,
+  .nav-pill,
+  .shelf-item,
+  .sidebar-create-shelf,
+  .book-actions-option,
+  .book-actions-close,
+  .book-status-menu-panel button,
+  .book-more-menu-panel button,
+  .card-add-actions button,
+  .edition-language-option,
+  .disposition-option,
+  .text-btn,
+  .book-breadcrumb button,
+  .recommendation-card,
+  .lookup-result
+)) {
+  background-image: linear-gradient(155deg, rgba(255, 250, 242, 0.16), transparent 58%, rgba(32, 42, 27, 0.14));
+  box-shadow: 0 2px 5px rgba(48, 59, 41, 0.2), inset 0 1px 0 rgba(255, 250, 242, 0.18);
+  transition: background-color 160ms ease, background-image 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+body :is(button, summary, [role="button"]):where(:not(
+  .sidebar-backdrop,
+  .card-open-button,
+  .reading-feature-cover,
+  .reading-feature-title,
+  .table-book-title,
+  .table-sort,
+  .nav-pill,
+  .shelf-item,
+  .sidebar-create-shelf,
+  .book-actions-option,
+  .book-actions-close,
+  .book-status-menu-panel button,
+  .book-more-menu-panel button,
+  .card-add-actions button,
+  .edition-language-option,
+  .disposition-option,
+  .text-btn,
+  .book-breadcrumb button,
+  .recommendation-card,
+  .lookup-result
+)):is(:hover, :focus-visible, :active, [aria-expanded="true"]) {
+  background-image: linear-gradient(155deg, rgba(255, 250, 242, 0.2), transparent 58%, rgba(32, 42, 27, 0.18));
+  box-shadow: 0 4px 9px rgba(48, 59, 41, 0.27), inset 0 1px 0 rgba(255, 250, 242, 0.2);
+}
+
+body :is(button, summary, [role="button"]):where(:not(
+  .sidebar-backdrop,
+  .card-open-button,
+  .reading-feature-cover,
+  .reading-feature-title,
+  .table-book-title,
+  .table-sort,
+  .nav-pill,
+  .shelf-item,
+  .sidebar-create-shelf,
+  .book-actions-option,
+  .book-actions-close,
+  .book-status-menu-panel button,
+  .book-more-menu-panel button,
+  .card-add-actions button,
+  .edition-language-option,
+  .disposition-option,
+  .text-btn,
+  .book-breadcrumb button,
+  .recommendation-card,
+  .lookup-result
+)):active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px rgba(48, 59, 41, 0.2), inset 0 1px 0 rgba(255, 250, 242, 0.16);
+}
+
+body :is(button, summary, [role="button"]):disabled,
+body :is(button, summary, [role="button"])[aria-disabled="true"] {
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
