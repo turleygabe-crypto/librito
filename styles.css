@@ -8250,11 +8250,11 @@ body .book-actions-list .book-status-menu[open] > summary {
     gap: 0.7rem 0.55rem;
     justify-content: stretch;
     margin: 0 0 0.65rem;
-    padding: 0.85rem;
-    border: 1px solid var(--logo-bronze);
-    border-radius: 1.35rem;
-    background: var(--warm-sand);
-    box-shadow: 0 2px 8px rgba(63, 46, 35, 0.1);
+    padding: 0.65rem 0 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
   }
 
   .spotify-topbar > .library-toggle-btn {
@@ -8403,7 +8403,7 @@ body .book-actions-list .book-status-menu[open] > summary {
   }
 
   .global-language-control .edition-language-trigger::before {
-    content: "文A";
+    content: "Search language:";
     font-size: 0.8rem;
   }
 

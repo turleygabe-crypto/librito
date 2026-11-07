@@ -61,6 +61,8 @@ test("global ISBN scan has a separate quick lookup flow that opens the scanned b
   assert.match(source, /scanBookOptionBtn\.addEventListener\("click", \(\) => \{\s*startBookLookup\("scan"\);\s*\}\)/);
   assert.match(css, /\.global-search-cluster > \.global-isbn-scan\s*\{/);
   assert.match(css, /grid-template-areas:\s*"menu brand scan account"\s*"search search search search"\s*"language language language language"/);
+  assert.match(css, /\.spotify-topbar\s*\{[^}]*padding: 0\.65rem 0 0;[^}]*border: 0;[^}]*border-radius: 0;[^}]*background: transparent;[^}]*box-shadow: none;/);
+  assert.match(css, /\.global-language-control \.edition-language-trigger::before\s*\{\s*content: "Search language:";/);
 });
 
 test("quick ISBN lookup opens matching library books and metadata-only book profiles", async () => {
