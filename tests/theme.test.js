@@ -210,6 +210,7 @@ test("book action sheet uses a single frame, roomy spacing and unframed inline s
 test("three-dot controls use centered geometry rather than font baselines", () => {
   assert.match(css, /\.card-menu,\s*\.book-more-menu > summary\s*\{\s*font-size: 0;\s*line-height: 0/);
   assert.match(css, /\.card-menu::before,\s*\.book-more-menu > summary::before\s*\{[^}]*width: 14px;[^}]*height: 4px;[^}]*radial-gradient[^}]*background-repeat: no-repeat/);
+  assert.match(css, /body :is\(\.card-menu, \.book-more-menu > summary\)\s*\{[^}]*background-image: linear-gradient\(155deg[^}]*box-shadow: 0 3px 7px[^}]*inset 0 1px 0/);
 });
 
 test("logo-inspired typography uses warm gold on green and readable bronze on light surfaces", () => {

@@ -63,7 +63,7 @@ test("global ISBN scan has a separate quick lookup flow that opens the scanned b
   assert.match(css, /grid-template-areas:\s*"menu brand scan account"\s*"search search search search"\s*"language language language language"/);
   assert.match(css, /\.spotify-topbar\s*\{[^}]*padding: 0\.65rem 0 0;[^}]*border: 0;[^}]*border-radius: 0;[^}]*background: transparent;[^}]*box-shadow: none;/);
   assert.match(css, /\.global-language-control \.edition-language-trigger::before\s*\{\s*content: "Search language:";/);
-  assert.match(css, /\.spotify-topbar > \.library-toggle-btn::before\s*\{[^}]*height: 0\.875rem;[^}]*currentColor 0 2px,[^}]*currentColor 6px 8px,[^}]*currentColor 12px 14px/);
+  assert.match(css, /\.spotify-topbar > \.library-toggle-btn::before\s*\{[^}]*position: absolute;[^}]*top: 50%;[^}]*left: 50%;[^}]*display: block;[^}]*height: 0\.875rem;[^}]*transform: translate\(-50%, -50%\);[^}]*currentColor 0 2px,[^}]*currentColor 6px 8px,[^}]*currentColor 12px 14px/);
   assert.match(css, /\.spotify-topbar > \.library-toggle-btn\s*\{[^}]*box-shadow: 0 2px 4px[^}]*inset 0 1px 0/);
   assert.match(css, /\.global-search-cluster \.global-search\s*\{[^}]*background-image: linear-gradient\(180deg/);
   assert.match(css, /\.global-language-control \.edition-language-trigger\s*\{[^}]*box-shadow: 0 2px 5px/);
