@@ -4,7 +4,7 @@ import { translate as t } from "./translations.js";
 import { listBookPhotos, uploadBookPhoto, downloadBookPhoto, removeBookPhotos } from "./lib/book-photos.js";
 import { normalizePlan, PLAN_LIMITS } from "./lib/entitlements.js";
 import { MEMBERSHIP_PRICING } from "./lib/membership-pricing.js?v=2";
-import { renderMarketplacePage } from "./lib/marketplace-ui.js";
+import { renderMarketplacePage, loadMarketplaceListings } from "./lib/marketplace-ui.js";
 import { escapeCsvCell } from "./lib/csv.js";
 import { booksWithCoversFirst } from "./lib/book-ordering.js";
 import { getBookRetailers, loadMarketplaceBookListings } from "./lib/book-purchases.js";
@@ -1920,6 +1920,7 @@ async function ensureHomeRecommendations(libraryBooks) {
   state.catalogLoading = false;
   rotateRecommendationPool();
   if (state.view === "home" && getLibraryDiscoveryKey(getLibraryBooks()) === libraryKey) renderBooks();
+  else if (state.view === "search" && !state.searchQuery) refreshDiscoverFeed();
   else if (state.view === "suggested-shelf") {
     const [path, query] = window.location.hash.slice(1).split("?");
     if (path === "/suggested-shelf") {
@@ -2165,6 +2166,7 @@ function buildSuggestedShelves(genres, recommendations, authorRecommendations = 
 const cardRowRegistry = new Map();
 
 function createRowCard(cardData, compact = false) {
+  if (cardData.type === "marketplace") return createDiscoverListingCard(cardData.listing);
   return cardData.type === "shelf" || cardData.type === "suggested-shelf"
     ? createShelfCard(cardData, { compact })
     : cardData.type === "genre"
@@ -2184,8 +2186,9 @@ function showCardListPage(key) {
     return;
   }
   const page = showPage("list");
-  updateActiveNavigation("Home");
-  page.append(createPageHeader("Home", list.title));
+  updateActiveNavigation(list.origin === "discover" ? "Discover" : "Home");
+  page.append(createPageHeader(list.origin === "discover" ? "Discover" : "Home", list.title,
+    "", list.origin === "discover" ? "search" : "home"));
   const grid = document.createElement("div");
   grid.className = "card-row expanded genre-browse-grid";
   list.cards.forEach((cardData) => grid.append(createRowCard(cardData, list.compact)));
@@ -2198,6 +2201,9 @@ function createCardRow(title, cards, {
   emptyActionLabel = "",
   emptyAction = null,
   loading = false,
+  origin = "home",
+  seeAllAction = null,
+  previewLimit = Infinity,
 } = {}) {
   if (cards.every((card) => card.type === "book" || card.type === "compact-book")) {
     cards = booksWithCoversFirst(cards, ({ book }) => book);
@@ -2242,12 +2248,16 @@ function createCardRow(title, cards, {
       row.append(action);
     }
   } else {
-    cards.forEach((cardData) => row.append(createRowCard(cardData, compact)));
+    cards.slice(0, previewLimit).forEach((cardData) => row.append(createRowCard(cardData, compact)));
   }
 
-  showAll.hidden = cards.length <= 5;
+  showAll.hidden = seeAllAction ? false : origin === "discover" ? !cards.length : cards.length <= 5;
   showAll.addEventListener("click", () => {
-    cardRowRegistry.set(listKey, { title, cards, compact });
+    if (seeAllAction) {
+      seeAllAction();
+      return;
+    }
+    cardRowRegistry.set(listKey, { title, cards, compact, origin });
     navigateTo("list", { key: listKey });
   });
   const wrap = document.createElement("div");
@@ -2271,7 +2281,14 @@ function createCardRow(title, cards, {
     next.hidden = !scrollable || row.scrollLeft + row.clientWidth >= row.scrollWidth - 4;
   };
   row.addEventListener("scroll", updateArrows, { passive: true });
-  window.addEventListener("resize", updateArrows);
+  const onResize = () => {
+    if (!section.isConnected) {
+      window.removeEventListener("resize", onResize);
+      return;
+    }
+    updateArrows();
+  };
+  window.addEventListener("resize", onResize);
   window.requestAnimationFrame(updateArrows);
   window.setTimeout(updateArrows, 600);
   wrap.append(row, prev, next);
@@ -2918,6 +2935,7 @@ function ensureGenreCatalogs() {
     genreCatalogRenderTimer = window.setTimeout(() => {
       addGenreBooksToRecommendationPool();
       if (state.view === "home") renderBooks();
+      else if (state.view === "search" && !state.searchQuery) refreshDiscoverFeed();
       else if (state.view === "suggested-shelf") {
         const [path, query] = window.location.hash.slice(1).split("?");
         if (path === "/suggested-shelf") showSuggestedShelfPage(new URLSearchParams(query).get("key") || "");
@@ -2968,7 +2986,7 @@ function loadGenreCovers(genre) {
         entry.books = result.books;
       })
       .catch((error) => {
-        genreCoverCache.delete(key);
+        entry.error = error;
         console.error(`Could not load ${genre} covers`, error);
       })
       .finally(() => {
@@ -3607,14 +3625,14 @@ function showGenrePage(genre, sort = "", page = 1, requestedSize = 0, filters = 
   load();
 }
 
-function createPageHeader(kicker, title, description = "") {
+function createPageHeader(kicker, title, description = "", backRoute = "home") {
   const header = document.createElement("header");
   header.className = "page-header";
   const back = document.createElement("button");
   back.type = "button";
   back.className = "text-btn page-back";
-  back.textContent = "‹ Home";
-  back.addEventListener("click", () => navigateTo("home"));
+  back.textContent = backRoute === "search" ? "‹ Discover" : "‹ Home";
+  back.addEventListener("click", () => navigateTo(backRoute));
   const heading = document.createElement("h1");
   heading.textContent = title;
   header.append(back);
@@ -7391,27 +7409,207 @@ function groupCatalogSearchBooks(books) {
   return grouped;
 }
 
+function buildDiscoverRows(libraryBooks, recommendations, listings = []) {
+  const books = booksWithCoversFirst([...new Map(recommendations.map(({ book }) =>
+    [getRecommendationKey(book), book])).values()]);
+  const genres = [...new Set([...libraryBooks.map((book) => book.genre).filter(Boolean), ...allGenres])];
+  const genreBooks = (genre) => books.filter((book) => bookMatchesGenre(book, genre));
+  const cards = (matches) => matches.map((book) => ({ type: "book", book }));
+  const seed = libraryBooks.find((book) => book.is_favorite) || libraryBooks[0];
+  const picked = recommendations.slice(0, homeRowBookCount)
+    .map(({ book, reason }) => ({ type: "book", book, subtitle: reason }));
+  const marketplace = (title, matches) => ({
+    title, cards: matches.map((listing) => ({ type: "marketplace", listing })),
+    hidden: !matches.length,
+    seeAllAction: () => navigateTo("marketplace"),
+  });
+  const rows = [
+    { title: "Picked for your library", cards: picked },
+    { title: "For a little escape", cards: cards(books.filter((book) =>
+      ["Fantasy", "Fiction", "Travel", "Science Fiction"].some((genre) => bookMatchesGenre(book, genre)))) },
+    { title: "Quiet, reflective reads", cards: cards(books.filter((book) =>
+      ["Essays", "Poetry", "Philosophy", "Memoir"].some((genre) => bookMatchesGenre(book, genre)))) },
+    { title: "Fantasy favorites", cards: cards(genreBooks("Fantasy")),
+      seeAllAction: () => navigateTo("genre", { name: "Fantasy" }) },
+    marketplace("Recently listed in the marketplace", listings.slice(0, 12)),
+    ...(seed ? [{ title: `${seed.is_favorite ? "Because you loved" : "More like"} ${seed.title}`, cards: cards(books.filter((book) =>
+      (seed.author && book.author?.toLowerCase() === seed.author.toLowerCase())
+      || (seed.genre && bookMatchesGenre(book, seed.genre)))) }] : []),
+    { title: "Off your beaten path", cards: cards(books.filter((book) =>
+      !libraryBooks.some((owned) => owned.genre && bookMatchesGenre(book, owned.genre)))) },
+    { title: "Mystery & thrillers", cards: cards(books.filter((book) =>
+      bookMatchesGenre(book, "Mystery") || bookMatchesGenre(book, "Thriller"))) },
+    { title: "Books under 200 pages", cards: cards(books.filter((book) => {
+      const pages = Number(book.page_count || book.pages);
+      return pages > 0 && pages < 200;
+    })) },
+    marketplace("More from the Librito marketplace", listings.slice(12, 24)),
+    ...genres.map((genre) => ({
+      title: `${genre} bookshelf`,
+      cards: cards(genreBooks(genre)),
+      genre,
+      seeAllAction: () => navigateTo("genre", { name: genre }),
+    })),
+    { title: "Explore all genres", cards: genres.map((genre, index) => ({
+      type: "genre", title: genre,
+      count: libraryBooks.filter((book) => bookMatchesGenre(book, genre)).length,
+      books: getGenreBooks(genre, libraryBooks, recommendations),
+      color: ["#8050a8", "#bf613f", "#3f7772", "#536c9e"][index % 4],
+    })) },
+  ];
+  return rows;
+}
+
+function refreshDiscoverFeed() {
+  const feed = document.getElementById("pageView").discoverFeed;
+  if (state.view !== "search" || state.searchQuery || !feed?.isConnected) return;
+  const libraryBooks = getLibraryBooks();
+  const recommendations = booksWithCoversFirst(getBookRecommendations(libraryBooks), ({ book }) => book);
+  const loading = state.loading || state.catalogLoading || genreCatalogPending > 0;
+  for (const descriptor of buildDiscoverRows(libraryBooks, recommendations, feed.listings)) {
+    const { title, cards, genre, seeAllAction } = descriptor;
+    const hidden = Boolean(descriptor.hidden);
+    const genreError = genre && genreCoverCache.get(genre.toLowerCase())?.error;
+    const signature = JSON.stringify({ cards, loading, hidden, error: state.catalogError, genreError: Boolean(genreError) });
+    const previous = feed.sections.get(title);
+    if (previous?.signature === signature) continue;
+    const section = createCardRow(title, cards, {
+      origin: "discover",
+      previewLimit: homeRowBookCount,
+      loading: !hidden && loading,
+      emptyMessage: genreError ? `Could not load ${genre} books. Check your connection and try again.`
+        : loading ? "Finding your next read..."
+        : state.catalogError || "No books in this collection yet. Explore a genre or try again.",
+      emptyActionLabel: genre && !genreError ? `Browse ${genre}` : "Retry recommendations",
+      emptyAction: genre && !genreError ? () => navigateTo("genre", { name: genre }) : () => {
+        state.catalogLibraryKey = "";
+        genreCoverCache.forEach((entry, key) => {
+          if (entry.error) genreCoverCache.delete(key);
+        });
+        ensureHomeRecommendations(getLibraryBooks());
+        ensureGenreCatalogs();
+        refreshDiscoverFeed();
+      },
+      seeAllAction,
+    });
+    section.hidden = hidden;
+    section.dataset.discoverRow = title;
+    if (previous) {
+      const scrollLeft = previous.section.querySelector(".card-row").scrollLeft;
+      const focused = previous.section.contains(document.activeElement) ? document.activeElement : null;
+      previous.section.replaceWith(section);
+      section.querySelector(".card-row").scrollLeft = scrollLeft;
+      if (focused?.classList.contains("show-all-btn")) section.querySelector(".show-all-btn").focus();
+    } else {
+      feed.append(section);
+    }
+    feed.sections.set(title, { section, signature });
+  }
+}
+
+function createDiscoverListingCard(listing) {
+  const card = document.createElement("article");
+  card.className = "media-card book-card discover-listing-card";
+  const open = document.createElement("button");
+  open.type = "button";
+  open.className = "card-open-button";
+  open.setAttribute("aria-label", `View marketplace listing: ${listing.title}`);
+  open.append(createBookCover({
+    ...listing, cover_i: null, cover_url: listing.photoUrls?.[0] || "",
+  }));
+  const title = document.createElement("strong");
+  title.className = "book-cover-title";
+  title.textContent = listing.title;
+  const author = document.createElement("span");
+  author.className = "book-cover-author";
+  author.textContent = listing.author || "Unknown author";
+  const price = document.createElement("strong");
+  price.className = "discover-listing-price";
+  const currency = (cents) => new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(cents / 100);
+  price.textContent = currency(listing.price_cents);
+  const details = document.createElement("span");
+  details.className = "book-cover-author";
+  details.textContent = `${listing.condition.replaceAll("_", " ")} · Shipping ${currency(listing.shipping_cents)}`;
+  open.append(title, author, price, details);
+  open.addEventListener("click", () => navigateTo("marketplace-listing", { id: listing.id }));
+  card.append(open);
+  return card;
+}
+
+async function loadDiscoverMarketplaceRows(feed, status) {
+  const client = state.supabase;
+  const userId = state.session?.user.id;
+  if (!client || !userId) return;
+  const isActive = () => feed.isConnected && state.view === "search" && !state.searchQuery
+    && state.supabase === client && state.session?.user.id === userId;
+  status.replaceChildren();
+  try {
+    const { data, error } = await client.rpc("is_admin");
+    if (error) throw error;
+    if (!isActive() || data !== true) return;
+    const { listings } = await loadMarketplaceListings(client);
+    if (!isActive()) return;
+    feed.listings = listings;
+    refreshDiscoverFeed();
+  } catch (error) {
+    console.error("Could not load Discover marketplace listings", error);
+    if (!isActive()) return;
+    status.textContent = "Marketplace listings could not be loaded. ";
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "text-btn";
+    retry.textContent = "Retry listings";
+    retry.addEventListener("click", () => loadDiscoverMarketplaceRows(feed, status));
+    status.append(retry);
+  }
+}
+
+function createDiscoverPage(page) {
+  page.append(createPageHeader("Discover", "Find your next favorite book",
+    "Fresh inspiration, familiar favorites, and books beyond your usual shelves."));
+  const hero = document.createElement("section");
+  hero.className = "discover-hero";
+  const kicker = document.createElement("p");
+  kicker.className = "eyebrow";
+  kicker.textContent = "Featured collection";
+  const title = document.createElement("h2");
+  title.textContent = "Stories worth getting lost in.";
+  const description = document.createElement("p");
+  description.textContent = "Explore unforgettable worlds, extraordinary characters, and stories that stay with you.";
+  const action = document.createElement("button");
+  action.type = "button";
+  action.className = "secondary-btn";
+  action.textContent = "Explore collection";
+  action.addEventListener("click", () => navigateTo("genre", { name: "Fantasy" }));
+  hero.append(kicker, title, description, action);
+  const status = document.createElement("div");
+  status.className = "discover-marketplace-status";
+  status.setAttribute("role", "status");
+  const feed = document.createElement("div");
+  feed.className = "home-rows discover-feed";
+  feed.sections = new Map();
+  feed.listings = [];
+  page.discoverFeed = feed;
+  page.append(hero, status, feed);
+  if (!state.loading) ensureHomeRecommendations(getLibraryBooks());
+  ensureGenreCatalogs();
+  refreshDiscoverFeed();
+  loadDiscoverMarketplaceRows(feed, status);
+}
+
 function showSearchPage(query = "") {
   state.view = "search";
   state.searchQuery = query;
   updateActiveNavigation("Discover");
   const page = showPage("search");
   page.classList.toggle("search-page", Boolean(query));
+  page.classList.toggle("discover-page", !query);
   if (query) page.append(createSearchHeader(query));
-  else page.append(createPageHeader("Discover", "Browse by genre"));
   if (!query) {
     state.searchResults = null;
     state.searchMessage = "";
     state.searchLoading = false;
-    const libraryBooks = getLibraryBooks();
-    const genres = [...new Set([...libraryBooks.map((book) => book.genre).filter(Boolean), ...allGenres])];
-    const tiles = genres.map((genre, index) => ({
-      title: genre,
-      count: libraryBooks.filter((book) => bookMatchesGenre(book, genre)).length,
-      books: getGenreBooks(genre, libraryBooks, getBookRecommendations(libraryBooks)),
-      color: ["#8050a8", "#bf613f", "#3f7772", "#536c9e"][index % 4],
-    }));
-    page.append(createCardRow("Explore genres", tiles.map((genre) => ({ type: "genre", ...genre }))));
+    createDiscoverPage(page);
     return;
   }
 

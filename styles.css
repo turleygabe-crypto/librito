@@ -2914,6 +2914,54 @@ body {
   gap: 0.9rem;
 }
 
+.discover-hero {
+  padding: clamp(1.25rem, 3vw, 2rem);
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--botanical-green);
+  border-radius: 0.45rem;
+  background: linear-gradient(115deg, #344934, #4c5d40);
+  color: #fff8ef;
+}
+
+.discover-hero .eyebrow {
+  margin: 0 0 0.65rem;
+  color: #e4d3ad;
+}
+
+.discover-hero h2 {
+  margin: 0;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+  font-style: italic;
+  line-height: 1.15;
+}
+
+.discover-hero > p:not(.eyebrow) {
+  max-width: 38rem;
+  margin: 0.65rem 0 1rem;
+  line-height: 1.5;
+}
+
+.discover-hero .secondary-btn {
+  border-color: #e4d3ad;
+  color: #fff8ef;
+  background: rgba(255, 248, 239, 0.08);
+}
+
+.discover-marketplace-status:empty {
+  display: none;
+}
+
+.discover-marketplace-status {
+  margin-bottom: 1rem;
+}
+
+.discover-listing-price {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--botanical-green);
+}
+
 .home-hero {
   position: relative;
   display: flex;
