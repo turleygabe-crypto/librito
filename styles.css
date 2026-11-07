@@ -8237,6 +8237,18 @@ body .book-actions-list .book-status-menu[open] > summary {
   white-space: nowrap;
 }
 
+@media (min-width: 900px) {
+  .topbar-brand,
+  .global-search-cluster > .global-isbn-scan {
+    display: none;
+  }
+
+  .global-language-control .edition-language-trigger::before {
+    margin-right: 0.35rem;
+    content: "Search:";
+  }
+}
+
 @media (max-width: 700px) {
   .app-shell {
     padding: 0;

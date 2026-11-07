@@ -38,6 +38,7 @@ class Element {
 test("global ISBN scan has a separate quick lookup flow that opens the scanned book profile", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+  const desktopSearchRules = css.slice(css.lastIndexOf("@media (min-width: 900px)"), css.lastIndexOf("@media (max-width: 700px)"));
   const searchCluster = html.slice(html.indexOf('<div class="global-search-cluster">'), html.indexOf("</div>", html.indexOf('<div class="global-search-cluster">')));
   const searchForm = html.slice(html.indexOf('<form id="globalSearchForm"'), html.indexOf("</form>", html.indexOf('<form id="globalSearchForm"')));
   assert.match(searchCluster, /id="globalIsbnScanBtn"[^>]*aria-label="Scan ISBN barcode"[^>]*title="Scan ISBN barcode"/);
@@ -67,6 +68,8 @@ test("global ISBN scan has a separate quick lookup flow that opens the scanned b
   assert.match(css, /\.spotify-topbar > \.library-toggle-btn\s*\{[^}]*box-shadow: 0 2px 4px[^}]*inset 0 1px 0/);
   assert.match(css, /\.global-search-cluster \.global-search\s*\{[^}]*background-image: linear-gradient\(180deg/);
   assert.match(css, /\.global-language-control \.edition-language-trigger\s*\{[^}]*box-shadow: 0 2px 5px/);
+  assert.match(desktopSearchRules, /\.topbar-brand,\s*\.global-search-cluster > \.global-isbn-scan\s*\{\s*display: none;/);
+  assert.match(desktopSearchRules, /\.global-language-control \.edition-language-trigger::before\s*\{\s*margin-right: 0\.35rem;\s*content: "Search:";/);
 });
 
 test("quick ISBN lookup opens matching library books and metadata-only book profiles", async () => {
