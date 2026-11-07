@@ -6,6 +6,7 @@ import { normalizePlan, PLAN_LIMITS } from "./lib/entitlements.js";
 import { MEMBERSHIP_PRICING } from "./lib/membership-pricing.js?v=2";
 import { renderMarketplacePage } from "./lib/marketplace-ui.js";
 import { escapeCsvCell } from "./lib/csv.js";
+import { booksWithCoversFirst } from "./lib/book-ordering.js";
 import { getBookRetailers, loadMarketplaceBookListings } from "./lib/book-purchases.js";
 import {
   browserLanguageCodes, detectSearchLanguage, loadLanguageDetector, rankSearchLanguages,
@@ -1644,12 +1645,9 @@ function renderBooks() {
   const libraryBooks = getLibraryBooks();
   if (!state.loading) ensureHomeRecommendations(libraryBooks);
   ensureGenreCatalogs();
-  const orderedBooks = libraryBooks.slice().sort((a, b) =>
-    new Date(b.added || b.added_on || 0) - new Date(a.added || a.added_on || 0));
-  // Books without cover art sort last so they only surface when a row is expanded.
-  const hasCoverArt = ({ book }) => Boolean(book.cover_i || book.cover_url);
-  const recommendations = getBookRecommendations(libraryBooks)
-    .sort((a, b) => Number(hasCoverArt(b)) - Number(hasCoverArt(a)));
+  const orderedBooks = booksWithCoversFirst(libraryBooks.slice().sort((a, b) =>
+    new Date(b.added || b.added_on || 0) - new Date(a.added || a.added_on || 0)));
+  const recommendations = booksWithCoversFirst(getBookRecommendations(libraryBooks), ({ book }) => book);
   const pickedRecommendations = recommendations.slice(0, homeRowBookCount);
   const pickedKeys = new Set(pickedRecommendations.map(({ book }) => getBookKey(book)));
   const shelfRecommendations = recommendations.filter(({ book }) => !pickedKeys.has(getBookKey(book)));
@@ -1961,7 +1959,7 @@ function createCurrentlyReadingHomeSection(books, libraryBooks) {
         row.scrollBy({ left: event.key === "ArrowRight" ? 240 : -240, behavior: "smooth" });
       }
     });
-    books.forEach((book) => row.append(createFeaturedReadingCard(book)));
+    booksWithCoversFirst(books).forEach((book) => row.append(createFeaturedReadingCard(book)));
     section.append(heading, row);
     return section;
   }
@@ -1985,7 +1983,7 @@ function createCurrentlyReadingHomeSection(books, libraryBooks) {
         row.scrollBy({ left: event.key === "ArrowRight" ? 240 : -240, behavior: "smooth" });
       }
     });
-    booksToStart.slice(0, 6).forEach((book) => row.append(createReadingBookCard(book)));
+    booksWithCoversFirst(booksToStart).slice(0, 6).forEach((book) => row.append(createReadingBookCard(book)));
     section.append(row);
   } else if (!state.loadError && !libraryBooks.length) {
     const addBook = document.createElement("button");
@@ -2128,7 +2126,7 @@ function buildSuggestedShelves(genres, recommendations, authorRecommendations = 
       if (seen.has(key) || libraryBooks.some((owned) => isSameBookWork(owned, book))) return false;
       seen.add(key);
       return true;
-    }).sort((a, b) => Number(Boolean(b.cover_i || b.cover_url)) - Number(Boolean(a.cover_i || a.cover_url)));
+    });
     if (books.length) {
       const owned = ownedGenres.has(genre.toLowerCase());
       suggestions.push({
@@ -2152,12 +2150,16 @@ function buildSuggestedShelves(genres, recommendations, authorRecommendations = 
       books: recommendations.map(({ book }) => book),
     });
   }
-  return suggestions.map((shelf) => ({
-    type: "suggested-shelf",
-    ...shelf,
-    count: shelf.books.length,
-    book: shelf.books[0],
-  }));
+  return suggestions.map((shelf) => {
+    const books = booksWithCoversFirst(shelf.books);
+    return {
+      type: "suggested-shelf",
+      ...shelf,
+      books,
+      count: books.length,
+      book: books[0],
+    };
+  });
 }
 
 const cardRowRegistry = new Map();
@@ -2197,6 +2199,9 @@ function createCardRow(title, cards, {
   emptyAction = null,
   loading = false,
 } = {}) {
+  if (cards.every((card) => card.type === "book" || card.type === "compact-book")) {
+    cards = booksWithCoversFirst(cards, ({ book }) => book);
+  }
   const section = document.createElement("section");
   section.className = "home-section card-row-section";
   const heading = document.createElement("div");
@@ -2681,7 +2686,7 @@ function showSuggestedShelfPage(key) {
   const libraryBooks = getLibraryBooks();
   ensureGenreCatalogs();
   if (!state.loading) ensureHomeRecommendations(libraryBooks);
-  const recommendations = getBookRecommendations(libraryBooks);
+  const recommendations = booksWithCoversFirst(getBookRecommendations(libraryBooks), ({ book }) => book);
   const genres = [...new Set(libraryBooks.map((book) => book.genre).filter(Boolean))];
   const pickedKeys = new Set(recommendations.slice(0, homeRowBookCount).map(({ book }) => getBookKey(book)));
   const shelfRecommendations = recommendations.filter(({ book }) => !pickedKeys.has(getBookKey(book)));
@@ -2697,7 +2702,7 @@ function showSuggestedShelfPage(key) {
     return;
   }
   page.append(createPageHeader("Suggestions · For your library", shelf.name, shelf.subtitle));
-  shelf.books = withSpotlight(shelf.books, takeSpotlight(`suggested-shelf:${shelf.key}`));
+  shelf.books = booksWithCoversFirst(withSpotlight(shelf.books, takeSpotlight(`suggested-shelf:${shelf.key}`)));
   const results = document.createElement("section");
   results.className = "search-result-group";
   page.append(results);
@@ -3197,7 +3202,7 @@ function applyBrowseControls(books, sort, filters) {
     added: (a, b) => String(b.added || b.added_on || "").localeCompare(String(a.added || a.added_on || "")),
     value: (a, b) => Number(b.cost || 0) - Number(a.cost || 0),
   }[sort];
-  return compare ? [...visible].sort(compare) : visible;
+  return booksWithCoversFirst(compare ? [...visible].sort(compare) : visible);
 }
 
 const browseUi = { scope: "", open: "" };
@@ -3558,7 +3563,7 @@ function showGenrePage(genre, sort = "", page = 1, requestedSize = 0, filters = 
     const library = getLibraryBooks();
     const grid = document.createElement("div");
     grid.className = "card-row expanded genre-browse-grid";
-    withSpotlight(result.books, spotlight).slice(0, Math.max(size, result.books.length)).forEach((book) => grid.append(createBookCard(book, {
+    booksWithCoversFirst(withSpotlight(result.books, spotlight)).slice(0, Math.max(size, result.books.length)).forEach((book) => grid.append(createBookCard(book, {
       recommendation: !library.some((owned) => isSameBookWork(owned, book)),
     })));
     const barOptions = {
@@ -3864,7 +3869,7 @@ function createCompletedBooksList(books) {
     return list;
   }
 
-  books.forEach((book) => {
+  booksWithCoversFirst(books).forEach((book) => {
     const row = document.createElement("article");
     row.className = "currently-reading-row completed-book-row";
     const coverButton = document.createElement("button");
@@ -3983,7 +3988,7 @@ function createCurrentlyReadingList(books) {
     return list;
   }
 
-  books.forEach((book) => {
+  booksWithCoversFirst(books).forEach((book) => {
     const row = document.createElement("article");
     row.className = "currently-reading-row";
     const coverButton = document.createElement("button");
@@ -4239,7 +4244,7 @@ function createBookTable(books) {
   });
   thead.append(headerRow);
   const tbody = document.createElement("tbody");
-  const sortedBooks = books.slice().sort((first, second) => {
+  const sortedBooks = booksWithCoversFirst(books.slice().sort((first, second) => {
     const { key, direction } = state.shelfSort;
     const a = key === "added" ? new Date(first.added || first.added_on || 0).getTime()
       : key === "cost" ? Number(first.cost || 0)
@@ -4248,7 +4253,7 @@ function createBookTable(books) {
       : key === "cost" ? Number(second.cost || 0)
         : String(second[key] || "").toLocaleLowerCase();
     return (a < b ? -1 : a > b ? 1 : 0) * (direction === "asc" ? 1 : -1);
-  });
+  }));
   sortedBooks.forEach((book, index) => {
     const row = document.createElement("tr");
     const number = document.createElement("td");
@@ -5961,7 +5966,7 @@ function renderBookProfileEditions(book, section, volumes, { groupByLanguage: gr
       heading.textContent = groupLabel;
       choices.append(heading);
     }
-    group.forEach(({ volume, details }) => {
+    booksWithCoversFirst(group, ({ details }) => details).forEach(({ volume, details }) => {
       const choice = document.createElement("button");
       choice.type = "button";
       choice.className = "edition-cover-choice";
@@ -7057,9 +7062,9 @@ async function loadBookProfileRecommendations(book, moreByAuthor, readersEnjoyed
   ]);
   if (state.view !== "book" || state.currentBook !== book) return;
 
-  const uniqueBooks = (books) => [...new Map(books
+  const uniqueBooks = (books) => booksWithCoversFirst([...new Map(books
     .filter((item) => item.title !== "Untitled" && item.author && !isSameBookWork(item, book))
-    .map((item) => [getRecommendationKey(item), item])).values()].slice(0, 8);
+    .map((item) => [getRecommendationKey(item), item])).values()]).slice(0, 8);
   const googleBooks = googleRequests.map((result) => result.status === "fulfilled"
     ? result.value.map(mapGoogleVolumeToBook)
     : []);
@@ -9288,7 +9293,7 @@ async function getBestEditionsByLanguage(workKey) {
 
 function renderTitleSearchResults() {
   titleLookupResults.replaceChildren();
-  titleSearchResults.forEach((result, index) => {
+  booksWithCoversFirst(titleSearchResults).forEach((result) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "lookup-result";
@@ -9312,7 +9317,7 @@ function renderTitleSearchResults() {
     copy.append(title, authorLine, description);
     button.append(copy);
     button.addEventListener("click", () => {
-      selectedTitleResult = titleSearchResults[index];
+      selectedTitleResult = result;
       renderTitleSearchResults();
       renderSelectedBookConfirmation();
       scanStatus.textContent = `Selected ${result.title || "Untitled"}. Confirm to use this book.`;

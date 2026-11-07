@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 import { test } from "node:test";
+import { booksWithCoversFirst } from "../lib/book-ordering.js";
 
 const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
 
@@ -294,6 +295,7 @@ test("an empty account stays pending during the session and library requests", a
 
 test("card rows show a book loader only while an empty row is pending", () => {
   const context = {
+    booksWithCoversFirst,
     document: { createElement: () => new Element() },
     window: { addEventListener() {}, requestAnimationFrame() {}, setTimeout() {} },
     createBookLoader: (options) => ({ loader: true, ...options }),
@@ -344,6 +346,7 @@ test("Currently reading shows the book loader while pending, then an honest empt
 function createReadingSection(books, libraryBooks = books) {
   const calls = [];
   const context = {
+    booksWithCoversFirst,
     document: { createElement: () => new Element() },
     state: { loading: false, loadError: "" },
     getReadingStatusLabel: () => "Currently Reading",
@@ -356,6 +359,18 @@ function createReadingSection(books, libraryBooks = books) {
   const createSection = runInNewContext(`${functions}\ncreateCurrentlyReadingHomeSection`, context);
   return { section: createSection(books, libraryBooks), calls };
 }
+
+test("home reading rows show covers first, including before the start-reading preview limit", () => {
+  const books = Array.from({ length: 8 }, (_, index) => ({
+    title: `Book ${index}`, cover_i: index >= 6 ? index : null,
+  }));
+  const { section } = createReadingSection(books);
+  assert.deepEqual(section.children[1].children.map((card) => card.children[0].children[0].book.title),
+    ["Book 6", "Book 7", "Book 0", "Book 1", "Book 2", "Book 3", "Book 4", "Book 5"]);
+  const { section: emptyReading } = createReadingSection([], books);
+  assert.deepEqual(emptyReading.children[2].children.map((card) => card.children[0].children[0].book.title),
+    ["Book 6", "Book 7", "Book 0", "Book 1", "Book 2", "Book 3"]);
+});
 
 test("every currently reading book has a cover-first card with progress and its own bookmark action", () => {
   const books = Array.from({ length: 8 }, (_, index) => ({
@@ -432,6 +447,7 @@ test("reading cards stack full-width covers above details in a slim, scrollable 
 test("home rows wait for the library before reporting an empty author row", () => {
   const rows = [];
   const context = {
+    booksWithCoversFirst,
     document: {
       getElementById: () => new Element(),
       createElement: () => new Element(),
@@ -468,6 +484,16 @@ test("home rows wait for the library before reporting an empty author row", () =
   assert.equal(authors.options.loading, false);
   assert.match(authors.options.emptyMessage, /Add books to your library/);
   assert.equal(rows.find((row) => row.title === "Recently added").options.loading, false);
+  const books = Array.from({ length: 4 }, (_, index) => ({
+    title: `Recent ${index}`, added: `202${4 - index}`, cover_i: index >= 2 ? index : null,
+  }));
+  context.getLibraryBooks = () => books;
+  context.getBookKey = (book) => book.title;
+  context.homeRowBookCount = 2;
+  rows.length = 0;
+  context.renderBooks();
+  assert.deepEqual(rows.find((row) => row.title === "Recently added").cards.map(({ book }) => book.title),
+    ["Recent 2", "Recent 3"]);
 });
 
 test("book loader renders immediately and rotates covers after bounce iterations", async () => {

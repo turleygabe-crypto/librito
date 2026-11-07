@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 import { test } from "node:test";
+import { booksWithCoversFirst } from "../lib/book-ordering.js";
 
 const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
 const editionSource = source.slice(source.indexOf("async function getOpenLibraryWorkEditions("), source.indexOf("\nfunction showSearchPage("));
@@ -322,6 +323,7 @@ test("Edition Finder renders more than eight editions per language, including co
   const { context } = createContext();
   const covers = [];
   Object.assign(context, {
+    booksWithCoversFirst,
     document: { createElement: () => new Element() },
     formatCatalogDate: (date) => date,
     getBookEditionProgressKey: (details) => details.isbn,
@@ -351,6 +353,15 @@ test("Edition Finder renders more than eight editions per language, including co
     assert.match(status.textContent, /12/);
   }
   assert.ok(covers.every((book) => !book.cover_url), "Coverless editions must not borrow the selected edition's cover");
+  volumes[4].volumeInfo.imageLinks = { thumbnail: "https://example.test/four.jpg" };
+  volumes[10].volumeInfo.imageLinks = { thumbnail: "https://example.test/ten.jpg" };
+  for (const grouped of [false, true]) {
+    covers.length = 0;
+    context.renderBookProfileEditions({ title: "Selected book" }, section, volumes, { groupByLanguage: grouped });
+    assert.deepEqual(covers.map((book) => book.title),
+      ["Edition 4", "Edition 10", ...volumes.filter((_, index) => index !== 4 && index !== 10).map((volume) => volume.volumeInfo.title)]);
+    assert.equal(choices.children.filter((child) => child.className === "edition-cover-choice").length, 12);
+  }
 });
 
 test("late print-format enrichment cannot overwrite a newer language selection", async () => {
