@@ -8245,7 +8245,7 @@ body .book-actions-list .book-status-menu[open] > summary {
 
   .global-language-control .edition-language-trigger::before {
     margin-right: 0.35rem;
-    content: "Search:";
+    content: "Search language:";
   }
 }
 

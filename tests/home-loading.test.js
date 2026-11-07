@@ -69,7 +69,7 @@ test("global ISBN scan has a separate quick lookup flow that opens the scanned b
   assert.match(css, /\.global-search-cluster \.global-search\s*\{[^}]*background-image: linear-gradient\(180deg/);
   assert.match(css, /\.global-language-control \.edition-language-trigger\s*\{[^}]*box-shadow: 0 2px 5px/);
   assert.match(desktopSearchRules, /\.topbar-brand,\s*\.global-search-cluster > \.global-isbn-scan\s*\{\s*display: none;/);
-  assert.match(desktopSearchRules, /\.global-language-control \.edition-language-trigger::before\s*\{\s*margin-right: 0\.35rem;\s*content: "Search:";/);
+  assert.match(desktopSearchRules, /\.global-language-control \.edition-language-trigger::before\s*\{\s*margin-right: 0\.35rem;\s*content: "Search language:";/);
 });
 
 test("quick ISBN lookup opens matching library books and metadata-only book profiles", async () => {
