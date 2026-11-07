@@ -188,11 +188,11 @@ test("home rows share a background and use alternating ornamental dividers", asy
   }
 });
 
-test("home category headings use self-hosted Cormorant Garamond with a two-point increase", async () => {
+test("home category headings use larger self-hosted Cormorant Garamond", async () => {
   assert.match(css, /@font-face\s*\{[^}]*font-family: "Cormorant Garamond";[^}]*CormorantGaramond-Semibold\.ttf[^}]*font-weight: 600;[^}]*font-display: swap/);
   const rows = css.slice(css.lastIndexOf("\n.home-rows > .card-row-section {"));
-  assert.match(rows, /\.section-heading-row h2\s*\{[^}]*font-family: "Cormorant Garamond", Georgia, serif;[^}]*font-size: calc\(1\.2rem \+ 2pt\);[^}]*font-weight: 600;[^}]*line-height: 1\.2/);
-  assert.match(rows, /@media \(max-width: 480px\)[^}]*font-size: calc\(1rem \+ 2pt\)/);
+  assert.match(rows, /\.section-heading-row h2\s*\{[^}]*font-family: "Cormorant Garamond", Georgia, serif;[^}]*font-size: clamp\(2rem, 3vw, 2\.4rem\);[^}]*font-weight: 600;[^}]*line-height: 1\.2/);
+  assert.match(rows, /@media \(max-width: 480px\)[^}]*font-size: calc\(1\.5rem \+ 3pt\)/);
   const worker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
   assert.match(worker, /"\/assets\/CormorantGaramond-Semibold\.ttf"/);
   const font = await readFile(new URL("../assets/CormorantGaramond-Semibold.ttf", import.meta.url));

@@ -8028,7 +8028,7 @@ body .book-actions-list .book-status-menu[open] > summary {
 
 .home-rows > .card-row-section .section-heading-row h2 {
   font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: calc(1.2rem + 2pt);
+  font-size: clamp(2rem, 3vw, 2.4rem);
   font-weight: 600;
   line-height: 1.2;
 }
@@ -8073,7 +8073,7 @@ body .book-actions-list .book-status-menu[open] > summary {
 
 @media (max-width: 480px) {
   .home-rows > .card-row-section .section-heading-row h2 {
-    font-size: calc(1rem + 2pt);
+    font-size: calc(1.5rem + 3pt);
   }
 }
 
